@@ -1,4 +1,5 @@
 # Using
+Detailed documentation located in `docs/` elsewhere in this repo.
 
 ## Installation
 
