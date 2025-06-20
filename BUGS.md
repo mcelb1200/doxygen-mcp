@@ -1,6 +1,5 @@
 # Support
 - **Issues**: Report bugs and feature requests via GitHub Issues
-- **Documentation**: Full Doxygen manual included in `docs/`
 - **Examples**: Sample projects in `examples/` directory
 
 ## Troubleshooting
@@ -53,10 +52,3 @@ import asyncio
 asyncio.run(main())
 "
 ```
-
-### Performance Optimization
-For large projects:
-- Use `EXTRACT_ALL = NO` to reduce processing time
-- Enable `OPTIMIZE_OUTPUT_FOR_C` for C projects
-- Set `MAX_DOT_GRAPH_DEPTH` to limit diagram complexity
-- Use `EXCLUDE_PATTERNS` to skip unnecessary files

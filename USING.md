@@ -285,6 +285,13 @@ black server.py
 mypy server.py
 ```
 
+### Performance Optimization
+For large projects:
+- Use `EXTRACT_ALL = NO` to reduce processing time
+- Enable `OPTIMIZE_OUTPUT_FOR_C` for C projects
+- Set `MAX_DOT_GRAPH_DEPTH` to limit diagram complexity
+- Use `EXCLUDE_PATTERNS` to skip unnecessary files
+
 ### Adding New Features
 1. **Extend DoxygenConfig**: Add new configuration options
 2. **Implement Tool Handler**: Add the tool method to DoxygenServer
