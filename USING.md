@@ -47,37 +47,30 @@ Detailed documentation located in `docs/` elsewhere in this repo.
    cd doxygen-mcp
    ```
 
-2. **Install Python dependencies**
-   We recommend using [uv](https://docs.astral.sh/uv/) to manage your Python projects.
+2. **Install with uv (Recommended)**
+   We use [uv](https://docs.astral.sh/uv/) for fast, modern Python dependency management.
    ```bash
-   # Create a virtual environment
-   uv venv
+   # Install dependencies and create virtual environment
+   uv sync
 
-   # Activate the virtual environment
-   source .venv/bin/activate
-
-   # Install dependencies
-   uv pip install -e .[dev]
+   # For development dependencies
+   uv sync --extra dev
    ```
 
 3. **Verify installation**
    ```bash
-   doxygen-mcp-server --help
+   uv run doxygen-mcp --version
    ```
 
 ## Starting the Server
+The server uses the MCP stdio transport and communicates via stdin/stdout.
+
 ```bash
 # Start the MCP server
-doxygen-mcp-server
+uv run doxygen-mcp
 ```
 
-## Running with uvenv
-This project is configured to be run with `uvenv` for MCP clients. To run the server with `uvenv`, you will need to have `uvenv` installed. You can then run the server using the following command:
-```bash
-uvenv doxygen-mcp-server
-```
-
-The server communicates via stdin/stdout using the MCP protocol.
+The server will run continuously, waiting for MCP protocol messages on stdin.
 
 ## Available Tools
 The server provides the following tools for documentation management:
@@ -229,12 +222,31 @@ The server provides three configuration templates:
 ### Claude Desktop Integration
 Add to your MCP client configuration:
 
+**Using uv (Recommended):**
 ```json
 {
   "mcpServers": {
     "doxygen-mcp": {
-      "command": "python",
-      "args": ["/path/to/doxygen-mcp/server.py"],
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/doxygen-mcp",
+        "run",
+        "doxygen-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+**Using installed package:**
+```json
+{
+  "mcpServers": {
+    "doxygen-mcp": {
+      "command": "doxygen-mcp",
+      "args": [],
       "env": {}
     }
   }
@@ -247,7 +259,10 @@ import mcp
 
 # Connect to the Doxygen MCP server
 client = mcp.Client()
-await client.connect_stdio("python", ["/path/to/doxygen-mcp/server.py"])
+await client.connect_stdio("uv", [
+    "--directory", "/path/to/doxygen-mcp",
+    "run", "doxygen-mcp"
+])
 
 # List available tools
 tools = await client.list_tools()
@@ -259,3 +274,184 @@ result = await client.call_tool("create_doxygen_project", {
     "language": "cpp"
 })
 ```
+
+## Development
+
+### Running Tests
+
+```bash
+# Install development dependencies
+uv sync --extra dev
+
+# Run all tests
+uv run pytest
+
+# Run tests with coverage
+uv run pytest --cov=src/doxygen_mcp --cov-report=html
+
+# Run specific test file
+uv run pytest tests/test_server.py -v
+```
+
+### Code Quality
+
+```bash
+# Format code with black
+uv run black src/doxygen_mcp/
+
+# Type checking with mypy
+uv run mypy src/doxygen_mcp/
+
+# Run linting
+uv run pylint src/doxygen_mcp/
+```
+
+### Running Server Manually
+
+```bash
+# Start server for MCP Inspector or debugging
+uv run doxygen-mcp
+
+# Or as module
+uv run python -m doxygen_mcp
+```
+
+### Performance Optimization
+
+For large projects, consider these Doxygen configuration optimizations:
+
+- **`EXTRACT_ALL = NO`**: Reduce processing time by only documenting annotated code
+- **`OPTIMIZE_OUTPUT_FOR_C = YES`**: Optimize for C projects (C-specific output)
+- **`MAX_DOT_GRAPH_DEPTH`**: Limit diagram complexity to improve generation speed
+- **`EXCLUDE_PATTERNS`**: Skip unnecessary files (build/, vendor/, node_modules/)
+- **`USE_MDFILE_AS_MAINPAGE`**: Use README.md as the main documentation page
+
+### Adding New Features
+
+When extending the server with new tools:
+
+1. **Extend Configuration**: Add new options to `DoxygenConfig` class if needed
+2. **Implement Tool**: Add `@mcp.tool()` decorated function in `server.py`
+3. **Add Validation**: Use Pydantic models for parameter validation
+4. **Write Tests**: Create comprehensive test cases in `tests/`
+5. **Update Documentation**: Document the new tool in this file
+6. **Update Examples**: Add usage examples
+
+### Project Structure
+
+```
+doxygen-mcp/
+├── src/
+│   └── doxygen_mcp/
+│       ├── __init__.py       # Package initialization
+│       ├── __main__.py       # Entry point
+│       └── server.py         # Main server implementation
+├── tests/
+│   └── test_server.py        # Test suite
+├── examples/                 # Example projects
+├── templates/                # Doxyfile templates
+├── pyproject.toml           # Project configuration
+└── README.md                # Project overview
+```
+
+## Migration Guide
+
+### Upgrading from Pre-1.0 Structure
+
+If you're upgrading from an older version that used `server.py` at the root level:
+
+#### What Changed
+
+1. **Command Name**: `doxygen-mcp-server` → `doxygen-mcp`
+2. **Package Structure**: Root `server.py` → `src/doxygen_mcp/`
+3. **Installation**: `uv pip install` → `uv sync`
+4. **Python Version**: `>=3.8` → `>=3.11`
+
+#### Migration Steps
+
+1. **Update Your Environment**
+   ```bash
+   # Pull latest changes
+   git pull origin main
+
+   # Remove old virtual environment
+   rm -rf .venv
+
+   # Install with new structure
+   uv sync
+   ```
+
+2. **Update MCP Client Configuration**
+
+   Change from:
+   ```json
+   {
+     "command": "python",
+     "args": ["/path/to/doxygen-mcp/server.py"]
+   }
+   ```
+
+   To:
+   ```json
+   {
+     "command": "uv",
+     "args": [
+       "--directory",
+       "/path/to/doxygen-mcp",
+       "run",
+       "doxygen-mcp"
+     ]
+   }
+   ```
+
+3. **Update CI/CD Pipelines**
+
+   Change from:
+   ```bash
+   pip install -r requirements.txt
+   python server.py
+   ```
+
+   To:
+   ```bash
+   uv sync
+   uv run doxygen-mcp
+   ```
+
+4. **Verify Migration**
+   ```bash
+   # Test server starts correctly
+   timeout 3 uv run doxygen-mcp || echo "Success"
+
+   # Verify package imports
+   uv run python -c "import doxygen_mcp; print(doxygen_mcp.__version__)"
+   ```
+
+#### Breaking Changes
+
+- **Command name changed**: Any scripts using `doxygen-mcp-server` must update
+- **Import paths changed**: If extending the server, update imports:
+  - Old: `from server import ...`
+  - New: `from doxygen_mcp.server import ...`
+- **Python 3.11+ required**: Older Python versions no longer supported
+
+#### Backward Compatibility
+
+The old `server.py` at the root is deprecated but still present temporarily. It will be removed in version 2.0.
+
+#### Troubleshooting Migration
+
+**"Module not found" errors:**
+- Run `uv sync` to ensure dependencies are installed
+- Verify you're in the project root directory
+
+**"Command not found: doxygen-mcp":**
+- Use `uv run doxygen-mcp` instead
+- Or activate venv: `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows)
+
+**MCP client won't connect:**
+- Double-check the command path in your configuration
+- Ensure `uv` is in your system PATH
+- Try running `uv run doxygen-mcp` manually to test
+
+For more help, see [BUGS.md](./BUGS.md)

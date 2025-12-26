@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv sync:*)",
+      "Bash(timeout 3 uv run:*)",
+      "Bash(tree:*)",
+      "Bash(uv run python:*)",
+      "Bash(timeout 2 uv run:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

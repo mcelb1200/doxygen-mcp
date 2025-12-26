@@ -34,17 +34,121 @@ The Doxygen MCP Server automates the generation of documentation from source cod
 - Man pages
 - DocBook
 
-## Installation, Usage, Configuration, and Development
-See `USING` elsewhere in this repo.
+## Prerequisites
+
+- **Python 3.11+**
+- **Doxygen** (required) - [Installation guide](https://www.doxygen.nl/download.html)
+- **uv** package manager - [Installation guide](https://docs.astral.sh/uv/)
+- **Graphviz** (optional, for diagrams) - [Installation guide](https://graphviz.org/download/)
+- **LaTeX** (optional, for PDF) - [Installation guide](https://www.latex-project.org/get/)
+- **Claude Desktop** or **Claude for Windows**
+
+## Quick Start
+
+### 1. Install Doxygen
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install doxygen
+
+# macOS
+brew install doxygen
+
+# Windows
+# Download from https://www.doxygen.nl/download.html
+```
+
+### 2. Install Dependencies
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd doxygen-mcp
+
+# Install with uv
+uv sync
+```
+
+### 3. Configure Claude Desktop
+
+Edit your Claude Desktop configuration file:
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+
+Add Doxygen MCP to `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "doxygen-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/absolute/path/to/doxygen-mcp",
+        "run",
+        "doxygen-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+**Windows Example**:
+```json
+{
+  "mcpServers": {
+    "doxygen-mcp": {
+      "command": "C:\\Users\\YourName\\.local\\bin\\uv.exe",
+      "args": [
+        "--directory",
+        "D:\\dev\\doxygen-mcp",
+        "run",
+        "doxygen-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+### 4. Restart Claude Desktop
+
+Close and reopen Claude Desktop to load the new MCP server.
+
+### 5. Verify Installation
+
+In Claude, try:
+```
+What MCP tools do you have available?
+```
+
+You should see Doxygen MCP tools listed.
+
+### 6. Basic Usage Example
+
+```
+Create a Doxygen project for my C++ codebase at /path/to/project
+```
+
+Claude will initialize a Doxygen project with appropriate configuration.
+
+## Detailed Documentation
+
+For comprehensive documentation, see:
+- **Installation & Usage**: [USING.md](./USING.md)
+- **Troubleshooting**: [BUGS.md](./BUGS.md)
+- **Contributing**: [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## Contributing
-See `CONTRIBUTING` elsewhere in this repo.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
 
 ## License
-See `COPYING` eslewhere in this repo.
+This project is licensed under the GNU General Public License version 3 (GPLv3). See [COPYING.md](./COPYING.md) for the full license text.
 
 ## Support
-See `BUGS` elsewhere in this repo.
+For bug reports and troubleshooting, see [BUGS.md](./BUGS.md).
 
 ## Roadmap
 
