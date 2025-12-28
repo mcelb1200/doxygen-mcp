@@ -6,7 +6,8 @@
       "Bash(tree:*)",
       "Bash(uv run python:*)",
       "Bash(timeout 2 uv run:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(where:*)"
     ]
   }
 }

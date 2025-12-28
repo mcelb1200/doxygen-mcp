@@ -44,7 +44,7 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doxygen-mcp")
 
-mcp = FastMCP("doxygen-mcp")
+mcp = FastMCP("Doxygen")
 
 class DoxygenConfig(BaseModel):
     """
