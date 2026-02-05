@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "doxygen-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "C:\\github\\tools\\doxygen-mcp",
+        "doxygen-mcp"
+      ]
+    }
+  }
+}
