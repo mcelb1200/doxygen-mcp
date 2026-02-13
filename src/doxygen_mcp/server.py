@@ -25,7 +25,13 @@ except ImportError:
 from mcp.server.fastmcp import FastMCP
 from .query_engine import DoxygenQueryEngine
 from .config import DoxygenConfig
-from .utils import resolve_project_path, detect_primary_language, get_ide_environment, update_ignore_file
+from .utils import (
+    resolve_project_path,
+    detect_primary_language,
+    get_ide_environment,
+    update_ignore_file,
+    get_active_context
+)
 
 # Internal alias for testing
 _resolve_project_path = resolve_project_path
@@ -44,6 +50,7 @@ async def get_context_info() -> Dict[str, Any]:
     project_path = resolve_project_path()
     language = detect_primary_language(project_path)
     ide_info = get_ide_environment()
+    active_context = get_active_context()
 
     has_doxyfile = (project_path / "Doxyfile").exists()
 
@@ -51,6 +58,7 @@ async def get_context_info() -> Dict[str, Any]:
         "project_root": str(project_path),
         "detected_language": language,
         "ide_environment": ide_info,
+        "active_context": active_context,
         "doxygen_status": {
             "has_doxyfile": has_doxyfile,
             "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
@@ -232,12 +240,20 @@ async def check_doxygen_install() -> str:
 
 @mcp.tool()
 async def query_project_reference(
-    symbol_name: str,
+    symbol_name: Optional[str] = None,
     project_path: Optional[str] = None,
 ) -> str:
     """
     Search for documentation of a specific class, function, or namespace using XML output.
+    If symbol_name is not provided, it attempts to use selected text from the active context.
     """
+    if not symbol_name:
+        context = get_active_context()
+        symbol_name = context.get("selected_text")
+
+    if not symbol_name:
+        return "❌ Error: No symbol name provided and no text selection detected in the active context."
+
     try:
         resolved_path = resolve_project_path(project_path)
         xml_dir = os.environ.get("DOXYGEN_XML_DIR")
@@ -345,6 +361,31 @@ async def get_symbol_at_location(file_path: str, line_number: int, project_path:
         return best_match
     except Exception as e:
         return {"error": str(e)}
+
+@mcp.tool()
+async def query_active_symbol(project_path: Optional[str] = None) -> str:
+    """
+    Identify and query documentation for the symbol at the current cursor position.
+    Uses context provided by the MCP client environment (MCP_ACTIVE_FILE, MCP_CURSOR_LINE).
+    """
+    context = get_active_context()
+    file_path = context.get("active_file")
+    line_str = context.get("cursor_line")
+
+    if not file_path or not line_str:
+        return "❓ No active file or cursor position detected in the environment. Ensure your MCP client provides 'MCP_ACTIVE_FILE' and 'MCP_CURSOR_LINE'."
+
+    try:
+        line_number = int(line_str)
+    except ValueError:
+        return f"❌ Invalid cursor line position: {line_str}"
+
+    symbol = await get_symbol_at_location(file_path, line_number, project_path)
+
+    if not symbol or (isinstance(symbol, dict) and "error" in symbol):
+        return f"❓ No symbol found at {file_path}:{line_number}."
+
+    return await query_project_reference(symbol["name"], project_path)
 
 @mcp.tool()
 async def get_file_structure(file_path: str, project_path: Optional[str] = None) -> List[Dict[str, Any]]:
