@@ -5,6 +5,7 @@ Doxygen MCP Server - Context Aware Version
 
 import logging
 import os
+import asyncio
 import subprocess
 import json
 from pathlib import Path
@@ -15,6 +16,9 @@ from mcp.server.fastmcp import FastMCP
 from .query_engine import DoxygenQueryEngine
 from .config import DoxygenConfig
 from .utils import resolve_project_path, detect_primary_language, get_ide_environment, update_ignore_file
+
+# Internal alias for testing
+_resolve_project_path = resolve_project_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -158,6 +162,26 @@ async def generate_documentation(
     except Exception as e:
         return f"❌ Error generating documentation: {str(e)}"
 
+def _perform_scan(safe_project_path: Path):
+    """Sync helper to scan the filesystem without blocking the event loop"""
+    extensions = {}
+    total_files = 0
+
+    for root, dirs, files in os.walk(safe_project_path):
+        # Skip hidden directories
+        dirs[:] = [d for d in dirs if not d.startswith('.')]
+
+        for file in files:
+            if file.startswith('.'):
+                continue
+
+            _, ext = os.path.splitext(file)
+            if ext:
+                ext_lower = ext.lower()
+                extensions[ext_lower] = extensions.get(ext_lower, 0) + 1
+                total_files += 1
+    return extensions, total_files
+
 @mcp.tool()
 async def scan_project(
     project_path: Optional[str] = None,
@@ -171,22 +195,30 @@ async def scan_project(
     if not safe_project_path.exists():
         return f"❌ Project path does not exist: {safe_project_path}"
 
-    extensions = {}
-    total_files = 0
-
-    for file_path in safe_project_path.rglob("*"):
-        if file_path.is_file() and not any(part.startswith('.') for part in file_path.parts):
-            ext = file_path.suffix.lower()
-            if ext:
-                extensions[ext] = extensions.get(ext, 0) + 1
-                total_files += 1
+    extensions, total_files = await asyncio.to_thread(_perform_scan, safe_project_path)
 
     sorted_extensions = sorted(extensions.items(), key=lambda x: x[1], reverse=True)
-    result_text = f"📁 Project Scan Results: {safe_project_path}\n📊 Total Files: {total_files}\n\n📋 Files by Type:\n"
+    result_text = f"📁 Project Scan Results: {safe_project_path}\n📊 Total Files Found: {total_files}\n\n📋 Files by Type:\n"
     for ext, count in sorted_extensions[:10]:
         result_text += f"  📄 {ext}: {count} files\n"
 
     return result_text
+
+@mcp.tool()
+async def check_doxygen_install() -> str:
+    """Verify that Doxygen is installed and accessible"""
+    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    try:
+        result = subprocess.run(
+            [doxygen_exe, "--version"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        version = result.stdout.strip()
+        return f"✅ Doxygen {version} is installed and working"
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return "❌ Doxygen is not installed"
 
 @mcp.tool()
 async def query_project_reference(
