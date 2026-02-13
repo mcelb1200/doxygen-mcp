@@ -56,9 +56,25 @@ cd doxygen-mcp
 uv sync
 ```
 
-## 🔧 Configuration (mcp_config.json)
+## 🔧 Configuration
 
-Integrate into your MCP client (Claude Desktop, Cursor, etc.) using dynamic path discovery:
+### Automagic Configuration (Recommended)
+
+To quickly generate the correct configuration for your MCP client, run:
+
+```bash
+# Generate generic MCP configuration (VS Code, etc.)
+uv run doxygen-mcp config
+
+# Generate configuration for Gemini CLI
+uv run doxygen-mcp config --gemini
+```
+
+The command will output a JSON snippet that you can copy directly into your client's configuration file (e.g., `settings.json` for VS Code extensions, or your local `mcp_config.json`).
+
+### Manual Configuration
+
+If you prefer to configure it manually, integrate into your MCP client (Claude Desktop, Cursor, Gemini CLI, etc.) using dynamic path discovery:
 
 ```json
 {
@@ -66,7 +82,7 @@ Integrate into your MCP client (Claude Desktop, Cursor, etc.) using dynamic path
     "doxygen-mcp": {
       "command": "uv",
       "args": [
-        "--directory", "C:\\path\\to\\doxygen-mcp",
+        "--directory", "/path/to/doxygen-mcp",
         "run", "doxygen-mcp"
       ],
       "env": {
