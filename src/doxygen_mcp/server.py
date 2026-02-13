@@ -6,10 +6,20 @@ Doxygen MCP Server - Context Aware Version
 import logging
 import os
 import asyncio
+import sys
+import argparse
 import subprocess
 import json
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+try:
+    from importlib.metadata import version
+except ImportError:
+    # Fallback for Python < 3.8
+    try:
+        from importlib_metadata import version
+    except ImportError:
+        version = None
 
 # MCP server imports
 from mcp.server.fastmcp import FastMCP
@@ -119,7 +129,7 @@ async def create_doxygen_project(
         with open(doxyfile_path, 'w', encoding='utf-8') as f:
             f.write(config.to_doxyfile())
 
-        # Update .gitignore.md
+        # Update .gitignore
         update_ignore_file(safe_project_path, "docs/")
 
         return f"✅ Doxygen project '{project_name}' created successfully at {safe_project_path} (Language: {language})"
@@ -381,24 +391,85 @@ def _find_xml_dir(resolved_path: Path) -> Optional[str]:
     return None
 
 
+def generate_config(args):
+    """Generate MCP configuration for various clients."""
+    script_path = Path(__file__).resolve()
+    # Check if running from source (presence of pyproject.toml in parent)
+    # src/doxygen_mcp/server.py -> src/doxygen_mcp -> src -> root
+    repo_root = script_path.parent.parent.parent
+    is_source = (repo_root / "pyproject.toml").exists()
+
+    if is_source:
+        cmd = "uv"
+        cmd_args = ["--directory", str(repo_root), "run", "doxygen-mcp"]
+    else:
+        # Assuming installed in path and available as command
+        cmd = "doxygen-mcp"
+        cmd_args = []
+
+    config = {
+        "mcpServers": {
+            "doxygen-mcp": {
+                "command": cmd,
+                "args": cmd_args,
+                "env": {
+                   "DOXYGEN_XML_DIR": "./xml"
+                }
+            }
+        }
+    }
+
+    print(json.dumps(config, indent=2))
+
+
 def main():
+    # Parse arguments for config generation
+    parser = argparse.ArgumentParser(description="Doxygen MCP Server", add_help=False)
+    parser.add_argument("--version", action="store_true", help="Show version")
+    parser.add_argument("command", nargs="?", choices=["config"], help="Command to run")
+    parser.add_argument("--vscode", action="store_true", help="Generate VS Code config")
+    parser.add_argument("--gemini", action="store_true", help="Generate Gemini CLI config")
+    parser.add_argument("--cursor", action="store_true", help="Generate Cursor config")
+
+    args, unknown = parser.parse_known_args()
+
+    if args.version:
+        v = "unknown"
+        if version:
+            try:
+                v = version("doxygen-mcp")
+            except:
+                pass
+        print(f"doxygen-mcp {v}")
+        sys.exit(0)
+
+    if args.command == "config":
+        generate_config(args)
+        sys.exit(0)
+
     # Check for Doxygen dependency
     doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
     try:
         subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError):
         logger.warning(f"Doxygen not found at '{doxygen_exe}'. Attempting automatic setup...")
+        # Use existing check_environment script
+        # src/doxygen_mcp/server.py -> src/doxygen_mcp -> src -> root
         script_path = Path(__file__).parent.parent.parent / "scripts" / "check_environment.py"
-        try:
-            subprocess.run([sys.executable, str(script_path), "--install"], check=True)
-            # Re-verify after install
-            subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
-            logger.info("Doxygen successfully installed and verified.")
-        except Exception as e:
-            logger.error(f"Automatic setup failed or Doxygen still not found: {e}")
-            logger.error("Please install Doxygen manually: https://www.doxygen.nl/download.html")
-            # We continue anyway to let MCP start, but tools will fail gracefully.
+        if script_path.exists():
+            try:
+                subprocess.run([sys.executable, str(script_path), "--install"], check=True)
+                # Re-verify after install
+                subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
+                logger.info("Doxygen successfully installed and verified.")
+            except Exception as e:
+                logger.error(f"Automatic setup failed or Doxygen still not found: {e}")
+                logger.error("Please install Doxygen manually: https://www.doxygen.nl/download.html")
+                # We continue anyway to let MCP start, but tools will fail gracefully.
+        else:
+             logger.warning(f"Setup script not found at {script_path}. Skipping auto-setup.")
 
+    # Only run MCP if not a custom command
     mcp.run()
 
 if __name__ == "__main__":

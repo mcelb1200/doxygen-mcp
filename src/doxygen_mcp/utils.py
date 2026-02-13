@@ -163,10 +163,10 @@ def get_active_context() -> Dict[str, Any]:
 
 def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     """
-    Ensure a path is added to the project-specific .gitignore.md file.
+    Ensure a path is added to the project-specific .gitignore file.
      Returns True if an entry was added, False otherwise.
     """
-    ignore_file = project_root / ".gitignore.md"
+    ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
 
     # Create file if it doesn't exist
