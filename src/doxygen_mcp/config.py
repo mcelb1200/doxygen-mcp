@@ -99,7 +99,8 @@ class DoxygenConfig(BaseModel):
             config_data["project_name"] = get_project_name(root)
 
         # Get all fields of the model
-        for field_name in cls.__fields__:
+        fields = getattr(cls, "model_fields", getattr(cls, "__fields__", {}))
+        for field_name in fields:
             env_var = f"DOXYGEN_MCP_{field_name.upper()}"
             if env_var in os.environ:
                 val = os.environ[env_var]
