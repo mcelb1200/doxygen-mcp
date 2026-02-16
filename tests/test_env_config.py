@@ -13,9 +13,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
-    query_project_reference,
-    _resolve_project_path
+    query_project_reference
 )
+from doxygen_mcp.utils import resolve_project_path
 
 @pytest.fixture
 def temp_project_dir():
@@ -26,20 +26,20 @@ class TestEnvConfig:
     
     def test_resolve_project_path_explicit(self, temp_project_dir):
         """Test resolving path when explicitly provided"""
-        resolved = _resolve_project_path(temp_project_dir)
+        resolved = resolve_project_path(temp_project_dir)
         assert resolved == Path(temp_project_dir).resolve()
 
     def test_resolve_project_path_env(self, temp_project_dir):
         """Test resolving path from environment variable"""
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            resolved = _resolve_project_path(None)
+            resolved = resolve_project_path(None)
             assert resolved == Path(temp_project_dir).resolve()
 
     def test_resolve_project_path_missing(self):
-        """Test error when path is missing entirely"""
+        """Test default to CWD when path is missing entirely"""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError):
-                _resolve_project_path(None)
+            resolved = resolve_project_path(None)
+            assert resolved == Path.cwd()
 
     @pytest.mark.asyncio
     async def test_create_project_with_env(self, temp_project_dir):
