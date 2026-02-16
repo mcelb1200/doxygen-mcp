@@ -3,13 +3,13 @@
 Doxygen MCP Server - Context Aware Version
 """
 
+import argparse
+import asyncio
+import json
 import logging
 import os
-import asyncio
-import sys
-import argparse
 import subprocess
-import json
+import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 try:

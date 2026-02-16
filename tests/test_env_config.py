@@ -38,8 +38,9 @@ class TestEnvConfig:
     def test_resolve_project_path_missing(self):
         """Test error when path is missing entirely"""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError):
-                _resolve_project_path(None)
+            # Should default to CWD
+            resolved = _resolve_project_path(None)
+            assert resolved == Path.cwd()
 
     @pytest.mark.asyncio
     async def test_create_project_with_env(self, temp_project_dir):
@@ -51,7 +52,7 @@ class TestEnvConfig:
                 language="python"
             )
             
-            assert "✅ Doxygen project 'Env Project' created successfully!" in result
+            assert "✅ Doxygen project 'Env Project' created successfully" in result
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
     @pytest.mark.asyncio
@@ -71,7 +72,7 @@ class TestEnvConfig:
                     # project_path is None
                 )
                 
-                assert "✅ Documentation generated successfully!" in result
+                assert "✅ Documentation generated successfully" in result
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):

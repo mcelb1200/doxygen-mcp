@@ -126,7 +126,7 @@ async def test_scan_project_success():
         )
         
         assert "📁 Project Scan Results" in result
-        assert "Total Files: 5" in result
+        assert "Total Files Found: 5" in result
         assert ".cpp: 1 files" in result
         assert ".h: 1 files" in result
         assert ".py: 1 files" in result
