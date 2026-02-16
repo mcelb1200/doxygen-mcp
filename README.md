@@ -2,6 +2,8 @@
 
 A powerful Model Context Protocol (MCP) server that provides AI assistants with deep structural understanding and management of Doxygen-based documentation projects.
 
+**[👉 Quick Start Guide for Users](./USING.md)** | **[🤖 Instructions for AI Agents](./AGENTS.md)**
+
 ## 🚀 Overview
 
 The Doxygen MCP Server bridges the gap between source code and AI understanding. By leveraging Doxygen's pre-parsed structural information, it enables AI assistants to:
@@ -19,13 +21,6 @@ The Doxygen MCP Server bridges the gap between source code and AI understanding.
 - **Dynamic Project Discovery**: Resolves the project root using IDE variables like `VSCODE_WORKSPACE_FOLDER` or by searching for Markers (`.git`, `Doxyfile`).
 - **Workspace State Tracking**: Integration with IDE-supplied environment variables to track active files and cursor positions.
 - **Auto-Project Naming**: Automatically retrieves the project name from IDE variables (e.g., `VSCODE_WORKSPACE_NAME`) or the workspace folder name.
-
-### 🛠️ New Context-Aware Tools
-
-- `get_symbol_at_location`: Find the closest symbol to the IDE's cursor (file/line).
-- `get_project_structure`: Provides a tree-like overview of classes, namespaces, and files.
-- `get_file_structure`: Lists all documented symbols and their locations within a specific file.
-- `refresh_index`: Triggers an instant re-scan of Doxygen XML metadata.
 
 ### ⚙️ Self-Configuration
 
@@ -102,11 +97,16 @@ If you prefer to configure it manually, integrate into your MCP client (Claude D
 | Tool | Description |
 |------|-------------|
 | `get_context_info` | Returns information about the detected IDE and project root. |
-| `auto_configure` | Detects language and initializes a Doxygen project. |
+| `auto_configure` | Detects language and initializes a Doxygen project (wrapper for `create_doxygen_project`). |
+| `create_doxygen_project` | Initialize a new Doxygen documentation project with specific settings. |
+| `scan_project` | Analyze project structure and identify file types. |
 | `generate_documentation` | Triggers a full Doxygen build. |
-| `get_project_structure` | Provides a high-level map of classes and files. |
+| `check_doxygen_install` | Verifies that Doxygen is installed and accessible. |
+| `get_project_structure` | Provides a high-level map of classes, namespaces, and files. |
+| `get_file_structure` | Lists all documented symbols and their locations within a specific file. |
 | `get_symbol_at_location` | Finds the symbol context for a specific file/line. |
-| `query_project_reference` | Searches for detailed documentation of a symbol. |
+| `query_active_symbol` | Identifies and queries documentation for the symbol at the current cursor position. |
+| `query_project_reference` | Searches for detailed documentation of a symbol (class, function, etc.). |
 | `refresh_index` | Updates the server's internal model from disk. |
 
 ## 📄 License
