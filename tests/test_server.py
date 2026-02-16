@@ -16,8 +16,7 @@ import os
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-from doxygen_mcp.server import mcp, create_doxygen_project, generate_documentation, scan_project
-# check_doxygen_install was removed from server.py
+from doxygen_mcp.server import mcp, create_doxygen_project, generate_documentation, scan_project, check_doxygen_install
 from doxygen_mcp.config import DoxygenConfig
 
 
@@ -126,33 +125,33 @@ async def test_scan_project_success():
         )
         
         assert "📁 Project Scan Results" in result
-        assert "Total Files: 5" in result
+        assert "Total Files Found: 5" in result
         assert ".cpp: 1 files" in result
         assert ".h: 1 files" in result
         assert ".py: 1 files" in result
 
-# @pytest.mark.asyncio
-# @patch('subprocess.run')
-# async def test_check_doxygen_install_success(mock_run):
-#     """Test successful Doxygen installation check"""
-#     mock_run.return_value = MagicMock(
-#         returncode=0,
-#         stdout="1.9.4\n"
-#     )
+@pytest.mark.asyncio
+@patch('subprocess.run')
+async def test_check_doxygen_install_success(mock_run):
+    """Test successful Doxygen installation check"""
+    mock_run.return_value = MagicMock(
+        returncode=0,
+        stdout="1.9.4\n"
+    )
 
-#     result = await check_doxygen_install()
+    result = await check_doxygen_install()
     
-#     assert "✅ Doxygen 1.9.4 is installed and working" in result
+    assert "✅ Doxygen 1.9.4 is installed and working" in result
 
-# @pytest.mark.asyncio
-# @patch('subprocess.run')
-# async def test_check_doxygen_install_not_found(mock_run):
-#     """Test Doxygen not found"""
-#     mock_run.side_effect = FileNotFoundError()
+@pytest.mark.asyncio
+@patch('subprocess.run')
+async def test_check_doxygen_install_not_found(mock_run):
+    """Test Doxygen not found"""
+    mock_run.side_effect = FileNotFoundError()
 
-#     result = await check_doxygen_install()
+    result = await check_doxygen_install()
     
-#     assert "❌ Doxygen is not installed" in result
+    assert "❌ Doxygen is not installed" in result
 
 @pytest.mark.asyncio
 async def test_generate_documentation_no_doxyfile():
@@ -186,6 +185,25 @@ async def test_generate_documentation_success(mock_run):
         )
         
         assert "✅ Documentation generated successfully" in result
+
+@pytest.mark.asyncio
+async def test_path_traversal_protection():
+    """Test protection against path traversal"""
+    # Attempt to access a path outside of the project root
+    # Since we are not in a test (according to PYTEST_CURRENT_TEST being absent if not careful,
+    # but here we ARE in pytest), we need to make sure we test the logic.
+
+    # In our implementation, /tmp is allowed during tests.
+    # So let's try something that is NOT /tmp and not the project root.
+    # We'll mock the project root to something specific.
+
+    with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "/app/project"}):
+        # This should fail as /etc is not under /app/project
+        result = await create_doxygen_project(
+            project_name="Evil",
+            project_path="/etc/evil"
+        )
+        assert "Security Error: Access denied" in result
 
 
 class TestLanguageDetection:

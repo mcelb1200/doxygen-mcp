@@ -3,13 +3,13 @@
 Doxygen MCP Server - Context Aware Version
 """
 
+import argparse
+import asyncio
+import json
 import logging
 import os
-import asyncio
-import sys
-import argparse
 import subprocess
-import json
+import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 try:
@@ -47,45 +47,51 @@ async def get_context_info() -> Dict[str, Any]:
     """
     Get information about the current project context, detected language, and IDE environment.
     """
-    project_path = resolve_project_path()
-    language = detect_primary_language(project_path)
-    ide_info = get_ide_environment()
-    active_context = get_active_context()
+    try:
+        project_path = resolve_project_path()
+        language = detect_primary_language(project_path)
+        ide_info = get_ide_environment()
+        active_context = get_active_context()
 
-    has_doxyfile = (project_path / "Doxyfile").exists()
+        has_doxyfile = (project_path / "Doxyfile").exists()
 
-    return {
-        "project_root": str(project_path),
-        "detected_language": language,
-        "ide_environment": ide_info,
-        "active_context": active_context,
-        "doxygen_status": {
-            "has_doxyfile": has_doxyfile,
-            "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
+        return {
+            "project_root": str(project_path),
+            "detected_language": language,
+            "ide_environment": ide_info,
+            "active_context": active_context,
+            "doxygen_status": {
+                "has_doxyfile": has_doxyfile,
+                "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
+            }
         }
-    }
+    except Exception as e:
+        return {"error": str(e)}
 
 @mcp.tool()
 async def auto_configure(project_name: Optional[str] = None) -> str:
     """
     Automatically detect project settings and create a Doxyfile if one doesn't exist.
     """
-    project_path = resolve_project_path()
-    if not project_name:
-        project_name = project_path.name
+    try:
+        project_path = resolve_project_path()
+        if not project_name:
+            project_name = project_path.name
 
-    language = detect_primary_language(project_path)
+        language = detect_primary_language(project_path)
 
-    if (project_path / "Doxyfile").exists():
-        return f"✨ Project already configured at {project_path}. Detected language: {language}."
+        if (project_path / "Doxyfile").exists():
+            return f"✨ Project already configured at {project_path}. Detected language: {language}."
 
-    result = await create_doxygen_project(
-        project_name=project_name,
-        project_path=str(project_path),
-        language=language
-    )
+        result = await create_doxygen_project(
+            project_name=project_name,
+            project_path=str(project_path),
+            language=language
+        )
 
-    return f"🚀 Auto-configured project!\n\n{result}"
+        return f"🚀 Auto-configured project!\n\n{result}"
+    except Exception as e:
+        return f"❌ Auto-configuration failed: {str(e)}"
 
 @mcp.tool()
 async def create_doxygen_project(
@@ -138,7 +144,7 @@ async def create_doxygen_project(
             f.write(config.to_doxyfile())
 
         # Update .gitignore
-        update_ignore_file(safe_project_path, "docs/")
+        await update_ignore_file(safe_project_path, "docs/")
 
         return f"✅ Doxygen project '{project_name}' created successfully at {safe_project_path} (Language: {language})"
 
@@ -271,7 +277,7 @@ async def query_project_reference(
         if not xml_dir:
             return "❌ Error: Could not find Doxygen XML directory. Ensure XML generation is enabled in Doxyfile and documentation has been generated."
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
         result = engine.query_symbol(symbol_name)
 
         if not result:
@@ -298,7 +304,7 @@ async def get_project_structure(project_path: Optional[str] = None) -> Dict[str,
         if not xml_dir:
             return {"error": "Doxygen XML not found. Generate documentation first."}
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
 
         structure = {
             "project_root": str(resolved_path),
@@ -324,7 +330,7 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
             return "❌ Doxygen XML not found. Generate documentation first."
 
         # Re-initializing the engine effectively refreshes the index
-        DoxygenQueryEngine(xml_dir)
+        await DoxygenQueryEngine.create(xml_dir)
         return "✅ Doxygen index refreshed successfully."
     except Exception as e:
         return f"❌ Error refreshing index: {str(e)}"
@@ -341,7 +347,7 @@ async def get_symbol_at_location(file_path: str, line_number: int, project_path:
         if not xml_dir:
             return {"error": "Doxygen XML not found. Generate documentation first."}
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
         file_symbols = engine.get_file_structure(file_path)
 
         # Simple heuristic: find the symbol that contains this line
@@ -399,7 +405,7 @@ async def get_file_structure(file_path: str, project_path: Optional[str] = None)
         if not xml_dir:
             return [{"error": "Doxygen XML not found. Generate documentation first."}]
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
         return engine.get_file_structure(file_path)
     except Exception as e:
         return [{"error": str(e)}]
