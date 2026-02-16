@@ -1,5 +1,6 @@
+import asyncio
 import os
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
@@ -9,7 +10,12 @@ class DoxygenQueryEngine:
         self.index_path = self.xml_dir / "index.xml"
         self.compounds = {}
         self.file_index = {} # Map files to symbols
-        self._load_index()
+
+    @classmethod
+    async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
+        self = cls(xml_dir)
+        await asyncio.to_thread(self._load_index)
+        return self
 
     def _load_index(self):
         if not self.index_path.exists():
@@ -109,4 +115,3 @@ class DoxygenQueryEngine:
         if kind_filter:
             return [name for name, info in self.compounds.items() if info["kind"] == kind_filter]
         return list(self.compounds.keys())
-
