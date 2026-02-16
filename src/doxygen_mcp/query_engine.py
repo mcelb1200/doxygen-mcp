@@ -99,11 +99,11 @@ class DoxygenQueryEngine:
     def _get_text_recursive(self, element) -> str:
         if element is None:
             return ""
-        text = element.text or ""
+        parts = [element.text or ""]
         for child in element:
-            text += self._get_text_recursive(child)
-            text += child.tail or ""
-        return text.strip()
+            parts.append(self._get_text_recursive(child))
+            parts.append(child.tail or "")
+        return "".join(parts).strip()
 
     def list_all_symbols(self, kind_filter: Optional[str] = None) -> List[str]:
         if kind_filter:
