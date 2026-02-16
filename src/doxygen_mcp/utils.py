@@ -179,15 +179,14 @@ def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
         except Exception:
             return False
 
-    # Check if already ignored
+    # Check if already ignored and append if not
     try:
-        with open(ignore_file, "r", encoding="utf-8") as f:
+        with open(ignore_file, "r+", encoding="utf-8") as f:
             lines = f.readlines()
             if any(line.strip() == path_to_ignore.strip() for line in lines):
                 return False
 
-        # Append new entry
-        with open(ignore_file, "a", encoding="utf-8") as f:
+            # Ensure the last line ends with a newline before appending
             if lines and not lines[-1].endswith("\n"):
                 f.write("\n")
             f.write(new_entry)
