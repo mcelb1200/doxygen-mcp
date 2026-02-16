@@ -271,7 +271,7 @@ async def query_project_reference(
         if not xml_dir:
             return "❌ Error: Could not find Doxygen XML directory. Ensure XML generation is enabled in Doxyfile and documentation has been generated."
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
         result = engine.query_symbol(symbol_name)
 
         if not result:
@@ -298,7 +298,7 @@ async def get_project_structure(project_path: Optional[str] = None) -> Dict[str,
         if not xml_dir:
             return {"error": "Doxygen XML not found. Generate documentation first."}
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
 
         structure = {
             "project_root": str(resolved_path),
@@ -324,7 +324,7 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
             return "❌ Doxygen XML not found. Generate documentation first."
 
         # Re-initializing the engine effectively refreshes the index
-        DoxygenQueryEngine(xml_dir)
+        await DoxygenQueryEngine.create(xml_dir)
         return "✅ Doxygen index refreshed successfully."
     except Exception as e:
         return f"❌ Error refreshing index: {str(e)}"
@@ -341,7 +341,7 @@ async def get_symbol_at_location(file_path: str, line_number: int, project_path:
         if not xml_dir:
             return {"error": "Doxygen XML not found. Generate documentation first."}
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
         file_symbols = engine.get_file_structure(file_path)
 
         # Simple heuristic: find the symbol that contains this line
@@ -399,7 +399,7 @@ async def get_file_structure(file_path: str, project_path: Optional[str] = None)
         if not xml_dir:
             return [{"error": "Doxygen XML not found. Generate documentation first."}]
 
-        engine = DoxygenQueryEngine(xml_dir)
+        engine = await DoxygenQueryEngine.create(xml_dir)
         return engine.get_file_structure(file_path)
     except Exception as e:
         return [{"error": str(e)}]
