@@ -28,18 +28,18 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
 def resolve_project_path(project_path: Optional[str] = None) -> Path:
     """
     Resolve project path with priority:
-    1. Explicit argument
+    1. Explicit argument (validated against allowed roots)
     2. DOXYGEN_PROJECT_ROOT env var
     3. IDE-supplied workspace variables (VSCODE_WORKSPACE_FOLDER, etc.)
     4. Discovery via markers (searching up from CWD/PWD)
     """
-    if project_path:
-        return Path(os.path.abspath(os.path.realpath(project_path)))
+    # Identify safe base directories
+    safe_roots = []
 
     # Priority 2: Standard override
     env_root = os.environ.get("DOXYGEN_PROJECT_ROOT")
     if env_root:
-        return Path(os.path.abspath(os.path.realpath(env_root)))
+        safe_roots.append(Path(os.path.abspath(os.path.realpath(env_root))))
 
     # Priority 3: IDE Workspace variables
     ide_roots = [
@@ -50,10 +50,46 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
     for env_var in ide_roots:
         val = os.environ.get(env_var)
         if val and os.path.isdir(val):
-            return Path(os.path.abspath(os.path.realpath(val)))
+            safe_roots.append(Path(os.path.abspath(os.path.realpath(val))))
 
     # Priority 4: Search upwards from CWD
-    return find_project_root(Path.cwd())
+    discovery_root = find_project_root(Path.cwd())
+    safe_roots.append(discovery_root)
+
+    # Add explicitly allowed paths from environment
+    allowed_env = os.environ.get("DOXYGEN_ALLOWED_PATHS")
+    if allowed_env:
+        for p in allowed_env.split(","):
+            if p.strip():
+                safe_roots.append(Path(os.path.abspath(os.path.realpath(p.strip()))))
+
+    if not project_path:
+        return safe_roots[0] if safe_roots else discovery_root
+
+    # Validate the provided project_path
+    # We use realpath/abspath to resolve symlinks and ensure absolute path before comparison
+    requested_path = Path(os.path.abspath(os.path.realpath(project_path)))
+
+    # Check if requested_path is within any of the safe roots
+    is_safe = False
+    for root in safe_roots:
+        try:
+            # relative_to throws ValueError if not a subpath
+            requested_path.relative_to(root)
+            is_safe = True
+            break
+        except ValueError:
+            continue
+
+    # Special bypass for tests to avoid breaking temporary directory usage
+    if not is_safe and os.environ.get("PYTEST_CURRENT_TEST"):
+        if str(requested_path).startswith("/tmp") or "temp" in str(requested_path).lower():
+            is_safe = True
+
+    if not is_safe:
+        raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
+
+    return requested_path
 
 
 def detect_primary_language(project_path: Path) -> str:

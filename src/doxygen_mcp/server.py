@@ -47,45 +47,51 @@ async def get_context_info() -> Dict[str, Any]:
     """
     Get information about the current project context, detected language, and IDE environment.
     """
-    project_path = resolve_project_path()
-    language = detect_primary_language(project_path)
-    ide_info = get_ide_environment()
-    active_context = get_active_context()
+    try:
+        project_path = resolve_project_path()
+        language = detect_primary_language(project_path)
+        ide_info = get_ide_environment()
+        active_context = get_active_context()
 
-    has_doxyfile = (project_path / "Doxyfile").exists()
+        has_doxyfile = (project_path / "Doxyfile").exists()
 
-    return {
-        "project_root": str(project_path),
-        "detected_language": language,
-        "ide_environment": ide_info,
-        "active_context": active_context,
-        "doxygen_status": {
-            "has_doxyfile": has_doxyfile,
-            "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
+        return {
+            "project_root": str(project_path),
+            "detected_language": language,
+            "ide_environment": ide_info,
+            "active_context": active_context,
+            "doxygen_status": {
+                "has_doxyfile": has_doxyfile,
+                "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
+            }
         }
-    }
+    except Exception as e:
+        return {"error": str(e)}
 
 @mcp.tool()
 async def auto_configure(project_name: Optional[str] = None) -> str:
     """
     Automatically detect project settings and create a Doxyfile if one doesn't exist.
     """
-    project_path = resolve_project_path()
-    if not project_name:
-        project_name = project_path.name
+    try:
+        project_path = resolve_project_path()
+        if not project_name:
+            project_name = project_path.name
 
-    language = detect_primary_language(project_path)
+        language = detect_primary_language(project_path)
 
-    if (project_path / "Doxyfile").exists():
-        return f"✨ Project already configured at {project_path}. Detected language: {language}."
+        if (project_path / "Doxyfile").exists():
+            return f"✨ Project already configured at {project_path}. Detected language: {language}."
 
-    result = await create_doxygen_project(
-        project_name=project_name,
-        project_path=str(project_path),
-        language=language
-    )
+        result = await create_doxygen_project(
+            project_name=project_name,
+            project_path=str(project_path),
+            language=language
+        )
 
-    return f"🚀 Auto-configured project!\n\n{result}"
+        return f"🚀 Auto-configured project!\n\n{result}"
+    except Exception as e:
+        return f"❌ Auto-configuration failed: {str(e)}"
 
 @mcp.tool()
 async def create_doxygen_project(

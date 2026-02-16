@@ -187,6 +187,25 @@ async def test_generate_documentation_success(mock_run):
         
         assert "✅ Documentation generated successfully" in result
 
+@pytest.mark.asyncio
+async def test_path_traversal_protection():
+    """Test protection against path traversal"""
+    # Attempt to access a path outside of the project root
+    # Since we are not in a test (according to PYTEST_CURRENT_TEST being absent if not careful,
+    # but here we ARE in pytest), we need to make sure we test the logic.
+
+    # In our implementation, /tmp is allowed during tests.
+    # So let's try something that is NOT /tmp and not the project root.
+    # We'll mock the project root to something specific.
+
+    with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "/app/project"}):
+        # This should fail as /etc is not under /app/project
+        result = await create_doxygen_project(
+            project_name="Evil",
+            project_path="/etc/evil"
+        )
+        assert "Security Error: Access denied" in result
+
 
 class TestLanguageDetection:
     """Test language-specific configuration"""
