@@ -138,7 +138,7 @@ async def create_doxygen_project(
             f.write(config.to_doxyfile())
 
         # Update .gitignore
-        update_ignore_file(safe_project_path, "docs/")
+        await update_ignore_file(safe_project_path, "docs/")
 
         return f"✅ Doxygen project '{project_name}' created successfully at {safe_project_path} (Language: {language})"
 

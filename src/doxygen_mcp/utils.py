@@ -4,6 +4,7 @@ Utility functions for Doxygen MCP context discovery and environment integration.
 
 import os
 import json
+import asyncio
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -161,10 +162,9 @@ def get_active_context() -> Dict[str, Any]:
         "selected_text": os.environ.get("MCP_SELECTED_TEXT")
     }
 
-def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
+def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
-    Ensure a path is added to the project-specific .gitignore file.
-     Returns True if an entry was added, False otherwise.
+    Synchronous helper for updating .gitignore.
     """
     ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
@@ -193,3 +193,12 @@ def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
         return True
     except Exception:
         return False
+
+
+async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
+    """
+    Ensure a path is added to the project-specific .gitignore file.
+    Offloaded to a thread pool to avoid blocking the event loop.
+    Returns True if an entry was added, False otherwise.
+    """
+    return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
