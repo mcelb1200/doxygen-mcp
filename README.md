@@ -44,7 +44,7 @@ The Doxygen MCP Server bridges the gap between source code and AI understanding.
 
 ```bash
 # Clone the repository
-git clone https://github.com/positronikal/doxygen-mcp
+git clone (https://github.com/mcelb1200/doxygen-mcp)
 cd doxygen-mcp
 
 # Install dependencies
