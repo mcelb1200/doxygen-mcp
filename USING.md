@@ -39,6 +39,29 @@ Restart your AI client. You should now see the `doxygen-mcp` tools available.
 
 ---
 
+## 📁 Using with Other Projects
+
+By default, the server looks at the directory where it's running. To use it with a **different project** or repository:
+
+### Method A: Configuration Flag (Recommended)
+Generate a config specifically for another path:
+```bash
+uv run doxygen-mcp config --path "/path/to/my/other-project"
+```
+
+### Method B: Run Script
+If you are running the server locally for testing:
+```bash
+./scripts/run.sh "/path/to/my/other-project"
+```
+
+### Method C: Environment Variables
+You can manually set these variables in your MCP client configuration:
+- `DOXYGEN_PROJECT_ROOT`: The absolute path to the project you want to document.
+- `DOXYGEN_ALLOWED_PATHS`: A comma-separated list of paths the server is allowed to access (for security).
+
+---
+
 ## 🤖 How to Use It (For AI Users)
 
 Once connected, you don't need to run commands manually. Just ask your AI questions like:

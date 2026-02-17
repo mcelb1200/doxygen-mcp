@@ -481,7 +481,6 @@ def generate_config(args):
     """Generate MCP configuration for various clients."""
     script_path = Path(__file__).resolve()
     # Check if running from source (presence of pyproject.toml in parent)
-    # src/doxygen_mcp/server.py -> src/doxygen_mcp -> src -> root
     repo_root = script_path.parent.parent.parent
     is_source = (repo_root / "pyproject.toml").exists()
 
@@ -493,19 +492,28 @@ def generate_config(args):
         cmd = "doxygen-mcp"
         cmd_args = []
 
+    target_path = args.path if args.path else "./"
+    abs_path = os.path.abspath(target_path)
+
     config = {
         "mcpServers": {
             "doxygen-mcp": {
                 "command": cmd,
                 "args": cmd_args,
                 "env": {
-                   "DOXYGEN_XML_DIR": "./xml"
+                   "DOXYGEN_PROJECT_ROOT": abs_path,
+                   "DOXYGEN_ALLOWED_PATHS": f"{os.path.dirname(abs_path)},{abs_path}",
+                   "DOXYGEN_XML_DIR": "./docs/xml"
                 }
             }
         }
     }
 
-    print(json.dumps(config, indent=2))
+    if args.gemini:
+        # Gemini specific format might differ, but for now we output standard MCP
+        print(json.dumps(config, indent=2))
+    else:
+        print(json.dumps(config, indent=2))
 
 
 def main():
@@ -513,6 +521,7 @@ def main():
     parser = argparse.ArgumentParser(description="Doxygen MCP Server", add_help=False)
     parser.add_argument("--version", action="store_true", help="Show version")
     parser.add_argument("command", nargs="?", choices=["config"], help="Command to run")
+    parser.add_argument("--path", type=str, help="Target project path for configuration")
     parser.add_argument("--vscode", action="store_true", help="Generate VS Code config")
     parser.add_argument("--gemini", action="store_true", help="Generate Gemini CLI config")
     parser.add_argument("--cursor", action="store_true", help="Generate Cursor config")
