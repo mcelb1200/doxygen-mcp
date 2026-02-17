@@ -74,7 +74,9 @@ def engine(xml_dir):
 </doxygen>
 """)
 
-    return DoxygenQueryEngine(str(xml_dir))
+    engine = DoxygenQueryEngine(str(xml_dir))
+    engine._load_index()
+    return engine
 
 def test_load_index_valid(engine):
     assert "TestClass" in engine.compounds
@@ -86,6 +88,7 @@ def test_load_index_valid(engine):
 def test_load_index_missing(xml_dir):
     # DoxygenQueryEngine should handle missing index.xml gracefully
     engine = DoxygenQueryEngine(str(xml_dir / "nonexistent"))
+    engine._load_index()
     assert engine.compounds == {}
 
 def test_load_index_invalid_xml(xml_dir):
@@ -93,6 +96,7 @@ def test_load_index_invalid_xml(xml_dir):
     index_xml = xml_dir / "index.xml"
     index_xml.write_text("invalid xml")
     engine = DoxygenQueryEngine(str(xml_dir))
+    engine._load_index()
     assert engine.compounds == {}
 
 def test_query_symbol_exact(engine):

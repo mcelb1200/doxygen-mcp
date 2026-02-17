@@ -179,6 +179,8 @@ async def generate_documentation(
         )
 
         if result.returncode == 0:
+            # Clear all caches as documentation has been regenerated
+            DoxygenQueryEngine.clear_cache()
             return f"✅ Documentation generated successfully at {safe_project_path / 'docs' / 'html' / 'index.html'}"
         else:
             return f"❌ Documentation generation failed:\n{result.stderr or result.stdout}"
@@ -330,6 +332,7 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
             return "❌ Doxygen XML not found. Generate documentation first."
 
         # Re-initializing the engine effectively refreshes the index
+        DoxygenQueryEngine.clear_cache(xml_dir)
         await DoxygenQueryEngine.create(xml_dir)
         return "✅ Doxygen index refreshed successfully."
     except Exception as e:
