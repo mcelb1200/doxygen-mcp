@@ -26,16 +26,38 @@ class TestSecurityConfig:
 
         # The injected key should not appear at the start of a line
         assert '\nINJECTED_KEY=VALUE' not in doxyfile_content
-        # It should appear as part of the value (space separated)
-        # We need to handle the fact that sanitization replaces \n with space
-        # and escapes quotes.
+
+        # It should appear as part of the value, quoted and escaped.
         # Original: src" -> src\"
         # \n -> space
         # INJECTED_KEY=VALUE -> INJECTED_KEY=VALUE
-        # \n -> space
         # REM=" -> REM=\"
-        expected_part = 'src\\" INJECTED_KEY=VALUE REM=\\"'
+        # Wrapped in quotes: "src\" INJECTED_KEY=VALUE REM=\""
+        expected_part = '"src\\" INJECTED_KEY=VALUE REM=\\""'
         assert expected_part in doxyfile_content
+
+        # Normal path should also be quoted
+        assert '"normal_path"' in doxyfile_content
+
+    def test_list_paths_with_spaces(self):
+        """Test that paths with spaces are correctly quoted."""
+        path_with_spaces = "path/to/my project"
+        config = DoxygenConfig(input_paths=[path_with_spaces])
+        doxyfile_content = config.to_doxyfile()
+
+        # Should be quoted: "path/to/my project"
+        assert '"path/to/my project"' in doxyfile_content
+
+    def test_list_paths_windows_style(self):
+        """Test that Windows paths (backslashes) are correctly escaped and quoted."""
+        win_path = r"C:\Users\Name\Project"
+        config = DoxygenConfig(input_paths=[win_path])
+        doxyfile_content = config.to_doxyfile()
+
+        # Should be escaped: C:\\Users\\Name\\Project
+        # And quoted: "C:\\Users\\Name\\Project"
+        expected = '"C:\\\\Users\\\\Name\\\\Project"'
+        assert expected in doxyfile_content
 
     def test_output_directory_traversal_injection(self):
         """Test that output directory is sanitized (though path traversal is handled elsewhere)."""

@@ -132,8 +132,9 @@ class DoxygenConfig(BaseModel):
     def _sanitize_list(self, values: List[str]) -> List[str]:
         """
         @brief Sanitize a list of strings for Doxyfile.
+        @details Each item is sanitized and wrapped in quotes.
         """
-        return [self._sanitize_value(v) for v in values]
+        return [f'"{self._sanitize_value(v)}"' for v in values]
 
     def to_doxyfile(self) -> str:
         """
