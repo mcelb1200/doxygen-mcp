@@ -2,9 +2,12 @@ import asyncio
 import os
 import defusedxml.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, ClassVar
+from functools import lru_cache
 
 class DoxygenQueryEngine:
+    _cache: ClassVar[Dict[str, "DoxygenQueryEngine"]] = {}
+
     def __init__(self, xml_dir: str):
         self.xml_dir = Path(xml_dir)
         self.index_path = self.xml_dir / "index.xml"
@@ -13,9 +16,23 @@ class DoxygenQueryEngine:
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
+        xml_path = str(Path(xml_dir).absolute())
+        if xml_path in cls._cache:
+            return cls._cache[xml_path]
+
         self = cls(xml_dir)
         await asyncio.to_thread(self._load_index)
+        cls._cache[xml_path] = self
         return self
+
+    @classmethod
+    def clear_cache(cls, xml_dir: Optional[str] = None):
+        if xml_dir:
+            xml_path = str(Path(xml_dir).absolute())
+            if xml_path in cls._cache:
+                del cls._cache[xml_path]
+        else:
+            cls._cache.clear()
 
     def _load_index(self):
         if not self.index_path.exists():
@@ -58,6 +75,7 @@ class DoxygenQueryEngine:
                 return details.get("members", [])
         return []
 
+    @lru_cache(maxsize=128)
     def _fetch_compound_details(self, refid: str) -> Dict[str, Any]:
         xml_file = self.xml_dir / f"{refid}.xml"
         if not xml_file.exists():
