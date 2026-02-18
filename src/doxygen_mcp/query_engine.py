@@ -12,7 +12,9 @@ class DoxygenQueryEngine:
         self.xml_dir = Path(xml_dir)
         self.index_path = self.xml_dir / "index.xml"
         self.compounds = {}
-        self.file_index = {} # Map files to symbols
+        # Optimization indices
+        self._lower_map = {} # lower_case_name -> info
+        self._file_map = {} # basename -> list of info (for kind="file")
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
@@ -45,10 +47,23 @@ class DoxygenQueryEngine:
                 name = compound.find("name").text
                 kind = compound.get("kind")
                 refid = compound.get("refid")
-                self.compounds[name] = {
+                info = {
                     "kind": kind,
                     "refid": refid,
                 }
+                self.compounds[name] = info
+
+                # Build optimization indices
+                # 1. Case-insensitive lookup (O(1))
+                self._lower_map[name.lower()] = info
+
+                # 2. File lookup by basename (O(1))
+                if kind == "file":
+                    file_name = Path(name).name
+                    if file_name not in self._file_map:
+                        self._file_map[file_name] = []
+                    self._file_map[file_name].append(info)
+
         except Exception as e:
             print(f"Error loading index: {e}")
 
@@ -58,9 +73,14 @@ class DoxygenQueryEngine:
         if symbol_name in self.compounds:
             return self._fetch_compound_details(self.compounds[symbol_name]["refid"])
 
-        # Partial match
+        # Case-insensitive exact match (O(1) optimization)
+        lower_name = symbol_name.lower()
+        if lower_name in self._lower_map:
+            return self._fetch_compound_details(self._lower_map[lower_name]["refid"])
+
+        # Partial match (fallback to O(N) scan)
         for name, info in self.compounds.items():
-            if symbol_name.lower() in name.lower():
+            if lower_name in name.lower():
                 return self._fetch_compound_details(info["refid"])
 
         return None
@@ -69,10 +89,22 @@ class DoxygenQueryEngine:
         """Identify all symbols defined in a specific file"""
         # In Doxygen XML, files are also compounds
         file_name = Path(file_path).name
+
+        # 1. Optimization: Use pre-built file map for exact basename match (O(1))
+        # This covers the common case where the user provides the correct filename (e.g. "test_file.h")
+        candidates = self._file_map.get(file_name)
+        if candidates:
+            # Return the first match
+            details = self._fetch_compound_details(candidates[0]["refid"])
+            return details.get("members", [])
+
+        # 2. Fallback: Linear scan for suffix matching (O(N))
+        # This covers partial suffix matching (e.g. "file.h" matching "test_file.h")
         for name, info in self.compounds.items():
-            if info["kind"] == "file" and (name == file_name or name.endswith(file_name)):
+            if info["kind"] == "file" and name.endswith(file_name):
                 details = self._fetch_compound_details(info["refid"])
                 return details.get("members", [])
+
         return []
 
     @lru_cache(maxsize=128)
