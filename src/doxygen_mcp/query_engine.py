@@ -15,6 +15,7 @@ class DoxygenQueryEngine:
         # Optimization indices
         self._lower_map = {} # lower_case_name -> info
         self._file_map = {} # basename -> list of info (for kind="file")
+        self._files = [] # list of (name, info) for kind="file"
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
@@ -59,6 +60,7 @@ class DoxygenQueryEngine:
 
                 # 2. File lookup by basename (O(1))
                 if kind == "file":
+                    self._files.append((name, info))
                     file_name = Path(name).name
                     if file_name not in self._file_map:
                         self._file_map[file_name] = []
@@ -100,8 +102,8 @@ class DoxygenQueryEngine:
 
         # 2. Fallback: Linear scan for suffix matching (O(N))
         # This covers partial suffix matching (e.g. "file.h" matching "test_file.h")
-        for name, info in self.compounds.items():
-            if info["kind"] == "file" and name.endswith(file_name):
+        for name, info in self._files:
+            if name.endswith(file_name):
                 details = self._fetch_compound_details(info["refid"])
                 return details.get("members", [])
 
@@ -155,10 +157,18 @@ class DoxygenQueryEngine:
     def _get_text_recursive(self, element) -> str:
         if element is None:
             return ""
-        parts = [element.text or ""]
-        for child in element:
-            parts.append(self._get_text_recursive(child))
-            parts.append(child.tail or "")
+
+        parts = []
+
+        def _accumulate(el):
+            if el.text:
+                parts.append(el.text)
+            for child in el:
+                _accumulate(child)
+                if child.tail:
+                    parts.append(child.tail)
+
+        _accumulate(element)
         return "".join(parts).strip()
 
     def list_all_symbols(self, kind_filter: Optional[str] = None) -> List[str]:
