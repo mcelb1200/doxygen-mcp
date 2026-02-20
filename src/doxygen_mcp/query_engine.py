@@ -81,8 +81,9 @@ class DoxygenQueryEngine:
             return self._fetch_compound_details(self._lower_map[lower_name]["refid"])
 
         # Partial match (fallback to O(N) scan)
-        for name, info in self.compounds.items():
-            if lower_name in name.lower():
+        # Optimized: Iterate over _lower_map to avoid repeated .lower() calls on keys
+        for name_lower, info in self._lower_map.items():
+            if lower_name in name_lower:
                 return self._fetch_compound_details(info["refid"])
 
         return None
