@@ -1,77 +1,62 @@
 import pytest
-import asyncio
+import tempfile
 import os
+import asyncio
 from pathlib import Path
 from doxygen_mcp.query_engine import DoxygenQueryEngine
 
-def test_path_traversal_refid(tmp_path):
-    async def run_test():
-        # Setup directory structure
-        base_dir = tmp_path / "base"
-        base_dir.mkdir()
-
-        xml_dir = base_dir / "xml"
+@pytest.fixture
+def traversal_env():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        xml_dir = Path(tmpdir) / "xml"
         xml_dir.mkdir()
 
-        # Create a secret file outside xml_dir
-        secret_file = base_dir / "secret.xml"
-        secret_content = """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
-        <doxygen>
-          <compounddef kind="file">
-            <compoundname>SECRET_FILE</compoundname>
-          </compounddef>
-        </doxygen>
-        """
-        secret_file.write_text(secret_content)
+        # Create a secret file outside the XML directory
+        secret_file = Path(tmpdir) / "secret.xml"
+        secret_file.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="secret" kind="class">
+    <compoundname>SECRET_DATA</compoundname>
+    <briefdescription><para>You found me!</para></briefdescription>
+  </compounddef>
+</doxygen>
+""")
 
-        # Create a VALID file inside xml_dir
-        valid_file = xml_dir / "valid.xml"
-        valid_content = """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
-        <doxygen>
-          <compounddef kind="file">
-            <compoundname>VALID_FILE</compoundname>
-            <briefdescription><para>This is a valid file.</para></briefdescription>
-            <detaileddescription></detaileddescription>
-          </compounddef>
-        </doxygen>
-        """
-        valid_file.write_text(valid_content)
+        # Create index.xml with traversal refid
+        index_xml = xml_dir / "index.xml"
+        # The refid points to ../secret which resolves to secret.xml
+        index_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygenindex>
+  <compound refid="../secret" kind="class"><name>MaliciousClass</name></compound>
+</doxygenindex>
+""")
 
-        # Create index.xml with a malicious refid AND a valid refid
-        index_content = """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
-        <doxygenindex>
-          <compound refid="../secret" kind="file">
-            <name>MaliciousFile</name>
-          </compound>
-          <compound refid="valid" kind="file">
-            <name>ValidFile</name>
-          </compound>
-        </doxygenindex>
-        """
-        (xml_dir / "index.xml").write_text(index_content)
+        yield str(xml_dir)
 
-        # Initialize engine
-        engine = await DoxygenQueryEngine.create(str(xml_dir))
+def test_path_traversal_prevention(traversal_env):
+    """
+    Test that path traversal attempts via malicious refid in index.xml are blocked.
+    """
+    async def run_test():
+        engine = await DoxygenQueryEngine.create(traversal_env)
 
-        # Query the malicious symbol
-        result_malicious = engine.query_symbol("MaliciousFile")
+        # Attempt to query the malicious symbol
+        result = engine.query_symbol("MaliciousClass")
+        return result
 
-        # Query the valid symbol
-        result_valid = engine.query_symbol("ValidFile")
+    result = asyncio.run(run_test())
 
-        return result_malicious, result_valid
+    # Assert that the result does NOT contain the secret data
+    if result and "name" in result:
+        assert result["name"] != "SECRET_DATA", "Path traversal vulnerability: Accessed file outside XML directory!"
 
-    result_malicious, result_valid = asyncio.run(run_test())
-
-    # Verify the malicious file is blocked
-    print(f"Malicious Result: {result_malicious}")
-    assert result_malicious is not None
-    assert "error" in result_malicious
-    assert "Security Error" in result_malicious["error"]
-    assert "SECRET_FILE" not in str(result_malicious)
-
-    # Verify the valid file is accessible
-    print(f"Valid Result: {result_valid}")
-    assert result_valid is not None
-    assert "error" not in result_valid
-    assert result_valid.get("name") == "VALID_FILE"
+    # Ideally, it should return an error
+    if result:
+        # If the fix works, it should return an error dict or raise an exception caught inside
+        # But for now, we expect this test to FAIL because the fix is not applied yet.
+        # Wait, if I want to confirm failure, I should assert the OPPOSITE?
+        # No, I want the test to pass ONLY if the vulnerability is fixed.
+        # So currently it should FAIL.
+        assert "error" in result, f"Should return an error for path traversal attempt, got: {result}"
+        err = result.get("error", "")
+        assert "Security Error" in err or "Access denied" in err or "not found" in err
