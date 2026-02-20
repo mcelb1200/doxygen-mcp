@@ -109,7 +109,15 @@ class DoxygenQueryEngine:
 
     @lru_cache(maxsize=128)
     def _fetch_compound_details(self, refid: str) -> Dict[str, Any]:
-        xml_file = self.xml_dir / f"{refid}.xml"
+        try:
+            resolved_xml_dir = self.xml_dir.resolve()
+            xml_file = (self.xml_dir / f"{refid}.xml").resolve()
+
+            # Security check: Ensure the file is within the XML directory
+            xml_file.relative_to(resolved_xml_dir)
+        except (ValueError, RuntimeError):
+            return {"error": f"Security Error: Access denied to path '{refid}'"}
+
         if not xml_file.exists():
             return {"error": f"Details file {xml_file} not found"}
 
