@@ -9,7 +9,7 @@ import json
 import tempfile
 import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 import sys
 import os
@@ -43,7 +43,7 @@ class TestDoxygenConfig:
         
         assert 'PROJECT_NAME           = "Test Project"' in doxyfile_content
         assert 'OUTPUT_DIRECTORY       = "./test_docs"' in doxyfile_content
-        assert 'FILE_PATTERNS          = *.cpp *.h' in doxyfile_content
+        assert 'FILE_PATTERNS          = "*.cpp" "*.h"' in doxyfile_content
         assert 'EXTRACT_ALL            = YES' in doxyfile_content
     
     def test_language_optimization(self):
@@ -81,7 +81,7 @@ async def test_create_project_success():
             content = f.read()
         
         assert 'PROJECT_NAME           = "Test Project"' in content
-        assert '*.cpp *.hpp *.cc *.hh *.cxx *.hxx' in content
+        assert '"*.cpp" "*.hpp" "*.cc" "*.hh" "*.cxx" "*.hxx"' in content
 
 @pytest.mark.asyncio
 async def test_create_project_invalid_path():
@@ -101,7 +101,8 @@ async def test_scan_project_nonexistent():
         project_path="/nonexistent/path"
     )
     
-    assert "❌ Project path does not exist:" in result
+    # Path outside allowed roots raises Security Error
+    assert "Security Error" in result
 
 @pytest.mark.asyncio
 async def test_scan_project_success():
@@ -131,23 +132,25 @@ async def test_scan_project_success():
         assert ".py: 1 files" in result
 
 @pytest.mark.asyncio
-@patch('subprocess.run')
-async def test_check_doxygen_install_success(mock_run):
+@patch('asyncio.create_subprocess_exec')
+async def test_check_doxygen_install_success(mock_exec):
     """Test successful Doxygen installation check"""
-    mock_run.return_value = MagicMock(
-        returncode=0,
-        stdout="1.9.4\n"
-    )
+    # Create a mock process
+    process = AsyncMock()
+    process.communicate.return_value = (b"1.9.4\n", b"")
+    process.returncode = 0
+
+    mock_exec.return_value = process
 
     result = await check_doxygen_install()
     
     assert "✅ Doxygen 1.9.4 is installed and working" in result
 
 @pytest.mark.asyncio
-@patch('subprocess.run')
-async def test_check_doxygen_install_not_found(mock_run):
+@patch('asyncio.create_subprocess_exec')
+async def test_check_doxygen_install_not_found(mock_exec):
     """Test Doxygen not found"""
-    mock_run.side_effect = FileNotFoundError()
+    mock_exec.side_effect = FileNotFoundError()
 
     result = await check_doxygen_install()
     
@@ -165,8 +168,8 @@ async def test_generate_documentation_no_doxyfile():
         assert "❌ No Doxyfile found" in result
 
 @pytest.mark.asyncio
-@patch('subprocess.run')
-async def test_generate_documentation_success(mock_run):
+@patch('asyncio.create_subprocess_exec')
+async def test_generate_documentation_success(mock_exec):
     """Test successful documentation generation"""
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a mock Doxyfile
@@ -174,10 +177,10 @@ async def test_generate_documentation_success(mock_run):
         doxyfile_path.write_text("PROJECT_NAME = Test")
         
         # Mock successful doxygen execution
-        mock_run.side_effect = [
-            MagicMock(returncode=0, stdout="1.9.4\n"),  # version check
-            MagicMock(returncode=0, stderr="")  # documentation generation
-        ]
+        process = AsyncMock()
+        process.communicate.return_value = (b"", b"")
+        process.returncode = 0
+        mock_exec.return_value = process
         
         result = await generate_documentation(
             project_path=temp_dir,
@@ -219,7 +222,7 @@ class TestLanguageDetection:
         
         doxyfile_content = config.to_doxyfile()
         
-        assert "*.cpp *.hpp *.cc *.hh *.cxx *.hxx" in doxyfile_content
+        assert '"*.cpp" "*.hpp" "*.cc" "*.hh" "*.cxx" "*.hxx"' in doxyfile_content
         assert "OPTIMIZE_OUTPUT_FOR_C  = NO" in doxyfile_content
     
     def test_python_language_config(self):
@@ -232,7 +235,7 @@ class TestLanguageDetection:
         
         doxyfile_content = config.to_doxyfile()
         
-        assert "FILE_PATTERNS          = *.py" in doxyfile_content
+        assert 'FILE_PATTERNS          = "*.py"' in doxyfile_content
         assert "OPTIMIZE_OUTPUT_JAVA   = YES" in doxyfile_content
     
     def test_c_language_config(self):
@@ -245,7 +248,7 @@ class TestLanguageDetection:
         
         doxyfile_content = config.to_doxyfile()
         
-        assert "FILE_PATTERNS          = *.c *.h" in doxyfile_content
+        assert 'FILE_PATTERNS          = "*.c" "*.h"' in doxyfile_content
         assert "OPTIMIZE_OUTPUT_FOR_C  = YES" in doxyfile_content
 
 
