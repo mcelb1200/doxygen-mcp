@@ -170,20 +170,35 @@ async def generate_documentation(
     doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
 
     try:
-        # Run Doxygen
-        result = subprocess.run(
-            [doxygen_exe, str(doxyfile_path)],
+        # Run Doxygen asynchronously with timeout
+        process = await asyncio.create_subprocess_exec(
+            doxygen_exe,
+            str(doxyfile_path),
             cwd=str(safe_project_path),
-            capture_output=True,
-            text=True
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
 
-        if result.returncode == 0:
+        try:
+            # Set a 300-second timeout to prevent indefinite hangs
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=300.0)
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass  # Process already finished
+            await process.wait()
+            return "❌ Documentation generation timed out after 300 seconds."
+
+        stdout_text = stdout.decode(errors='replace') if stdout else ""
+        stderr_text = stderr.decode(errors='replace') if stderr else ""
+
+        if process.returncode == 0:
             # Clear all caches as documentation has been regenerated
             DoxygenQueryEngine.clear_cache()
             return f"✅ Documentation generated successfully at {safe_project_path / 'docs' / 'html' / 'index.html'}"
         else:
-            return f"❌ Documentation generation failed:\n{result.stderr or result.stdout}"
+            return f"❌ Documentation generation failed:\n{stderr_text or stdout_text}"
 
     except Exception as e:
         return f"❌ Error generating documentation: {str(e)}"
@@ -235,16 +250,32 @@ async def check_doxygen_install() -> str:
     """Verify that Doxygen is installed and accessible"""
     doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
     try:
-        result = subprocess.run(
-            [doxygen_exe, "--version"],
-            capture_output=True,
-            text=True,
-            check=True
+        process = await asyncio.create_subprocess_exec(
+            doxygen_exe,
+            "--version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
         )
-        version = result.stdout.strip()
+
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+            return "❌ Doxygen check timed out"
+
+        if process.returncode != 0:
+            return "❌ Doxygen is not installed or returned an error"
+
+        version = stdout.decode(errors='replace').strip()
         return f"✅ Doxygen {version} is installed and working"
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, OSError):
         return "❌ Doxygen is not installed"
+    except Exception as e:
+        return f"❌ Error checking Doxygen: {str(e)}"
 
 @mcp.tool()
 async def query_project_reference(
