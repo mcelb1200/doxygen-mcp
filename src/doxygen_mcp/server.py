@@ -100,6 +100,7 @@ async def create_doxygen_project(
     language: Optional[str] = None,
     include_subdirs: bool = True,
     extract_private: bool = False,
+    follow_symlinks: bool = False,
 ) -> str:
     """Initialize a new Doxygen documentation project with configuration"""
     try:
@@ -120,7 +121,8 @@ async def create_doxygen_project(
             output_directory=str(safe_project_path / "docs"),
             input_paths=[str(safe_project_path)],
             recursive=include_subdirs,
-            extract_private=extract_private
+            extract_private=extract_private,
+            exclude_symlinks=not follow_symlinks
         )
 
         # Language-specific optimizations
