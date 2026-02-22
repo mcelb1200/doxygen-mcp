@@ -98,7 +98,7 @@ If you prefer to configure it manually, integrate into your MCP client (Claude D
 |------|-------------|
 | `get_context_info` | Returns information about the detected IDE and project root. |
 | `auto_configure` | Detects language and initializes a Doxygen project (wrapper for `create_doxygen_project`). |
-| `create_doxygen_project` | Initialize a new Doxygen documentation project with specific settings. |
+| `create_doxygen_project` | Initialize a new Doxygen documentation project (safely, without overwriting existing configs). |
 | `scan_project` | Analyze project structure and identify file types. |
 | `generate_documentation` | Triggers a full Doxygen build. |
 | `check_doxygen_install` | Verifies that Doxygen is installed and accessible. |
@@ -108,6 +108,14 @@ If you prefer to configure it manually, integrate into your MCP client (Claude D
 | `query_active_symbol` | Identifies and queries documentation for the symbol at the current cursor position. |
 | `query_project_reference` | Searches for detailed documentation of a symbol (class, function, etc.). |
 | `refresh_index` | Updates the server's internal model from disk. |
+
+## 🛡️ Security
+
+This server implements several security measures to protect your development environment:
+
+- **Path Traversal Protection**: All file access is restricted to the detected project root and explicitly whitelisted directories.
+- **Symlink Safety**: File creation and modification tools (like `create_doxygen_project`) refuse to follow symbolic links to prevent arbitrary file overwrites.
+- **Safe Configuration**: `auto_configure` and `create_doxygen_project` will not overwrite existing `Doxyfile` configurations to prevent data loss.
 
 ## 📄 License
 
