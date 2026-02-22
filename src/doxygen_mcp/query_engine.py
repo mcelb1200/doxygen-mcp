@@ -44,30 +44,36 @@ class DoxygenQueryEngine:
             return
 
         try:
-            tree = ET.parse(self.index_path)
-            root = tree.getroot()
-            # use iterfind to iterate lazily instead of building a full list with findall
-            for compound in root.iterfind("compound"):
-                name = compound.find("name").text
-                kind = compound.get("kind")
-                refid = compound.get("refid")
-                info = {
-                    "kind": kind,
-                    "refid": refid,
-                }
-                self.compounds[name] = info
+            # Use iterparse to handle large XML files with minimal memory usage
+            context = ET.iterparse(self.index_path, events=("end",))
 
-                # Build optimization indices
-                # 1. Case-insensitive lookup (O(1))
-                self._lower_map[name.lower()] = info
+            for event, elem in context:
+                if elem.tag == "compound":
+                    name_elem = elem.find("name")
+                    if name_elem is not None and name_elem.text:
+                        name = name_elem.text
+                        kind = elem.get("kind")
+                        refid = elem.get("refid")
+                        info = {
+                            "kind": kind,
+                            "refid": refid,
+                        }
+                        self.compounds[name] = info
 
-                # 2. File lookup by basename (O(1))
-                if kind == "file":
-                    self._files.append((name, info))
-                    file_name = Path(name).name
-                    if file_name not in self._file_map:
-                        self._file_map[file_name] = []
-                    self._file_map[file_name].append(info)
+                        # Build optimization indices
+                        # 1. Case-insensitive lookup (O(1))
+                        self._lower_map[name.lower()] = info
+
+                        # 2. File lookup by basename (O(1))
+                        if kind == "file":
+                            self._files.append((name, info))
+                            file_name = Path(name).name
+                            if file_name not in self._file_map:
+                                self._file_map[file_name] = []
+                            self._file_map[file_name].append(info)
+
+                    # Clear the element to free memory
+                    elem.clear()
 
         except Exception as e:
             print(f"Error loading index: {e}")
