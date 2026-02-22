@@ -205,6 +205,9 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
 
+    if ignore_file.is_symlink():
+        return False
+
     # Create file if it doesn't exist
     if not ignore_file.exists():
         try:
