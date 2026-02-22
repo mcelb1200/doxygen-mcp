@@ -43,6 +43,7 @@ class DoxygenConfig(BaseModel):
     input_paths: List[str] = ["."]
     file_patterns: List[str] = ["*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.php"]
     recursive: bool = True
+    exclude_symlinks: bool = True
     exclude_patterns: List[str] = []
 
     # Language optimization
@@ -99,7 +100,8 @@ class DoxygenConfig(BaseModel):
             config_data["project_name"] = get_project_name(root)
 
         # Get all fields of the model
-        fields = getattr(cls, "model_fields", getattr(cls, "__fields__", {}))
+        # Fallback to __annotations__ if Pydantic metadata is missing (e.g. in mocked environments)
+        fields = getattr(cls, "model_fields", getattr(cls, "__fields__", cls.__annotations__))
         for field_name in fields:
             env_var = f"DOXYGEN_MCP_{field_name.upper()}"
             if env_var in os.environ:
@@ -161,6 +163,7 @@ class DoxygenConfig(BaseModel):
             f"INPUT                  = {' '.join(self._sanitize_list(self.input_paths))}",
             f"FILE_PATTERNS          = {' '.join(self._sanitize_list(self.file_patterns))}",
             f"RECURSIVE              = {'YES' if self.recursive else 'NO'}",
+            f"EXCLUDE_SYMLINKS       = {'YES' if self.exclude_symlinks else 'NO'}",
         ]
 
         if self.exclude_patterns:
