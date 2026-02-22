@@ -142,6 +142,12 @@ async def create_doxygen_project(
 
         # Save configuration
         doxyfile_path = safe_project_path / "Doxyfile"
+
+        if doxyfile_path.is_symlink():
+            return f"❌ Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
+        if doxyfile_path.exists():
+            return f"❌ Doxyfile already exists at {doxyfile_path}. Use 'auto_configure' or backup first."
+
         with open(doxyfile_path, 'w', encoding='utf-8') as f:
             f.write(config.to_doxyfile())
 
