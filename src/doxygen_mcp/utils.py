@@ -96,9 +96,9 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
     return requested_path
 
 
-def detect_primary_language(project_path: Path) -> str:
+def _detect_primary_language_sync(project_path: Path) -> str:
     """
-    Identify the dominant programming language in the project to optimize Doxygen settings.
+    Synchronous helper to identify the dominant programming language.
     """
     ext_map = {
         ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp", ".hh": "cpp", ".cxx": "cpp",
@@ -129,6 +129,14 @@ def detect_primary_language(project_path: Path) -> str:
         return "mixed"
 
     return max(counts, key=counts.get)
+
+
+async def detect_primary_language(project_path: Path) -> str:
+    """
+    Identify the dominant programming language in the project to optimize Doxygen settings.
+    Offloaded to a thread pool to avoid blocking the event loop.
+    """
+    return await asyncio.to_thread(_detect_primary_language_sync, project_path)
 
 def get_project_name(resolved_path: Path) -> str:
     """
