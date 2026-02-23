@@ -5,7 +5,7 @@ import tempfile
 import asyncio
 import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 # Add src to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src")
@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) +
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
-    query_project_reference
+    query_project_reference,
+    _resolve_project_path
 )
 from doxygen_mcp.utils import resolve_project_path
 
@@ -56,23 +57,24 @@ class TestEnvConfig:
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
     @pytest.mark.asyncio
-    async def test_generate_docs_with_env(self, temp_project_dir):
+    @patch('asyncio.create_subprocess_exec')
+    async def test_generate_docs_with_env(self, mock_exec, temp_project_dir):
         """Test generating docs using environment variable"""
         # Create Doxyfile first
         (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test")
         
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            with patch('subprocess.run') as mock_run:
-                mock_run.side_effect = [
-                    MagicMock(returncode=0, stdout="1.9.4\n"),  # version check
-                    MagicMock(returncode=0, stderr="")  # generation
-                ]
-                
-                result = await generate_documentation(
-                    # project_path is None
-                )
-                
-                assert "✅ Documentation generated successfully" in result
+            # Mock successful doxygen execution
+            process = MagicMock()
+            process.communicate = AsyncMock(return_value=(b"", b""))
+            process.returncode = 0
+            mock_exec.return_value = process
+
+            result = await generate_documentation(
+                # project_path is None
+            )
+
+            assert "✅ Documentation generated successfully" in result
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):
