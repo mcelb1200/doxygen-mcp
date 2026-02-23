@@ -45,7 +45,7 @@ class TestEnvConfig:
         """Test fallback when path is missing entirely"""
         with patch.dict(os.environ, {}, clear=True):
             # Should resolve to CWD if nothing else found
-            resolved = _resolve_project_path(None)
+            resolved = resolve_project_path(None)
             assert resolved == Path.cwd()
 
     @pytest.mark.asyncio
