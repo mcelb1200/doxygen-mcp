@@ -1,14 +1,17 @@
-
+"""
+Tests for environment-based configuration and path resolution.
+"""
+import asyncio
 import os
 import sys
 import tempfile
-import asyncio
-import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
+import pytest
+
 # Add src to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src")
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 from doxygen_mcp.server import (
     create_doxygen_project,
@@ -20,11 +23,13 @@ from doxygen_mcp.utils import resolve_project_path
 
 @pytest.fixture
 def temp_project_dir():
+    """Fixture for a temporary project directory."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
 
 class TestEnvConfig:
-    
+    """Test suite for environment-based configuration."""
+
     def test_resolve_project_path_explicit(self, temp_project_dir):
         """Test resolving path when explicitly provided"""
         resolved = resolve_project_path(temp_project_dir)
@@ -52,7 +57,7 @@ class TestEnvConfig:
                 # project_path is None by default
                 language="python"
             )
-            
+
             assert "✅ Doxygen project 'Env Project' created successfully" in result
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
@@ -61,8 +66,8 @@ class TestEnvConfig:
     async def test_generate_docs_with_env(self, mock_exec, temp_project_dir):
         """Test generating docs using environment variable"""
         # Create Doxyfile first
-        (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test")
-        
+        (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test", encoding="utf-8")
+
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
             # Mock successful doxygen execution
             process = MagicMock()
@@ -70,9 +75,7 @@ class TestEnvConfig:
             process.returncode = 0
             mock_exec.return_value = process
 
-            result = await generate_documentation(
-                # project_path is None
-            )
+            result = await generate_documentation()
 
             assert "✅ Documentation generated successfully" in result
 
@@ -81,24 +84,24 @@ class TestEnvConfig:
         """Test querying with DOXYGEN_XML_DIR"""
         xml_dir = Path(temp_project_dir) / "xml"
         xml_dir.mkdir(parents=True)
-        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>")
-        
-        with patch.dict(os.environ, {"DOXYGEN_XML_DIR": str(xml_dir)}):
-             # Mock query engine to avoid actual parsing logic dependencies if possible,
-             # or just ensure it returns something we can assert on (even error is fine if path found)
-             
-             with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
-                 mock_engine = MagicMock()
-                 mock_engine.query_symbol.return_value = {"kind": "class", "name": "Test", "brief": "Brief", "detailed": "", "members": []}
-                 
-                 future = asyncio.Future()
-                 future.set_result(mock_engine)
-                 mock_engine_cls.create.return_value = future
+        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>", encoding="utf-8")
 
-                 result = await query_project_reference("Test")
-                 
-                 assert "Documentation for class Test" in result
-                 mock_engine_cls.create.assert_called_with(str(xml_dir))
+        with patch.dict(os.environ, {"DOXYGEN_XML_DIR": str(xml_dir)}):
+            with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
+                mock_engine = MagicMock()
+                mock_engine.query_symbol.return_value = {
+                    "kind": "class", "name": "Test", "brief": "Brief",
+                    "detailed": "", "members": []
+                }
+
+                future = asyncio.Future()
+                future.set_result(mock_engine)
+                mock_engine_cls.create.return_value = future
+
+                result = await query_project_reference("Test")
+
+                assert "Documentation for class Test" in result
+                mock_engine_cls.create.assert_called_with(str(xml_dir))
 
     @pytest.mark.asyncio
     async def test_query_reference_with_project_root_env(self, temp_project_dir):
@@ -106,22 +109,25 @@ class TestEnvConfig:
         # Setup standard structure: root/docs/xml
         xml_dir = Path(temp_project_dir) / "docs" / "xml"
         xml_dir.mkdir(parents=True)
-        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>")
-        
-        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-             # Clear XML_DIR to ensure we use PROJECT_ROOT
-             if "DOXYGEN_XML_DIR" in os.environ:
-                 del os.environ["DOXYGEN_XML_DIR"]
-                 
-             with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
-                 mock_engine = MagicMock()
-                 mock_engine.query_symbol.return_value = {"kind": "class", "name": "Test", "brief": "Brief", "detailed": "", "members": []}
-                 
-                 future = asyncio.Future()
-                 future.set_result(mock_engine)
-                 mock_engine_cls.create.return_value = future
+        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>", encoding="utf-8")
 
-                 result = await query_project_reference("Test")
-                 
-                 assert "Documentation for class Test" in result
-                 mock_engine_cls.create.assert_called_with(str(xml_dir))
+        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
+            # Clear XML_DIR to ensure we use PROJECT_ROOT
+            if "DOXYGEN_XML_DIR" in os.environ:
+                del os.environ["DOXYGEN_XML_DIR"]
+
+            with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
+                mock_engine = MagicMock()
+                mock_engine.query_symbol.return_value = {
+                    "kind": "class", "name": "Test", "brief": "Brief",
+                    "detailed": "", "members": []
+                }
+
+                future = asyncio.Future()
+                future.set_result(mock_engine)
+                mock_engine_cls.create.return_value = future
+
+                result = await query_project_reference("Test")
+
+                assert "Documentation for class Test" in result
+                mock_engine_cls.create.assert_called_with(str(xml_dir))

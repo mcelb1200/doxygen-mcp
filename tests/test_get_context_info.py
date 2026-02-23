@@ -1,7 +1,12 @@
-import pytest
+"""
+Tests for get_context_info tool.
+"""
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
+
 from doxygen_mcp.server import get_context_info
 
 @pytest.mark.asyncio
@@ -10,13 +15,25 @@ async def test_get_context_info_success():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         doxyfile_path = temp_path / "Doxyfile"
-        doxyfile_path.write_text("PROJECT_NAME = TestProject")
+        doxyfile_path.write_text("PROJECT_NAME = TestProject", encoding="utf-8")
 
         # Mock dependencies in server.py
+        ide_env = {
+            "ide": "vscode",
+            "workspace_root": str(temp_path),
+            "project_name": "TestProject"
+        }
+        active_ctx = {
+            "active_file": "main.py",
+            "cursor_line": "10",
+            "cursor_column": "1",
+            "selected_text": None
+        }
+
         with patch("doxygen_mcp.server.resolve_project_path", return_value=temp_path), \
              patch("doxygen_mcp.server.detect_primary_language", return_value="python"), \
-             patch("doxygen_mcp.server.get_ide_environment", return_value={"ide": "vscode", "workspace_root": str(temp_path), "project_name": "TestProject"}), \
-             patch("doxygen_mcp.server.get_active_context", return_value={"active_file": "main.py", "cursor_line": "10", "cursor_column": "1", "selected_text": None}):
+             patch("doxygen_mcp.server.get_ide_environment", return_value=ide_env), \
+             patch("doxygen_mcp.server.get_active_context", return_value=active_ctx):
 
             result = await get_context_info()
 
@@ -34,9 +51,10 @@ async def test_get_context_info_no_doxyfile():
         temp_path = Path(temp_dir)
 
         # Mock dependencies in server.py
+        ide_env = {"ide": "unknown", "workspace_root": str(temp_path)}
         with patch("doxygen_mcp.server.resolve_project_path", return_value=temp_path), \
              patch("doxygen_mcp.server.detect_primary_language", return_value="mixed"), \
-             patch("doxygen_mcp.server.get_ide_environment", return_value={"ide": "unknown", "workspace_root": str(temp_path)}), \
+             patch("doxygen_mcp.server.get_ide_environment", return_value=ide_env), \
              patch("doxygen_mcp.server.get_active_context", return_value={}):
 
             result = await get_context_info()
