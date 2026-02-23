@@ -13,13 +13,13 @@ import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 try:
-    from importlib.metadata import version
+    from importlib.metadata import version as get_package_version
 except ImportError:
     # Fallback for Python < 3.8
     try:
-        from importlib_metadata import version
+        from importlib_metadata import version as get_package_version # type: ignore
     except ImportError:
-        version = None
+        get_package_version = None # type: ignore
 
 # MCP server imports
 from mcp.server.fastmcp import FastMCP
@@ -123,7 +123,7 @@ async def create_doxygen_project(
         )
 
         # Language-specific optimizations
-        lang_settings = {
+        lang_settings: Dict[str, Dict[str, Any]] = {
             "c": {"optimize_output_for_c": True, "file_patterns": ["*.c", "*.h"]},
             "cpp": {"file_patterns": ["*.cpp", "*.hpp", "*.cc", "*.hh", "*.cxx", "*.hxx"]},
             "python": {"optimize_output_java": True, "file_patterns": ["*.py"]},
@@ -210,7 +210,7 @@ async def generate_documentation(
 
 def _perform_scan(safe_project_path: Path):
     """Sync helper to scan the filesystem without blocking the event loop"""
-    extensions = {}
+    extensions: Dict[str, int] = {}
     total_files = 0
 
     for root, dirs, files in os.walk(safe_project_path):
@@ -275,8 +275,8 @@ async def check_doxygen_install() -> str:
         if process.returncode != 0:
             return "❌ Doxygen is not installed or returned an error"
 
-        version = stdout.decode(errors='replace').strip()
-        return f"✅ Doxygen {version} is installed and working"
+        doxygen_version = stdout.decode(errors='replace').strip()
+        return f"✅ Doxygen {doxygen_version} is installed and working"
     except (FileNotFoundError, OSError):
         return "❌ Doxygen is not installed"
     except Exception as e:
@@ -529,13 +529,13 @@ def main():
     args, unknown = parser.parse_known_args()
 
     if args.version:
-        v = "unknown"
-        if version:
+        pkg_v = "unknown"
+        if get_package_version is not None:
             try:
-                v = version("doxygen-mcp")
+                pkg_v = get_package_version("doxygen-mcp")
             except:
                 pass
-        print(f"doxygen-mcp {v}")
+        print(f"doxygen-mcp {pkg_v}")
         sys.exit(0)
 
     if args.command == "config":

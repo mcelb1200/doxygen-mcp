@@ -1,9 +1,9 @@
 import asyncio
 import os
-import defusedxml.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Optional, Any, ClassVar
+from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
+import defusedxml.ElementTree as ET
 
 
 class DoxygenQueryEngine:
@@ -13,11 +13,11 @@ class DoxygenQueryEngine:
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
-        self.compounds = {}
+        self.compounds: Dict[str, Any] = {}
         # Optimization indices
-        self._lower_map = {}  # lower_case_name -> info
-        self._file_map = {}  # basename -> list of info (for kind="file")
-        self._files = []  # list of (name, info) for kind="file"
+        self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
+        self._file_map: Dict[str, List[Dict[str, Any]]] = {}  # basename -> list of info (for kind="file")
+        self._files: List[Tuple[str, Dict[str, Any]]] = []  # list of (name, info) for kind="file"
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
@@ -47,7 +47,7 @@ class DoxygenQueryEngine:
             # Use iterparse to handle large XML files with minimal memory usage
             context = ET.iterparse(self.index_path, events=("end",))
 
-            for event, elem in context:
+            for _, elem in context:
                 if elem.tag == "compound":
                     name_elem = elem.find("name")
                     if name_elem is not None and name_elem.text:
