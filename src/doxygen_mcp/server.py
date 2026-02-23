@@ -33,6 +33,9 @@ from .utils import (
     get_active_context
 )
 
+# Internal alias for testing
+_resolve_project_path = resolve_project_path
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doxygen-mcp")
@@ -46,7 +49,7 @@ async def get_context_info() -> Dict[str, Any]:
     """
     try:
         project_path = resolve_project_path()
-        language = await detect_primary_language(project_path)
+        language = detect_primary_language(project_path)
         ide_info = get_ide_environment()
         active_context = get_active_context()
 
@@ -62,7 +65,7 @@ async def get_context_info() -> Dict[str, Any]:
                 "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
             }
         }
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         return {"error": str(e)}
 
 @mcp.tool()
@@ -75,7 +78,7 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
         if not project_name:
             project_name = project_path.name
 
-        language = await detect_primary_language(project_path)
+        language = detect_primary_language(project_path)
 
         if (project_path / "Doxyfile").exists():
             return f"✨ Project already configured at {project_path}. Detected language: {language}."
@@ -104,7 +107,7 @@ async def create_doxygen_project(
         # Resolve project path and detect language if not provided
         safe_project_path = resolve_project_path(project_path)
         if language is None:
-            language = await detect_primary_language(safe_project_path)
+            language = detect_primary_language(safe_project_path)
 
         if safe_project_path.exists() and not safe_project_path.is_dir():
             return f"❌ Path exists but is not a directory: {safe_project_path}"
@@ -553,7 +556,7 @@ def main():
                 logger.error("Please install Doxygen manually: https://www.doxygen.nl/download.html")
                 # We continue anyway to let MCP start, but tools will fail gracefully.
         else:
-             logger.warning(f"Setup script not found at {script_path}. Skipping auto-setup.")
+            logger.warning(f"Setup script not found at {script_path}. Skipping auto-setup.")
 
     # Only run MCP if not a custom command
     mcp.run()

@@ -5,9 +5,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
+import pytest  # pylint: disable=import-error
 
-from doxygen_mcp.server import get_context_info
+from doxygen_mcp.server import get_context_info  # pylint: disable=import-error
 
 @pytest.mark.asyncio
 async def test_get_context_info_success():

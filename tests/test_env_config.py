@@ -8,18 +8,19 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
-import pytest
+import pytest  # pylint: disable=import-error
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-
+# pylint: disable=import-error
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
-    query_project_reference,
-    _resolve_project_path
+    query_project_reference
 )
 from doxygen_mcp.utils import resolve_project_path
+# pylint: enable=import-error
+
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 @pytest.fixture
 def temp_project_dir():
@@ -27,6 +28,7 @@ def temp_project_dir():
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
 
+# pylint: disable=redefined-outer-name
 class TestEnvConfig:
     """Test suite for environment-based configuration."""
 
