@@ -40,9 +40,10 @@ def test_symlink_protection_doxyfile(tmp_path):
         os.symlink(target_file, symlink)
 
         # Mock dependencies
+        from unittest.mock import AsyncMock
         with patch("doxygen_mcp.server.resolve_project_path", return_value=project_root):
             with patch("doxygen_mcp.server.update_ignore_file", return_value=True):
-                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
+                 with patch("doxygen_mcp.server.detect_primary_language", new_callable=AsyncMock, return_value="python"):
                      result = await create_doxygen_project("TestProject", str(project_root))
 
         assert "Security Error" in result, f"Should return security error, got: {result}"
@@ -60,9 +61,10 @@ def test_overwrite_protection_doxyfile(tmp_path):
         doxyfile.write_text("existing content")
 
         # Mock dependencies
+        from unittest.mock import AsyncMock
         with patch("doxygen_mcp.server.resolve_project_path", return_value=project_root):
             with patch("doxygen_mcp.server.update_ignore_file", return_value=True):
-                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
+                 with patch("doxygen_mcp.server.detect_primary_language", new_callable=AsyncMock, return_value="python"):
                      result = await create_doxygen_project("TestProject", str(project_root))
 
         assert "Doxyfile already exists" in result, f"Should return exists error, got: {result}"

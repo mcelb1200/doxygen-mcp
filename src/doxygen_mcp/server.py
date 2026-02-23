@@ -46,7 +46,7 @@ async def get_context_info() -> Dict[str, Any]:
     """
     try:
         project_path = resolve_project_path()
-        language = detect_primary_language(project_path)
+        language = await detect_primary_language(project_path)
         ide_info = get_ide_environment()
         active_context = get_active_context()
 
@@ -75,7 +75,7 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
         if not project_name:
             project_name = project_path.name
 
-        language = detect_primary_language(project_path)
+        language = await detect_primary_language(project_path)
 
         if (project_path / "Doxyfile").exists():
             return f"✨ Project already configured at {project_path}. Detected language: {language}."
@@ -104,7 +104,7 @@ async def create_doxygen_project(
         # Resolve project path and detect language if not provided
         safe_project_path = resolve_project_path(project_path)
         if language is None:
-            language = detect_primary_language(safe_project_path)
+            language = await detect_primary_language(safe_project_path)
 
         if safe_project_path.exists() and not safe_project_path.is_dir():
             return f"❌ Path exists but is not a directory: {safe_project_path}"
