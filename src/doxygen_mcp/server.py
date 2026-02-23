@@ -143,7 +143,8 @@ async def create_doxygen_project(
         if doxyfile_path.is_symlink():
             return f"❌ Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
         if doxyfile_path.exists():
-            return f"❌ Doxyfile already exists at {doxyfile_path}. Use 'auto_configure' or backup first."
+            return (f"❌ Doxyfile already exists at {doxyfile_path}. "
+                    "Use 'auto_configure' or backup first.")
 
         with open(doxyfile_path, 'w', encoding='utf-8') as f:
             f.write(config.to_doxyfile())
@@ -151,7 +152,8 @@ async def create_doxygen_project(
         # Update .gitignore
         await update_ignore_file(safe_project_path, "docs/")
 
-        return f"✅ Doxygen project '{project_name}' created successfully at {safe_project_path} (Language: {language})"
+        return (f"✅ Doxygen project '{project_name}' created successfully at "
+                f"{safe_project_path} (Language: {language})")
 
     except Exception as e:
         return f"❌ Failed to create project: {str(e)}"
@@ -201,7 +203,8 @@ async def generate_documentation(
         if process.returncode == 0:
             # Clear all caches as documentation has been regenerated
             DoxygenQueryEngine.clear_cache()
-            return f"✅ Documentation generated successfully at {safe_project_path / 'docs' / 'html' / 'index.html'}"
+            output_path = safe_project_path / 'docs' / 'html' / 'index.html'
+            return f"✅ Documentation generated successfully at {output_path}"
         else:
             return f"❌ Documentation generation failed:\n{stderr_text or stdout_text}"
 
@@ -213,7 +216,7 @@ def _perform_scan(safe_project_path: Path):
     extensions = {}
     total_files = 0
 
-    for root, dirs, files in os.walk(safe_project_path):
+    for _, dirs, files in os.walk(safe_project_path):
         # Skip hidden directories
         dirs[:] = [d for d in dirs if not d.startswith('.')]
 
@@ -244,7 +247,8 @@ async def scan_project(
     extensions, total_files = await asyncio.to_thread(_perform_scan, safe_project_path)
 
     sorted_extensions = sorted(extensions.items(), key=lambda x: x[1], reverse=True)
-    result_text = f"📁 Project Scan Results: {safe_project_path}\n📊 Total Files Found: {total_files}\n\n📋 Files by Type:\n"
+    result_text = (f"📁 Project Scan Results: {safe_project_path}\n"
+                   f"📊 Total Files Found: {total_files}\n\n📋 Files by Type:\n")
     for ext, count in sorted_extensions[:10]:
         result_text += f"  📄 {ext}: {count} files\n"
 
@@ -296,7 +300,8 @@ async def query_project_reference(
         symbol_name = context.get("selected_text")
 
     if not symbol_name:
-        return "❌ Error: No symbol name provided and no text selection detected in the active context."
+        return ("❌ Error: No symbol name provided and no text selection "
+                "detected in the active context.")
 
     try:
         resolved_path = resolve_project_path(project_path)
@@ -313,7 +318,9 @@ async def query_project_reference(
                     break
 
         if not xml_dir:
-            return "❌ Error: Could not find Doxygen XML directory. Ensure XML generation is enabled in Doxyfile and documentation has been generated."
+            return ("❌ Error: Could not find Doxygen XML directory. "
+                    "Ensure XML generation is enabled in Doxyfile and "
+                    "documentation has been generated.")
 
         engine = await DoxygenQueryEngine.create(xml_dir)
         result = engine.query_symbol(symbol_name)
@@ -375,7 +382,11 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
         return f"❌ Error refreshing index: {str(e)}"
 
 @mcp.tool()
-async def get_symbol_at_location(file_path: str, line_number: int, project_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+async def get_symbol_at_location(
+    file_path: str,
+    line_number: int,
+    project_path: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
     """
     Find symbol context for the IDE's cursor.
     """
@@ -418,7 +429,8 @@ async def query_active_symbol(project_path: Optional[str] = None) -> str:
     line_str = context.get("cursor_line")
 
     if not file_path or not line_str:
-        return "❓ No active file or cursor position detected in the environment. Ensure your MCP client provides 'MCP_ACTIVE_FILE' and 'MCP_CURSOR_LINE'."
+        return ("❓ No active file or cursor position detected in the environment. "
+                "Ensure your MCP client provides 'MCP_ACTIVE_FILE' and 'MCP_CURSOR_LINE'.")
 
     try:
         line_number = int(line_str)
@@ -433,7 +445,10 @@ async def query_active_symbol(project_path: Optional[str] = None) -> str:
     return await query_project_reference(symbol["name"], project_path)
 
 @mcp.tool()
-async def get_file_structure(file_path: str, project_path: Optional[str] = None) -> List[Dict[str, Any]]:
+async def get_file_structure(
+    file_path: str,
+    project_path: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """
     Retrieve all symbols defined in a specific file.
     """
@@ -517,7 +532,7 @@ def main():
     parser.add_argument("--gemini", action="store_true", help="Generate Gemini CLI config")
     parser.add_argument("--cursor", action="store_true", help="Generate Cursor config")
 
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if args.version:
         v = "unknown"
@@ -538,7 +553,7 @@ def main():
     try:
         subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError):
-        logger.warning(f"Doxygen not found at '{doxygen_exe}'. Attempting automatic setup...")
+        logger.warning("Doxygen not found at '%s'. Attempting automatic setup...", doxygen_exe)
         # Use existing check_environment script
         # src/doxygen_mcp/server.py -> src/doxygen_mcp -> src -> root
         script_path = Path(__file__).parent.parent.parent / "scripts" / "check_environment.py"
@@ -549,11 +564,12 @@ def main():
                 subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
                 logger.info("Doxygen successfully installed and verified.")
             except Exception as e:
-                logger.error(f"Automatic setup failed or Doxygen still not found: {e}")
-                logger.error("Please install Doxygen manually: https://www.doxygen.nl/download.html")
+                logger.error("Automatic setup failed or Doxygen still not found: %s", e)
+                logger.error("Please install Doxygen manually: "
+                             "https://www.doxygen.nl/download.html")
                 # We continue anyway to let MCP start, but tools will fail gracefully.
         else:
-             logger.warning(f"Setup script not found at {script_path}. Skipping auto-setup.")
+             logger.warning("Setup script not found at %s. Skipping auto-setup.", script_path)
 
     # Only run MCP if not a custom command
     mcp.run()

@@ -2,6 +2,8 @@
 Tests for environment-based configuration and path resolution.
 """
 
+# pylint: disable=redefined-outer-name,import-error
+
 import os
 import sys
 import tempfile
