@@ -4,47 +4,49 @@ Doxygen Configuration
 This module handles Doxygen configuration generation and management.
 """
 
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 class DoxygenConfig(BaseModel):
     """
-    @brief Represents a Doxygen configuration with all major options
+    Represents a Doxygen configuration with all major options.
 
     This class encapsulates all the major configuration options available in Doxygen,
     providing a structured way to manage documentation generation settings. It supports
     multiple programming languages, output formats, and advanced features like diagram
     generation and source browsing.
 
-    @details The configuration is designed to be language-agnostic while providing
+    The configuration is designed to be language-agnostic while providing
     specific optimizations for different programming languages. It can generate
     Doxyfile content that is compatible with Doxygen 1.9.0 and later.
-
-    @example
-    @code{.py}
-    config = DoxygenConfig(
-        project_name="My API Documentation",
-        output_directory="./docs",
-        file_patterns=["*.cpp", "*.h"],
-        extract_private=False
-    )
-    doxyfile_content = config.to_doxyfile()
-    @endcode
     """
 
-    # Project settings
+    # Project related configuration options
     project_name: str = "My Project"
     project_number: str = ""
     project_brief: str = ""
-    project_logo: str = ""
     output_directory: str = "./docs"
+    create_subdirs: bool = False
+    allow_unicode_names: bool = False
+    output_language: str = "English"
 
-    # Input settings
+    # Build related configuration options
+    extract_all: bool = True
+    extract_private: bool = False
+    extract_priv_virtual: bool = False
+    extract_static: bool = True
+    extract_local_classes: bool = True
+    extract_local_methods: bool = False
+    extract_anon_ns: bool = False
+    case_sense_names: bool = False
+
+    # Input related configuration options
     input_paths: List[str] = ["."]
-    file_patterns: List[str] = ["*.c", "*.cpp", "*.h", "*.hpp", "*.py", "*.php"]
+    input_encoding: str = "UTF-8"
+    file_patterns: List[str] = ["*.c", "*.cpp", "*.h", "*.py", "*.java", "*.cs"]
     recursive: bool = True
-    exclude_symlinks: bool = True
-    exclude_patterns: List[str] = []
+    exclude_paths: List[str] = []
+    exclude_symlinks: bool = False
 
     # Language optimization
     optimize_output_for_c: bool = False
@@ -52,155 +54,135 @@ class DoxygenConfig(BaseModel):
     optimize_for_fortran: bool = False
     optimize_output_vhdl: bool = False
 
-    # Output formats
+    # Output format configuration
     generate_html: bool = True
     generate_latex: bool = False
+    generate_xml: bool = True
     generate_rtf: bool = False
     generate_man: bool = False
-    generate_xml: bool = True
-    generate_docbook: bool = False
-
-    # Documentation extraction
-    extract_all: bool = True
-    extract_private: bool = False
-    extract_static: bool = True
-    extract_local_classes: bool = True
 
     # Diagram generation
-    have_dot: bool = True
-    class_graph: bool = True
-    collaboration_graph: bool = True
+    have_dot: bool = False
     call_graph: bool = False
     caller_graph: bool = False
-    include_graph: bool = True
-    included_by_graph: bool = True
+    inheritance_graph: bool = True
+    collaboration_graph: bool = True
+    directory_graph: bool = True
+    dot_path: str = ""
 
-    # Advanced features
+    # Source browsing
     source_browser: bool = True
     inline_sources: bool = False
-    strip_code_comments: bool = True
+    strip_code_comments: bool = False
     referenced_by_relation: bool = True
     references_relation: bool = True
+    references_link_source: bool = True
 
     @classmethod
     def from_env(cls, **kwargs) -> "DoxygenConfig":
         """
-        Create configuration with environment variable overrides.
-        Env vars should follow DOXYGEN_MCP_VAR_NAME format.
+        Create a DoxygenConfig instance from environment variables and overrides.
         """
+        # pylint: disable=import-outside-toplevel
         import os
         from .utils import resolve_project_path, get_project_name
 
-        # Start with kwargs if provided, or defaults
-        config_data = kwargs.copy()
+        # Default values from environment
+        project_root = resolve_project_path()
+        defaults = {
+            "project_name": get_project_name(project_root),
+            "output_directory": str(project_root / "docs"),
+            "input_paths": [str(project_root)],
+        }
 
-        # Automatically detect project name if not provided
-        if "project_name" not in config_data:
-            root = resolve_project_path(config_data.get("project_path"))
-            config_data["project_name"] = get_project_name(root)
+        # Override defaults with kwargs
+        defaults.update(kwargs)
 
-        # Get all fields of the model
-        # Fallback to __annotations__ if Pydantic metadata is missing (e.g. in mocked environments)
-        fields = getattr(cls, "model_fields", getattr(cls, "__fields__", cls.__annotations__))
-        for field_name in fields:
-            env_var = f"DOXYGEN_MCP_{field_name.upper()}"
+        # Further override with env vars prefixed with DOXYGEN_MCP_
+        config_obj = cls(**defaults)
+
+        # Get field names from model
+        # pylint: disable=no-member
+        try:
+            fields = config_obj.model_fields.keys() # Pydantic v2
+        except AttributeError:
+            fields = config_obj.__fields__.keys() # Pydantic v1 fallback
+
+        for field in fields:
+            env_var = f"DOXYGEN_MCP_{field.upper()}"
             if env_var in os.environ:
                 val = os.environ[env_var]
-                # Type conversion based on field type
-                field_type = cls.__annotations__.get(field_name)
-                if field_type == bool:
-                    config_data[field_name] = val.lower() in ("yes", "true", "1")
-                elif field_type == List[str]:
-                    config_data[field_name] = [v.strip() for v in val.split(",")]
+                # Simple type conversion for bool and list
+                if isinstance(getattr(config_obj, field), bool):
+                    setattr(config_obj, field, val.lower() in ('yes', 'true', '1'))
+                elif isinstance(getattr(config_obj, field), list):
+                    setattr(config_obj, field, val.split(','))
                 else:
-                    config_data[field_name] = val
+                    setattr(config_obj, field, val)
 
-        return cls(**config_data)
-
-    def _sanitize_value(self, value: str) -> str:
-        """
-        @brief Sanitize a string value for Doxyfile.
-        @details Escapes backslashes and double quotes, and replaces newlines
-        to prevent configuration injection.
-        """
-        # Escape backslashes first to avoid double escaping
-        value = value.replace('\\', '\\\\')
-        # Escape double quotes
-        value = value.replace('"', '\\"')
-        # Replace newlines with spaces to prevent key injection
-        value = value.replace('\n', ' ').replace('\r', '')
-        return value
-
-    def _sanitize_list(self, values: List[str]) -> List[str]:
-        """
-        @brief Sanitize a list of strings for Doxyfile.
-        @details Each item is sanitized and wrapped in quotes.
-        """
-        return [f'"{self._sanitize_value(v)}"' for v in values]
+        return config_obj
 
     def to_doxyfile(self) -> str:
         """
-        @brief Convert configuration to Doxyfile format
-        @return String containing complete Doxyfile configuration
+        Generate a Doxyfile string from the current configuration.
         """
         lines = [
-            f"# Doxyfile generated by Doxygen MCP Server",
-            f"",
-            f"# Project related configuration options",
-            f"PROJECT_NAME           = \"{self._sanitize_value(self.project_name)}\"",
-            f"PROJECT_NUMBER         = \"{self._sanitize_value(self.project_number)}\"",
-            f"PROJECT_BRIEF          = \"{self._sanitize_value(self.project_brief)}\"",
-            f"PROJECT_LOGO           = \"{self._sanitize_value(self.project_logo)}\"",
-            f"OUTPUT_DIRECTORY       = \"{self._sanitize_value(self.output_directory)}\"",
-            f"",
-            f"# Build related configuration options",
-            f"EXTRACT_ALL            = {'YES' if self.extract_all else 'NO'}",
-            f"EXTRACT_PRIVATE        = {'YES' if self.extract_private else 'NO'}",
-            f"EXTRACT_STATIC         = {'YES' if self.extract_static else 'NO'}",
-            f"EXTRACT_LOCAL_CLASSES  = {'YES' if self.extract_local_classes else 'NO'}",
-            f"",
-            f"# Input related configuration options",
-            f"INPUT                  = {' '.join(self._sanitize_list(self.input_paths))}",
-            f"FILE_PATTERNS          = {' '.join(self._sanitize_list(self.file_patterns))}",
-            f"RECURSIVE              = {'YES' if self.recursive else 'NO'}",
-            f"EXCLUDE_SYMLINKS       = {'YES' if self.exclude_symlinks else 'NO'}",
+            "# Doxyfile generated by Doxygen MCP Server",
+            "",
+            "# Project related configuration options",
+            f'PROJECT_NAME           = "{self._sanitize_value(self.project_name)}"',
+            f'PROJECT_NUMBER         = "{self._sanitize_value(self.project_number)}"',
+            f'PROJECT_BRIEF          = "{self._sanitize_value(self.project_brief)}"',
+            f'OUTPUT_DIRECTORY       = "{self.output_directory}"',
+            f'CREATE_SUBDIRS         = {"YES" if self.create_subdirs else "NO"}',
+            f'ALLOW_UNICODE_NAMES    = {"YES" if self.allow_unicode_names else "NO"}',
+            f'OUTPUT_LANGUAGE        = {self.output_language}',
+            "",
+            "# Build related configuration options",
+            f'EXTRACT_ALL            = {"YES" if self.extract_all else "NO"}',
+            f'EXTRACT_PRIVATE        = {"YES" if self.extract_private else "NO"}',
+            f'EXTRACT_STATIC         = {"YES" if self.extract_static else "NO"}',
+            f'CASE_SENSE_NAMES       = {"YES" if self.case_sense_names else "NO"}',
+            "",
+            "# Input related configuration options",
+            f'INPUT                  = {self._sanitize_list(self.input_paths)}',
+            f'INPUT_ENCODING         = {self.input_encoding}',
+            f'FILE_PATTERNS          = {self._sanitize_list(self.file_patterns)}',
+            f'RECURSIVE              = {"YES" if self.recursive else "NO"}',
+            f'EXCLUDE                = {self._sanitize_list(self.exclude_paths)}',
+            f'EXCLUDE_SYMLINKS       = {"YES" if self.exclude_symlinks else "NO"}',
+            "",
+            "# Language optimization",
+            f'OPTIMIZE_OUTPUT_FOR_C  = {"YES" if self.optimize_output_for_c else "NO"}',
+            f'OPTIMIZE_OUTPUT_JAVA   = {"YES" if self.optimize_output_java else "NO"}',
+            "",
+            "# Output format configuration",
+            f'GENERATE_HTML          = {"YES" if self.generate_html else "NO"}',
+            f'GENERATE_LATEX         = {"YES" if self.generate_latex else "NO"}',
+            f'GENERATE_XML           = {"YES" if self.generate_xml else "NO"}',
+            "",
+            "# Diagram generation",
+            f'HAVE_DOT               = {"YES" if self.have_dot else "NO"}',
+            f'DOT_PATH               = "{self.dot_path}"',
+            f'CALL_GRAPH             = {"YES" if self.call_graph else "NO"}',
+            f'CALLER_GRAPH           = {"YES" if self.caller_graph else "NO"}',
+            "",
+            "# Source browsing",
+            f'SOURCE_BROWSER         = {"YES" if self.source_browser else "NO"}',
+            f'INLINE_SOURCES         = {"YES" if self.inline_sources else "NO"}',
         ]
-
-        if self.exclude_patterns:
-            lines.append(f"EXCLUDE_PATTERNS       = {' '.join(self._sanitize_list(self.exclude_patterns))}")
-
-        lines.extend([
-            f"",
-            f"# Language optimization",
-            f"OPTIMIZE_OUTPUT_FOR_C  = {'YES' if self.optimize_output_for_c else 'NO'}",
-            f"OPTIMIZE_OUTPUT_JAVA   = {'YES' if self.optimize_output_java else 'NO'}",
-            f"OPTIMIZE_FOR_FORTRAN   = {'YES' if self.optimize_for_fortran else 'NO'}",
-            f"OPTIMIZE_OUTPUT_VHDL   = {'YES' if self.optimize_output_vhdl else 'NO'}",
-            f"",
-            f"# Output format configuration",
-            f"GENERATE_HTML          = {'YES' if self.generate_html else 'NO'}",
-            f"GENERATE_LATEX         = {'YES' if self.generate_latex else 'NO'}",
-            f"GENERATE_RTF           = {'YES' if self.generate_rtf else 'NO'}",
-            f"GENERATE_MAN           = {'YES' if self.generate_man else 'NO'}",
-            f"GENERATE_XML           = {'YES' if self.generate_xml else 'NO'}",
-            f"GENERATE_DOCBOOK       = {'YES' if self.generate_docbook else 'NO'}",
-            f"",
-            f"# Diagram generation",
-            f"HAVE_DOT               = {'YES' if self.have_dot else 'NO'}",
-            f"CLASS_GRAPH            = {'YES' if self.class_graph else 'NO'}",
-            f"COLLABORATION_GRAPH    = {'YES' if self.collaboration_graph else 'NO'}",
-            f"CALL_GRAPH             = {'YES' if self.call_graph else 'NO'}",
-            f"CALLER_GRAPH           = {'YES' if self.caller_graph else 'NO'}",
-            f"INCLUDE_GRAPH          = {'YES' if self.include_graph else 'NO'}",
-            f"INCLUDED_BY_GRAPH      = {'YES' if self.included_by_graph else 'NO'}",
-            f"",
-            f"# Source browsing",
-            f"SOURCE_BROWSER         = {'YES' if self.source_browser else 'NO'}",
-            f"INLINE_SOURCES         = {'YES' if self.inline_sources else 'NO'}",
-            f"STRIP_CODE_COMMENTS    = {'YES' if self.strip_code_comments else 'NO'}",
-            f"REFERENCED_BY_RELATION = {'YES' if self.referenced_by_relation else 'NO'}",
-            f"REFERENCES_RELATION    = {'YES' if self.references_relation else 'NO'}",
-        ])
 
         return "\n".join(lines)
 
+    def _sanitize_value(self, value: str) -> str:
+        """Sanitize a value for inclusion in a Doxyfile string."""
+        if not value: return ""
+        # Escape quotes and handle newlines to prevent configuration injection
+        return value.replace('"', '\\"').replace('\n', ' ').replace('\r', '')
+
+    def _sanitize_list(self, values: List[str]) -> str:
+        """Sanitize and format a list of values for a Doxyfile string."""
+        if not values: return ""
+        # Wrap each item in quotes and join with spaces
+        sanitized = [f'"{self._sanitize_value(v)}"' for v in values]
+        return " ".join(sanitized)

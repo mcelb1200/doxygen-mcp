@@ -11,7 +11,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,broad-exception-caught
 from doxygen_mcp.server import create_doxygen_project
 from doxygen_mcp.utils import resolve_project_path
 
@@ -68,7 +68,6 @@ async def test_tools():
         else:
             print("  Doxyfile check: FAILED")
 
-    # pylint: disable=broad-exception-caught
     except Exception as e:
         print(f"  Exception during tool call: {e}")
 

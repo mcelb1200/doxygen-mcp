@@ -2,20 +2,20 @@
 Tests for environment-based configuration and path resolution.
 """
 
-# pylint: disable=redefined-outer-name,import-error
-
 import os
 import sys
 import tempfile
 import asyncio
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+
+# pylint: disable=import-error
 import pytest
 
 # Add src to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src")
 
-# pylint: disable=wrong-import-position
+# pylint: disable=wrong-import-position,redefined-outer-name
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,

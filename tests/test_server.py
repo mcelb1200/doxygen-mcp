@@ -4,6 +4,8 @@ Tests for Doxygen MCP Server
 Basic test suite to verify core functionality of the Doxygen MCP server.
 """
 
+# pylint: disable=wrong-import-order,wrong-import-position,unused-import,broad-exception-caught
+
 import asyncio
 import json
 import tempfile
@@ -27,9 +29,9 @@ class TestDoxygenConfig:
         """Test default configuration values"""
         config = DoxygenConfig()
         assert config.project_name == "My Project"
-        assert config.extract_all == True
-        assert config.generate_html == True
-        assert config.recursive == True
+        assert config.extract_all is True
+        assert config.generate_html is True
+        assert config.recursive is True
     
     def test_config_serialization(self):
         """Test Doxyfile generation"""
@@ -77,7 +79,7 @@ async def test_create_project_success():
         assert doxyfile_path.exists()
         
         # Verify content
-        with open(doxyfile_path, 'r') as f:
+        with open(doxyfile_path, 'r', encoding='utf-8') as f:
             content = f.read()
         
         assert 'PROJECT_NAME           = "Test Project"' in content

@@ -2,6 +2,8 @@
 Utility functions for Doxygen MCP context discovery and environment integration.
 """
 
+# pylint: disable=broad-exception-caught,bare-except
+
 import os
 import json
 import asyncio
@@ -177,9 +179,9 @@ def get_ide_environment() -> Dict[str, Any]:
         vscode_settings = project_root / ".vscode" / "settings.json"
         if vscode_settings.exists():
             try:
-                with open(vscode_settings, "r") as f:
+                with open(vscode_settings, "r", encoding='utf-8') as f:
                     context["vscode_settings"] = json.load(f)
-            except:
+            except Exception:
                 pass
 
     # JetBrains detection

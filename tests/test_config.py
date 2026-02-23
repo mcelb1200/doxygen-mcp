@@ -1,11 +1,17 @@
+"""
+Tests for Doxygen configuration model.
+"""
+
+# pylint: disable=unused-variable,import-error,wrong-import-order,unused-import
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import patch, MagicMock
+import pytest
 from doxygen_mcp.config import DoxygenConfig
 
 class TestDoxygenConfig:
+    """Test the DoxygenConfig model."""
     def test_from_env_basic(self):
         """Test from_env with default values and no environment variables."""
         # Mocking utils to avoid side effects and dependency on environment

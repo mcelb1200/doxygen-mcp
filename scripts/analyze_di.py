@@ -1,3 +1,9 @@
+"""
+Analyze Dependency Injection patterns in the codebase using Doxygen XML.
+"""
+
+# pylint: disable=wrong-import-position,too-many-locals,unused-import
+
 import os
 import sys
 from pathlib import Path
@@ -8,7 +14,8 @@ sys.path.append(str(Path("src").resolve()))
 from doxygen_mcp.query_engine import DoxygenQueryEngine
 
 # Force UTF-8 output for Windows console redirection
-sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def is_logic_class(name: str) -> bool:
     """Check if class name suggests it contains business logic."""
@@ -18,87 +25,61 @@ def is_logic_class(name: str) -> bool:
     ]
     return any(name.endswith(s) for s in suffixes)
 
-def analyze_di_compliance(xml_dir: str):
+def analyze_di_patterns(xml_dir: str):
+    """Scan XML for potential dependency injection compliance and violations."""
     print("# Dependency Injection Compliance Report")
     print(f"\n**Analysis Target:** `{xml_dir}`")
+
     engine = DoxygenQueryEngine(xml_dir)
 
     # Get all classes
     classes = engine.list_all_symbols(kind_filter="class")
     print(f"\n- **Total Classes Found:** {len(classes)}")
 
-    logic_classes = [c for c in classes if is_logic_class(c)]
-    print(f"- **Logic Classes Analyzed:** {len(logic_classes)}")
+    logic_classes = [c for c in classes if is_logic_class(c['name'])]
+    print(f"- **Classes requiring DI (heuristic):** {len(logic_classes)}")
 
-    flagged_classes = []
+    violations = []
+    compliance = []
 
-    for class_name in logic_classes:
-        details = engine.query_symbol(class_name)
-        if not details or "error" in details:
-            continue
+    for class_info in logic_classes:
+        details = engine.query_symbol(class_info['name'])
+        if not details: continue
 
-        members = details.get("members", [])
+        has_constructor = False
+        constructor_params = []
+        global_vars_used = False
 
-        # Find constructor
-        constructors = [m for m in members if m["name"] == class_name]
+        for member in details.get('members', []):
+            if member['kind'] == 'function' and member['name'] == class_info['name'].split('::')[-1]:
+                has_constructor = True
+                constructor_params.append(member.get('argsstring', ''))
 
-        has_dependencies = False
-        constructor_args = ""
+            # Check for direct global access in detailed description (crude heuristic)
+            if 'detailed' in details and 'global' in details['detailed'].lower():
+                global_vars_used = True
 
-        if constructors:
-            for c in constructors:
-                args = c["args"]
-                constructor_args = args
-                # Heuristic: Check for references (&) or pointers (*) which usually restrict dependencies
-                # And check if it's not just "void" or empty
-                if "&" in args or "*" in args:
-                    has_dependencies = True
-                    break
+        if has_constructor and any(constructor_params):
+            compliance.append(class_info['name'])
+        else:
+            violations.append(class_info['name'])
 
-        # Check for singleton pattern (getInstance method)
-        has_get_instance = any(m["name"] == "getInstance" for m in members)
+    print(f"\n## Compliance Summary")
+    print(f"- ✅ **Compliant classes:** {len(compliance)}")
+    print(f"- ⚠️ **Potential Violations:** {len(violations)}")
 
-        if not has_dependencies:
-            reason = "No dependencies in constructor"
-            if not constructors:
-                 # Check if it has a singleton getInstance, which confirms it's a singleton violating DI
-                if has_get_instance:
-                    reason = "Singleton (getInstance found, no public injection)"
-                else:
-                    # Might be a simple struct or implicit constructor, checking members
-                    # If it has static methods, might be a static utility class
-                    if any(m.get("static") == "yes" for m in members):
-                        reason = "Static Utility Class (likely)"
-                    else:
-                        reason = "No Code Constructor / Implicit"
+    if violations:
+        print("\n### Details: Potential Violations")
+        for v in violations[:10]:
+            print(f"- `{v}`: Missing constructor-based injection or uses static patterns.")
 
-            flagged_classes.append({
-                "name": class_name,
-                "reason": reason,
-                "args": constructor_args,
-                "has_get_instance": has_get_instance
-            })
-
-    print("\n## 🚨 Potential DI Violations")
-    print("| Class Name | Reason | Singleton? |")
-    print("| :--- | :--- | :---: |")
-
-    suspicious_count = 0
-    for c in sorted(flagged_classes, key=lambda x: x['name']):
-        # Filter out some likely false positives or trivial classes if needed
-        # For now, print all logic classes without clear dependencies
-        if c["reason"] == "Static Utility Class (likely)":
-            continue
-
-        singleton_mark = "✅ Yes" if c['has_get_instance'] else "No"
-        print(f"| `{c['name']}` | {c['reason']} | {singleton_mark} |")
-        suspicious_count += 1
-
-    print(f"\n**Summary:** Found **{suspicious_count}** suspicious classes out of **{len(logic_classes)}** logic classes checked.")
+    if len(logic_classes) > 0:
+        score = (len(compliance) / len(logic_classes)) * 100
+        print(f"\n**Overall DI Score:** {score:.1f}%")
 
 if __name__ == "__main__":
-    if "DOXYGEN_XML_DIR" not in os.environ:
-        # Default to MidiKobold path if not set
-        os.environ["DOXYGEN_XML_DIR"] = r"C:\GitHub\MidiKobold\xml"
-
-    analyze_di_compliance(os.environ["DOXYGEN_XML_DIR"])
+    target = os.environ.get("DOXYGEN_XML_DIR", "docs/xml")
+    if os.path.exists(target):
+        analyze_di_patterns(target)
+    else:
+        print(f"Error: XML directory not found at {target}")

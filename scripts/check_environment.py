@@ -8,7 +8,8 @@ import subprocess
 import sys
 import os
 from pathlib import Path
-import json
+
+# pylint: disable=broad-exception-caught,redefined-outer-name,no-else-return,multiple-statements
 
 def install_with_winget(package_id: str, name: str) -> bool:
     """Attempt to install a package using Windows Package Manager (winget)"""
@@ -18,10 +19,15 @@ def install_with_winget(package_id: str, name: str) -> bool:
         subprocess.run(["winget", "--version"], capture_output=True, check=True)
 
         # Install the package
+        cmd = [
+            "winget", "install", "--id", package_id, "--exact",
+            "--accept-package-agreements", "--accept-source-agreements"
+        ]
         result = subprocess.run(
-            ["winget", "install", "--id", package_id, "--exact", "--accept-package-agreements", "--accept-source-agreements"],
+            cmd,
             capture_output=True,
-            text=True
+            text=True,
+            check=False
         )
 
         if result.returncode == 0:

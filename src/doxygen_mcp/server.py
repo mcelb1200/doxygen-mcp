@@ -3,6 +3,8 @@
 Doxygen MCP Server - Context Aware Version
 """
 
+# pylint: disable=broad-exception-caught,too-many-arguments,too-many-positional-arguments
+
 import argparse
 import asyncio
 import json
@@ -569,7 +571,7 @@ def main():
                              "https://www.doxygen.nl/download.html")
                 # We continue anyway to let MCP start, but tools will fail gracefully.
         else:
-             logger.warning("Setup script not found at %s. Skipping auto-setup.", script_path)
+            logger.warning("Setup script not found at %s. Skipping auto-setup.", script_path)
 
     # Only run MCP if not a custom command
     mcp.run()

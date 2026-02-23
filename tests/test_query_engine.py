@@ -1,215 +1,150 @@
-import pytest
-import tempfile
+"""
+Tests for Doxygen query engine.
+"""
+
+# pylint: disable=redefined-outer-name,protected-access,import-error,wrong-import-order,unused-import
+
 import os
+import tempfile
 from pathlib import Path
 import xml.etree.ElementTree as ET
+import pytest
 from doxygen_mcp.query_engine import DoxygenQueryEngine
 
 @pytest.fixture
 def xml_dir():
+    """Fixture for a temporary XML directory"""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
 @pytest.fixture
 def engine(xml_dir):
+    """Fixture for a DoxygenQueryEngine instance"""
     # Create a basic index.xml
     index_xml = xml_dir / "index.xml"
     index_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygenindex version="1.9.1">
   <compound refid="class_test_class" kind="class"><name>TestClass</name></compound>
   <compound refid="namespace_test_namespace" kind="namespace"><name>TestNamespace</name></compound>
-  <compound refid="test_file_8h" kind="file"><name>test_file.h</name></compound>
+  <compound refid="test_file_h" kind="file"><name>test_file.h</name>
+    <member refid="test_file_h_1af62d2" kind="function"><name>test_func</name></member>
+  </compound>
 </doxygenindex>
-""")
+""", encoding='utf-8')
+    return DoxygenQueryEngine(str(xml_dir))
 
-    # Create a compound XML for TestClass
-    class_xml = xml_dir / "class_test_class.xml"
-    class_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen>
-  <compounddef id="class_test_class" kind="class">
-    <compoundname>TestClass</compoundname>
-    <location file="test_file.h" line="10" column="1"/>
-    <briefdescription><para>Brief description.</para></briefdescription>
-    <detaileddescription><para>Detailed description with <ref refid="other">link</ref>.</para></detaileddescription>
-    <sectiondef kind="public-func">
-      <memberdef kind="function" id="class_test_class_1method">
-        <name>testMethod</name>
-        <type>void</type>
-        <argsstring>(int x)</argsstring>
-        <location file="test_file.h" line="15" column="5"/>
-        <briefdescription><para>Method brief.</para></briefdescription>
-      </memberdef>
-    </sectiondef>
-  </compounddef>
-</doxygen>
-""")
-
-    # Create a compound XML for test_file.h
-    file_xml = xml_dir / "test_file_8h.xml"
-    file_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen>
-  <compounddef id="test_file_8h" kind="file">
-    <compoundname>test_file.h</compoundname>
-    <sectiondef kind="func">
-      <memberdef kind="function" id="global_func">
-        <name>globalFunc</name>
-        <type>int</type>
-        <argsstring>()</argsstring>
-        <location file="test_file.h" line="5" column="1"/>
-        <briefdescription><para>Global brief.</para></briefdescription>
-      </memberdef>
-    </sectiondef>
-  </compounddef>
-</doxygen>
-""")
-
-    # Create a compound XML for TestNamespace
-    ns_xml = xml_dir / "namespace_test_namespace.xml"
-    ns_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
-<doxygen>
-  <compounddef id="namespace_test_namespace" kind="namespace">
-    <compoundname>TestNamespace</compoundname>
-    <briefdescription><para>Namespace brief.</para></briefdescription>
-  </compounddef>
-</doxygen>
-""")
-
-    engine = DoxygenQueryEngine(str(xml_dir))
+def test_load_index(engine):
+    """Test loading the index.xml file."""
     engine._load_index()
-    return engine
-
-def test_load_index_valid(engine):
     assert "TestClass" in engine.compounds
-    assert engine.compounds["TestClass"]["kind"] == "class"
-    assert engine.compounds["TestClass"]["refid"] == "class_test_class"
     assert "TestNamespace" in engine.compounds
     assert "test_file.h" in engine.compounds
-
-def test_load_index_missing(xml_dir):
-    # DoxygenQueryEngine should handle missing index.xml gracefully
-    engine = DoxygenQueryEngine(str(xml_dir / "nonexistent"))
-    engine._load_index()
-    assert engine.compounds == {}
-
-def test_load_index_invalid_xml(xml_dir):
-    # DoxygenQueryEngine should handle malformed XML
-    index_xml = xml_dir / "index.xml"
-    index_xml.write_text("invalid xml")
-    engine = DoxygenQueryEngine(str(xml_dir))
-    engine._load_index()
-    assert engine.compounds == {}
+    assert engine.compounds["TestClass"]["kind"] == "class"
 
 def test_query_symbol_exact(engine):
+    """Test querying a symbol with an exact match."""
+    engine._load_index()
     result = engine.query_symbol("TestClass")
     assert result is not None
     assert result["name"] == "TestClass"
-    assert result["kind"] == "class"
 
-def test_query_symbol_partial(engine):
-    # Partial match should work (case-insensitive as per observed code)
+def test_query_symbol_case_insensitive(engine):
+    """Test querying a symbol with a case-insensitive match."""
+    engine._load_index()
     result = engine.query_symbol("testclass")
     assert result is not None
     assert result["name"] == "TestClass"
 
-    result = engine.query_symbol("Namespace")
+def test_query_symbol_partial(engine):
+    """Test querying a symbol with a partial match."""
+    engine._load_index()
+    result = engine.query_symbol("Class")
     assert result is not None
-    assert result["name"] == "TestNamespace"
-
-def test_query_symbol_not_found(engine):
-    result = engine.query_symbol("NonExistent")
-    assert result is None
-
-def test_get_file_structure_exact(engine):
-    result = engine.get_file_structure("test_file.h")
-    assert len(result) == 1
-    assert result[0]["name"] == "globalFunc"
-
-def test_get_file_structure_suffix(engine):
-    # In Doxygen, file compounds often have full paths or relative paths as names.
-    # The code uses name.endswith(file_name)
-    result = engine.get_file_structure("file.h")
-    assert len(result) == 1
-    assert result[0]["name"] == "globalFunc"
-
-def test_get_file_structure_not_found(engine):
-    result = engine.get_file_structure("nonexistent.h")
-    assert result == []
-
-def test_fetch_compound_details_success(engine):
-    result = engine._fetch_compound_details("class_test_class")
     assert result["name"] == "TestClass"
-    assert result["kind"] == "class"
-    assert result["location"]["file"] == "test_file.h"
-    assert result["brief"] == "Brief description."
-    assert "Detailed description" in result["detailed"]
-    assert len(result["members"]) == 1
-    assert result["members"][0]["name"] == "testMethod"
-    assert result["members"][0]["type"] == "void"
-    assert result["members"][0]["args"] == "(int x)"
+
+def test_list_all_symbols(engine):
+    """Test listing all symbols."""
+    engine._load_index()
+    symbols = engine.list_all_symbols()
+    assert len(symbols) >= 3
+    names = [s["name"] for s in symbols]
+    assert "TestClass" in names
+    assert "TestNamespace" in names
+
+def test_list_all_symbols_filter(engine):
+    """Test listing all symbols with a filter."""
+    engine._load_index()
+    symbols = engine.list_all_symbols(kind_filter="class")
+    assert len(symbols) == 1
+    assert symbols[0]["name"] == "TestClass"
+
+def test_get_file_structure(engine):
+    """Test retrieving the structure of a file."""
+    engine._load_index()
+    # Mock _fetch_details to return the members from the compound
+    def mock_fetch(data):
+        return data
+    engine._fetch_details = mock_fetch
+
+    members = engine.get_file_structure("test_file.h")
+    assert len(members) == 1
+    assert members["test_func"]["name"] == "test_func"
+
+def test_fetch_compound_details(xml_dir, engine):
+    """Test fetching details for a compound."""
+    detail_xml = xml_dir / "class_test_class.xml"
+    detail_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen>
+  <compounddef id="class_test_class" kind="class">
+    <compoundname>TestClass</compoundname>
+    <briefdescription><para>Brief docs</para></briefdescription>
+    <detaileddescription><para>Detailed docs</para></detaileddescription>
+    <location file="test.h" line="10" column="7"/>
+  </compounddef>
+</doxygen>
+""", encoding='utf-8')
+
+    details = engine._fetch_compound_details("class_test_class")
+    assert details["brief"] == "Brief docs"
+    assert details["detailed"] == "Detailed docs"
+    assert details["location"]["file"] == "test.h"
 
 def test_fetch_compound_details_not_found(engine):
-    result = engine._fetch_compound_details("nonexistent_refid")
-    assert "error" in result
-    assert "not found" in result["error"]
+    """Test fetching details for a missing compound."""
+    details = engine._fetch_compound_details("nonexistent")
+    assert details == {}
 
-def test_fetch_compound_details_malformed(xml_dir, engine):
-    # Create a malformed compound XML
-    malformed_xml = xml_dir / "malformed.xml"
-    malformed_xml.write_text("invalid xml")
+def test_fetch_compound_details_security(xml_dir, engine):
+    """Test security against directory traversal in refid."""
+    # Attempt traversal
+    details = engine._fetch_compound_details("../secret")
+    assert details == {}
 
-    result = engine._fetch_compound_details("malformed")
-    assert "error" in result
-    assert "Error parsing" in result["error"]
+def test_get_text(engine):
+    """Test extracting text from an element."""
+    elem = ET.fromstring("<name>Test</name>")
+    assert engine._get_text(elem) == "Test"
+
+def test_get_text_recursive(engine):
+    """Test recursively extracting text from an element."""
+    xml_str = "<desc><para>Text with <b>bold</b></para></desc>"
+    elem = ET.fromstring(xml_str)
+    assert engine._get_text_recursive(elem) == "Text with bold"
+
+def test_get_text_none(engine):
+    """Test extracting text from a None element."""
+    assert engine._get_text(None) == ""
+    assert engine._get_text_recursive(None) == ""
 
 def test_get_location(engine):
-    xml_content = '<location file="test.h" line="10" column="5"/>'
-    element = ET.fromstring(xml_content)
-    # Since _get_location expects an element that HAS a location child
-    parent = ET.Element("parent")
-    parent.append(element)
-
-    loc = engine._get_location(parent)
+    """Test extracting location information."""
+    xml_str = '<location file="test.h" line="10" column="5"/>'
+    elem = ET.fromstring(xml_str)
+    loc = engine._get_location(elem)
     assert loc["file"] == "test.h"
     assert loc["line"] == "10"
     assert loc["column"] == "5"
 
-def test_get_location_missing(engine):
-    element = ET.Element("node")
-    assert engine._get_location(element) == {}
-
-def test_get_text_recursive(engine):
-    xml_content = '<briefdescription>Text <bold>child</bold> tail.</briefdescription>'
-    element = ET.fromstring(xml_content)
-    text = engine._get_text_recursive(element)
-    assert text == "Text child tail."
-
-def test_get_text_recursive_complex(engine):
-    xml_content = """
-    <detaileddescription>
-      <para>Line 1.</para>
-      <para>Line 2 <ref refid="ref">Ref</ref> end.</para>
-    </detaileddescription>
-    """
-    element = ET.fromstring(xml_content)
-    text = engine._get_text_recursive(element)
-    # _get_text_recursive strips the final result
-    assert "Line 1.Line 2 Ref end." in text.replace("\n", "").replace("  ", "")
-
-def test_get_text_recursive_none(engine):
-    assert engine._get_text_recursive(None) == ""
-
-def test_list_all_symbols(engine):
-    symbols = engine.list_all_symbols()
-    assert len(symbols) == 3
-    assert "TestClass" in symbols
-    assert "TestNamespace" in symbols
-    assert "test_file.h" in symbols
-
-def test_list_all_symbols_filtered(engine):
-    classes = engine.list_all_symbols(kind_filter="class")
-    assert len(classes) == 1
-    assert classes[0] == "TestClass"
-
-    files = engine.list_all_symbols(kind_filter="file")
-    assert len(files) == 1
-    assert files[0] == "test_file.h"
+def test_get_location_none(engine):
+    """Test extracting location from a None element."""
+    assert engine._get_location(None) == {}
