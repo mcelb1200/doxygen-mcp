@@ -1,0 +1,17 @@
+{
+  "name": "doxygen-mcp",
+  "version": "1.0.0",
+  "description": "A powerful Model Context Protocol (MCP) server for Doxygen documentation.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "doxygen-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${extensionPath}",
+        "doxygen-mcp"
+      ]
+    }
+  }
+}

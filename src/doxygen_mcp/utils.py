@@ -15,7 +15,8 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
     if markers is None:
         markers = [
             ".git", ".svn", "Doxyfile", "pyproject.toml", "package.json",
-            "CMakeLists.txt", "Makefile", "solution.sln", "go.mod", "Cargo.toml"
+            "CMakeLists.txt", "Makefile", "solution.sln", "go.mod", "Cargo.toml",
+            "requirements.txt", "build.gradle", "pom.xml"
         ]
 
     current = start_path.resolve()
@@ -46,6 +47,8 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
     ide_roots = [
         "VSCODE_WORKSPACE_FOLDER",
         "CURSOR_WORKSPACE_PATH",
+        "GEMINI_PROJECT_ROOT",
+        "ACTIVE_WORKSPACE_PATH",
         "PWD", # Often set by shells/IDE terminals
     ]
     for env_var in ide_roots:
