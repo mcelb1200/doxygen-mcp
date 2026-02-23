@@ -91,7 +91,10 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
             is_safe = True
 
     if not is_safe:
-        raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
+        raise ValueError(
+            f"Security Error: Access denied to path '{requested_path}'. "
+            "It is outside of allowed project roots."
+        )
 
     return requested_path
 
@@ -170,7 +173,8 @@ def get_ide_environment() -> Dict[str, Any]:
 
     if is_vscode:
         context["ide"] = "vscode"
-        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or "cursor" in os.environ.get("APP_PATH", "").lower():
+        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or \
+           "cursor" in os.environ.get("APP_PATH", "").lower():
             context["ide"] = "cursor"
 
         # Try to find VS Code settings
@@ -218,7 +222,7 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
                 f.write("# Doxygen Generated Documentation Folders\n")
                 f.write(new_entry)
             return True
-        except Exception:
+        except Exception:  # pylint: disable=broad-exception-caught
             return False
 
     # Check if already ignored and append if not
@@ -233,7 +237,7 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
                 f.write("\n")
             f.write(new_entry)
         return True
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         return False
 
 

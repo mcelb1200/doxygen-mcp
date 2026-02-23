@@ -1,6 +1,7 @@
 """
 Tests for get_context_info tool.
 """
+# pylint: disable=import-error
 import tempfile
 from pathlib import Path
 from unittest.mock import patch

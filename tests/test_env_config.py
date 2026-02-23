@@ -1,6 +1,7 @@
 """
 Tests for environment-based configuration and path resolution.
 """
+# pylint: disable=import-error, redefined-outer-name
 import asyncio
 import os
 import sys
