@@ -526,7 +526,7 @@ def main():
     parser.add_argument("--gemini", action="store_true", help="Generate Gemini CLI config")
     parser.add_argument("--cursor", action="store_true", help="Generate Cursor config")
 
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if args.version:
         pkg_v = "unknown"
