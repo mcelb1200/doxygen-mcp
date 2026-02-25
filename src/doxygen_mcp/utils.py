@@ -87,8 +87,13 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
 
     # Special bypass for tests to avoid breaking temporary directory usage
     if not is_safe and os.environ.get("PYTEST_CURRENT_TEST"):
-        if str(requested_path).startswith("/tmp") or "temp" in str(requested_path).lower():
-            is_safe = True
+        for temp_base in ["/tmp", "/var/tmp"]:
+            try:
+                requested_path.relative_to(Path(temp_base))
+                is_safe = True
+                break
+            except ValueError:
+                continue
 
     if not is_safe:
         raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
