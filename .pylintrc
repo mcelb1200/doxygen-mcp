@@ -1,0 +1,8 @@
+[MASTER]
+ignore=mock_modules,scripts,tests
+
+[MESSAGES CONTROL]
+disable=C0114,C0115,C0116,R0903,W0718,W1203,C0301
+
+[FORMAT]
+max-line-length=100
