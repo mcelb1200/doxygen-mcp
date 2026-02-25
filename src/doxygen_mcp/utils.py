@@ -209,6 +209,18 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
     Synchronous helper for updating .gitignore.
     """
+    # Validate input to prevent arbitrary file write/traversal in .gitignore
+    if "\n" in path_to_ignore or "\r" in path_to_ignore:
+        return False
+
+    # Prevent traversal or absolute paths
+    try:
+        path_obj = Path(path_to_ignore)
+        if path_obj.is_absolute() or ".." in path_obj.parts:
+            return False
+    except Exception:
+        return False
+
     ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
 
