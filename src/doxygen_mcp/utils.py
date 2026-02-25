@@ -252,3 +252,9 @@ async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     Returns True if an entry was added, False otherwise.
     """
     return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
+
+def get_doxygen_executable() -> str:
+    """
+    Get the path to the Doxygen executable from the environment or default to 'doxygen'.
+    """
+    return os.environ.get("DOXYGEN_PATH", "doxygen")
