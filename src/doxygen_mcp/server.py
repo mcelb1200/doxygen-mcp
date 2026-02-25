@@ -91,6 +91,11 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Auto-configuration failed: {str(e)}"
 
+def _write_doxyfile_sync(path: Path, content: str) -> None:
+    """Helper to write Doxyfile synchronously."""
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
 @mcp.tool()
 async def create_doxygen_project(
     project_name: str,
@@ -149,8 +154,8 @@ async def create_doxygen_project(
                 "Use 'auto_configure' or backup first."
             )
 
-        with open(doxyfile_path, 'w', encoding='utf-8') as f:
-            f.write(config.to_doxyfile())
+        # pylint: disable=no-member
+        await asyncio.to_thread(_write_doxyfile_sync, doxyfile_path, config.to_doxyfile())
 
         # Update .gitignore
         await update_ignore_file(safe_project_path, "docs/")
