@@ -40,6 +40,9 @@ logger = logging.getLogger("doxygen-mcp")
 
 mcp = FastMCP("Doxygen")
 
+# Cache for Doxygen version check
+_DOXYGEN_VERSION_CACHE: Dict[str, str] = {}
+
 @mcp.tool()
 async def get_context_info() -> Dict[str, Any]:
     """
@@ -273,6 +276,9 @@ async def scan_project(
 async def check_doxygen_install() -> str:
     """Verify that Doxygen is installed and accessible"""
     doxygen_exe = get_doxygen_executable()
+    if doxygen_exe in _DOXYGEN_VERSION_CACHE:
+        return _DOXYGEN_VERSION_CACHE[doxygen_exe]
+
     try:
         process = await asyncio.create_subprocess_exec(
             doxygen_exe,
@@ -295,7 +301,9 @@ async def check_doxygen_install() -> str:
             return "❌ Doxygen is not installed or returned an error"
 
         doxygen_version = stdout.decode(errors='replace').strip()
-        return f"✅ Doxygen {doxygen_version} is installed and working"
+        result = f"✅ Doxygen {doxygen_version} is installed and working"
+        _DOXYGEN_VERSION_CACHE[doxygen_exe] = result
+        return result
     except (FileNotFoundError, OSError):
         return "❌ Doxygen is not installed"
     except Exception as e:  # pylint: disable=broad-exception-caught
