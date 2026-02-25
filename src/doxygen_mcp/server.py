@@ -278,7 +278,7 @@ async def check_doxygen_install() -> str:
         )
 
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+            stdout, _stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
         except asyncio.TimeoutError:
             try:
                 process.kill()
@@ -290,8 +290,8 @@ async def check_doxygen_install() -> str:
         if process.returncode != 0:
             return "❌ Doxygen is not installed or returned an error"
 
-        version = stdout.decode(errors='replace').strip()
-        return f"✅ Doxygen {version} is installed and working"
+        doxygen_version = stdout.decode(errors='replace').strip()
+        return f"✅ Doxygen {doxygen_version} is installed and working"
     except (FileNotFoundError, OSError):
         return "❌ Doxygen is not installed"
     except Exception as e:  # pylint: disable=broad-exception-caught
