@@ -5,7 +5,7 @@ import tempfile
 import asyncio
 import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 # Add src to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/src")
@@ -62,11 +62,12 @@ class TestEnvConfig:
         (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test")
         
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            with patch('subprocess.run') as mock_run:
-                mock_run.side_effect = [
-                    MagicMock(returncode=0, stdout="1.9.4\n"),  # version check
-                    MagicMock(returncode=0, stderr="")  # generation
-                ]
+            with patch('asyncio.create_subprocess_exec') as mock_exec:
+                # Mock successful doxygen execution
+                process = MagicMock()
+                process.communicate = AsyncMock(return_value=(b"", b""))
+                process.returncode = 0
+                mock_exec.return_value = process
                 
                 result = await generate_documentation(
                     # project_path is None
