@@ -32,6 +32,8 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "black>=22.0.0",
     "mypy>=1.0.0",
+    "pylint>=3.0.0",
+    "types-defusedxml",
 ]
 full = [
     "regex>=2022.0.0",
@@ -84,3 +86,11 @@ exclude_lines = [
 dev = [
     "pytest-cov>=7.0.0",
 ]
+
+[tool.mypy]
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "doxygen_mcp.query_engine"
+ignore_errors = true

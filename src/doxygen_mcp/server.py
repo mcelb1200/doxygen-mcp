@@ -13,13 +13,13 @@ import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 try:
-    from importlib.metadata import version
+    from importlib.metadata import version as get_package_version
 except ImportError:
     # Fallback for Python < 3.8
     try:
-        from importlib_metadata import version
+        from importlib_metadata import version as get_package_version # type: ignore
     except ImportError:
-        version = None
+        get_package_version = None # type: ignore
 
 # MCP server imports
 from mcp.server.fastmcp import FastMCP
@@ -123,7 +123,7 @@ async def create_doxygen_project(
         )
 
         # Language-specific optimizations
-        lang_settings = {
+        lang_settings: Dict[str, Dict[str, Any]] = {
             "c": {"optimize_output_for_c": True, "file_patterns": ["*.c", "*.h"]},
             "cpp": {"file_patterns": ["*.cpp", "*.hpp", "*.cc", "*.hh", "*.cxx", "*.hxx"]},
             "python": {"optimize_output_java": True, "file_patterns": ["*.py"]},
@@ -219,7 +219,7 @@ async def generate_documentation(
 
 def _perform_scan(safe_project_path: Path):
     """Sync helper to scan the filesystem without blocking the event loop"""
-    extensions = {}
+    extensions: Dict[str, int] = {}
     total_files = 0
 
     for _, dirs, files in os.walk(safe_project_path):
@@ -288,8 +288,8 @@ async def check_doxygen_install() -> str:
         if process.returncode != 0:
             return "❌ Doxygen is not installed or returned an error"
 
-        version = stdout.decode(errors='replace').strip()
-        return f"✅ Doxygen {version} is installed and working"
+        doxygen_version = stdout.decode(errors='replace').strip()
+        return f"✅ Doxygen {doxygen_version} is installed and working"
     except (FileNotFoundError, OSError):
         return "❌ Doxygen is not installed"
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -511,7 +511,6 @@ def generate_config(args):  # pylint: disable=unused-argument
     """Generate MCP configuration for various clients."""
     script_path = Path(__file__).resolve()
     # Check if running from source (presence of pyproject.toml in parent)
-    # src/doxygen_mcp/server.py -> src/doxygen_mcp -> src -> root
     repo_root = script_path.parent.parent.parent
     is_source = (repo_root / "pyproject.toml").exists()
 
@@ -523,19 +522,28 @@ def generate_config(args):  # pylint: disable=unused-argument
         cmd = "doxygen-mcp"
         cmd_args = []
 
+    target_path = args.path if args.path else "./"
+    abs_path = os.path.abspath(target_path)
+
     config = {
         "mcpServers": {
             "doxygen-mcp": {
                 "command": cmd,
                 "args": cmd_args,
                 "env": {
-                   "DOXYGEN_XML_DIR": "./xml"
+                   "DOXYGEN_PROJECT_ROOT": abs_path,
+                   "DOXYGEN_ALLOWED_PATHS": f"{os.path.dirname(abs_path)},{abs_path}",
+                   "DOXYGEN_XML_DIR": "./docs/xml"
                 }
             }
         }
     }
 
-    print(json.dumps(config, indent=2))
+    if args.gemini:
+        # Gemini specific format might differ, but for now we output standard MCP
+        print(json.dumps(config, indent=2))
+    else:
+        print(json.dumps(config, indent=2))
 
 
 def main():
@@ -544,6 +552,7 @@ def main():
     parser = argparse.ArgumentParser(description="Doxygen MCP Server", add_help=False)
     parser.add_argument("--version", action="store_true", help="Show version")
     parser.add_argument("command", nargs="?", choices=["config"], help="Command to run")
+    parser.add_argument("--path", type=str, help="Target project path for configuration")
     parser.add_argument("--vscode", action="store_true", help="Generate VS Code config")
     parser.add_argument("--gemini", action="store_true", help="Generate Gemini CLI config")
     parser.add_argument("--cursor", action="store_true", help="Generate Cursor config")
@@ -551,13 +560,13 @@ def main():
     args, unknown = parser.parse_known_args()
 
     if args.version:
-        v = "unknown"
-        if version:
+        pkg_v = "unknown"
+        if get_package_version is not None:
             try:
-                v = version("doxygen-mcp")
-            except Exception:  # pylint: disable=broad-exception-caught
+                pkg_v = get_package_version("doxygen-mcp")
+            except:
                 pass
-        print(f"doxygen-mcp {v}")
+        print(f"doxygen-mcp {pkg_v}")
         sys.exit(0)
 
     if args.command == "config":
