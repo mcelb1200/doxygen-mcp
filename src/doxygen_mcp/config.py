@@ -107,14 +107,14 @@ class DoxygenConfig(BaseModel):
         elif hasattr(cls, "__fields__"):
             fields = getattr(cls, "__fields__")
         else:
-            fields = cls.__annotations__
+            fields = getattr(cls, "__annotations__", {})
 
         for field_name in fields:
             env_var = f"DOXYGEN_MCP_{field_name.upper()}"
             if env_var in os.environ:
                 val = os.environ[env_var]
                 # Type conversion based on field type
-                field_type = cls.__annotations__.get(field_name)
+                field_type = getattr(cls, "__annotations__", {}).get(field_name)
                 if field_type == bool:
                     config_data[field_name] = val.lower() in ("yes", "true", "1")
                 elif field_type == List[str]:

@@ -5,7 +5,6 @@ import asyncio
 import os
 from unittest.mock import patch
 
-import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.utils import _update_ignore_file_sync

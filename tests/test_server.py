@@ -4,7 +4,6 @@ Tests for Doxygen MCP Server
 Basic test suite to verify core functionality of the Doxygen MCP server.
 """
 
-import asyncio
 import os
 import sys
 import tempfile
@@ -16,7 +15,7 @@ import pytest  # pylint: disable=import-error
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-# pylint: disable=import-error
+# pylint: disable=import-error, wrong-import-position
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
@@ -24,7 +23,7 @@ from doxygen_mcp.server import (
     check_doxygen_install
 )
 from doxygen_mcp.config import DoxygenConfig
-# pylint: enable=import-error
+# pylint: enable=import-error, wrong-import-position
 
 
 class TestDoxygenConfig:

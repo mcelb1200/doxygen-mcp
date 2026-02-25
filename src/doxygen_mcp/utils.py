@@ -115,7 +115,7 @@ def detect_primary_language(project_path: Path) -> str:
         ".rs": "rust"
     }
 
-    counts: Dict[str, int] = {}
+    counts = {}
     try:
         # Scan root and one level deep for performance
         files = list(project_path.glob("*")) + list(project_path.glob("*/*"))
@@ -131,7 +131,7 @@ def detect_primary_language(project_path: Path) -> str:
     if not counts:
         return "mixed"
 
-    return max(counts, key=lambda x: counts.get(x, 0))
+    return max(counts, key=counts.get)
 
 def get_project_name(resolved_path: Path) -> str:
     """

@@ -5,11 +5,11 @@ This module parses Doxygen XML output and provides an API for querying
 symbols, structures, and documentation.
 """
 import asyncio
-import os
-from pathlib import Path
-from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
-import defusedxml.ElementTree as ET
+from pathlib import Path
+from typing import Dict, List, Optional, Any, ClassVar
+
+import defusedxml.ElementTree as ET  # pylint: disable=import-error
 
 
 class DoxygenQueryEngine:
@@ -21,11 +21,11 @@ class DoxygenQueryEngine:
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
-        self.compounds: Dict[str, Any] = {}
+        self.compounds = {}
         # Optimization indices
-        self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
-        self._file_map: Dict[str, List[Dict[str, Any]]] = {}  # basename -> list of info (for kind="file")
-        self._files: List[Tuple[str, Dict[str, Any]]] = []  # list of (name, info) for kind="file"
+        self._lower_map = {}  # lower_case_name -> info
+        self._file_map = {}  # basename -> list of info (for kind="file")
+        self._files = []  # list of (name, info) for kind="file"
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
@@ -50,6 +50,31 @@ class DoxygenQueryEngine:
         else:
             cls._cache.clear()
 
+    def _process_compound(self, elem):
+        """Process a compound element from the index."""
+        name_elem = elem.find("name")
+        if name_elem is not None and name_elem.text:
+            name = name_elem.text
+            kind = elem.get("kind")
+            refid = elem.get("refid")
+            info = {
+                "kind": kind,
+                "refid": refid,
+            }
+            self.compounds[name] = info
+
+            # Build optimization indices
+            # 1. Case-insensitive lookup (O(1))
+            self._lower_map[name.lower()] = info
+
+            # 2. File lookup by basename (O(1))
+            if kind == "file":
+                self._files.append((name, info))
+                file_name = Path(name).name
+                if file_name not in self._file_map:
+                    self._file_map[file_name] = []
+                self._file_map[file_name].append(info)
+
     def _load_index(self):
         """Load and parse the Doxygen index.xml file."""
         if not self.index_path.exists():
@@ -60,31 +85,9 @@ class DoxygenQueryEngine:
             # pylint: disable=unused-variable
             context = ET.iterparse(self.index_path, events=("end",))
 
-            for _, elem in context:
+            for event, elem in context:
                 if elem.tag == "compound":
-                    name_elem = elem.find("name")
-                    if name_elem is not None and name_elem.text:
-                        name = name_elem.text
-                        kind = elem.get("kind")
-                        refid = elem.get("refid")
-                        info = {
-                            "kind": kind,
-                            "refid": refid,
-                        }
-                        self.compounds[name] = info
-
-                        # Build optimization indices
-                        # 1. Case-insensitive lookup (O(1))
-                        self._lower_map[name.lower()] = info
-
-                        # 2. File lookup by basename (O(1))
-                        if kind == "file":
-                            self._files.append((name, info))
-                            file_name = Path(name).name
-                            if file_name not in self._file_map:
-                                self._file_map[file_name] = []
-                            self._file_map[file_name].append(info)
-
+                    self._process_compound(elem)
                     # Clear the element to free memory
                     elem.clear()
 

@@ -1,15 +1,16 @@
 """
 Analyze documentation coverage using Doxygen XML data.
 """
+# pylint: disable=duplicate-code
 import os
 import sys
 from pathlib import Path
 
 # Add src to path to import DoxygenQueryEngine
 sys.path.append(str(Path("src").resolve()))
-# pylint: disable=import-error
+# pylint: disable=import-error, wrong-import-position
 from doxygen_mcp.query_engine import DoxygenQueryEngine
-# pylint: enable=import-error
+# pylint: enable=import-error, wrong-import-position
 
 # Force UTF-8 output
 if hasattr(sys.stdout, 'reconfigure'):
