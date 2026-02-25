@@ -87,3 +87,15 @@ class TestSecurityConfig:
 
         # Should be escaped as \\
         assert 'PROJECT_NAME           = "Project with \\\\ backslash"' in doxyfile_content
+
+    def test_control_character_injection(self):
+        """Test that control characters (including line breaks) are sanitized."""
+        # Inject vertical tab, form feed, etc.
+        malicious_name = 'My Project\vINJECTED=YES\fREM='
+        config = DoxygenConfig(project_name=malicious_name)
+        doxyfile_content = config.to_doxyfile()
+
+        # Should not contain unescaped control characters
+        assert '\v' not in doxyfile_content
+        assert '\f' not in doxyfile_content
+        assert '\nINJECTED=YES' not in doxyfile_content

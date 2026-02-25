@@ -4,6 +4,7 @@ Doxygen Configuration
 This module handles Doxygen configuration generation and management.
 """
 
+import re
 from typing import List
 from pydantic import BaseModel
 
@@ -120,15 +121,19 @@ class DoxygenConfig(BaseModel):
     def _sanitize_value(self, value: str) -> str:
         """
         @brief Sanitize a string value for Doxyfile.
-        @details Escapes backslashes and double quotes, and replaces newlines
-        to prevent configuration injection.
+        @details Escapes backslashes and double quotes, and replaces all control
+        characters (including newlines) to prevent configuration injection.
         """
         # Escape backslashes first to avoid double escaping
         value = value.replace('\\', '\\\\')
         # Escape double quotes
         value = value.replace('"', '\\"')
-        # Replace newlines with spaces to prevent key injection
-        value = value.replace('\n', ' ').replace('\r', '')
+
+        # Replace all control characters (except tab) with space
+        # This catches \n, \r, \v, \f, etc.
+        # ASCII 0-8, 10-31, 127
+        value = re.sub(r'[\x00-\x08\x0a-\x1f\x7f]', ' ', value)
+
         return value
 
     def _sanitize_list(self, values: List[str]) -> List[str]:
