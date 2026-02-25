@@ -30,7 +30,8 @@ from .utils import (
     detect_primary_language,
     get_ide_environment,
     update_ignore_file,
-    get_active_context
+    get_active_context,
+    get_doxygen_executable
 )
 
 # Configure logging
@@ -178,7 +179,7 @@ async def generate_documentation(
     if not doxyfile_path.exists():
         return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
 
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = get_doxygen_executable()
 
     try:
         # Run Doxygen asynchronously with timeout
@@ -266,7 +267,7 @@ async def scan_project(
 @mcp.tool()
 async def check_doxygen_install() -> str:
     """Verify that Doxygen is installed and accessible"""
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = get_doxygen_executable()
     try:
         process = await asyncio.create_subprocess_exec(
             doxygen_exe,
@@ -574,7 +575,7 @@ def main():
         sys.exit(0)
 
     # Check for Doxygen dependency
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = get_doxygen_executable()
     try:
         subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError):
