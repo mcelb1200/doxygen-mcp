@@ -72,15 +72,17 @@ class TestEnvConfig:
         (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test", encoding="utf-8")
 
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            # Mock successful doxygen execution
-            process = MagicMock()
-            process.communicate = AsyncMock(return_value=(b"", b""))
-            process.returncode = 0
-            mock_exec.return_value = process
-
-            result = await generate_documentation()
-
-            assert "✅ Documentation generated successfully" in result
+            with patch('asyncio.create_subprocess_exec') as mock_exec:
+                process = MagicMock()
+                process.communicate = AsyncMock(return_value=(b"", b""))
+                process.returncode = 0
+                mock_exec.return_value = process
+                
+                result = await generate_documentation(
+                    # project_path is None
+                )
+                
+                assert "✅ Documentation generated successfully" in result
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):
