@@ -1,16 +1,22 @@
+"""
+Analyze documentation coverage using Doxygen XML data.
+"""
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
 
 # Add src to path to import DoxygenQueryEngine
 sys.path.append(str(Path("src").resolve()))
+# pylint: disable=import-error
 from doxygen_mcp.query_engine import DoxygenQueryEngine
+# pylint: enable=import-error
 
 # Force UTF-8 output
-sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def analyze_docs_coverage(xml_dir: str):
+    """Analyze the project for documentation coverage and print a report."""
     print("# Documentation Coverage Report")
     print(f"\n**Analysis Target:** `{xml_dir}`")
 
@@ -35,13 +41,13 @@ def analyze_docs_coverage(xml_dir: str):
 
         # Check members
         members = details.get("members", [])
-        for m in members:
+        for member in members:
             # Skip compiler generated or trivial members if possible
-            if m["name"].startswith("~") or m["name"] == class_name:
+            if member["name"].startswith("~") or member["name"] == class_name:
                 continue
 
-            if not m.get("brief") and not m.get("detailed"):
-                 class_missing.append(f"Member: `{m['name']}`")
+            if not member.get("brief") and not member.get("detailed"):
+                class_missing.append(f"Member: `{member['name']}`")
 
         if class_missing:
             missing_docs.append({
@@ -57,16 +63,19 @@ def analyze_docs_coverage(xml_dir: str):
 
     for item in sorted(missing_docs, key=lambda x: x['name']):
         # Limit the number of issues shown per class to keep table readable
-        issues = item['issues']
-        total_issues += len(issues)
+        item_issues = item['issues']
+        total_issues += len(item_issues)
 
-        display_issues = "<br>".join(issues[:5])
-        if len(issues) > 5:
-            display_issues += f"<br>...and {len(issues)-5} more"
+        display_issues = "<br>".join(item_issues[:5])
+        if len(item_issues) > 5:
+            display_issues += f"<br>...and {len(item_issues)-5} more"
 
         print(f"| `{item['name']}` | {display_issues} |")
 
-    print(f"\n**Summary:** Found **{len(missing_docs)}** classes with missing documentation, totaling **{total_issues}** undocumented items.")
+    print(
+        f"\n**Summary:** Found **{len(missing_docs)}** classes with missing documentation, "
+        f"totaling **{total_issues}** undocumented items."
+    )
 
 if __name__ == "__main__":
     if "DOXYGEN_XML_DIR" not in os.environ:
