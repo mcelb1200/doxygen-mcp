@@ -62,12 +62,23 @@ class TestEnvConfig:
         (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test")
         
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            with patch('subprocess.run') as mock_run:
-                mock_run.side_effect = [
-                    MagicMock(returncode=0, stdout="1.9.4\n"),  # version check
-                    MagicMock(returncode=0, stderr="")  # generation
-                ]
+            # Patch asyncio.create_subprocess_exec instead of subprocess.run for generate_documentation
+            with patch('asyncio.create_subprocess_exec') as mock_exec:
+                mock_process = MagicMock()
                 
+                # communicate needs to be awaitable
+                comm_future = asyncio.Future()
+                comm_future.set_result((b"", b""))
+                mock_process.communicate.return_value = comm_future
+
+                mock_process.returncode = 0
+
+                # Handle both MagicMock and AsyncMock behavior by using side_effect with a coroutine
+                async def get_mock_process(*args, **kwargs):
+                    return mock_process
+
+                mock_exec.side_effect = get_mock_process
+
                 result = await generate_documentation(
                     # project_path is None
                 )
