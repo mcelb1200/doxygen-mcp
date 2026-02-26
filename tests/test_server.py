@@ -17,6 +17,7 @@ import pytest  # pylint: disable=import-error
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 # pylint: disable=import-error
+import doxygen_mcp.server
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
@@ -25,6 +26,12 @@ from doxygen_mcp.server import (
 )
 from doxygen_mcp.config import DoxygenConfig
 # pylint: enable=import-error
+
+@pytest.fixture(autouse=True)
+def clear_doxygen_cache():
+    """Clear Doxygen version cache before each test"""
+    doxygen_mcp.server._DOXYGEN_VERSION_CACHE.clear()
+    yield
 
 
 class TestDoxygenConfig:
