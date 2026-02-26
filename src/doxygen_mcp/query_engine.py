@@ -152,9 +152,9 @@ class DoxygenQueryEngine:
             return {"error": f"Details file {xml_file} not found"}
 
         try:
-            tree = ET.parse(xml_file)
-            xml_root = tree.getroot()
-            compounddef = xml_root.find("compounddef")
+            tree = SafeET.parse(xml_file)
+            root = tree.getroot()
+            compounddef = root.find("compounddef")
 
             details = {
                 "name": compounddef.find("compoundname").text,

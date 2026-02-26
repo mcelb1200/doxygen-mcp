@@ -27,6 +27,15 @@ def pytest_pyfunc_call(pyfuncitem):
         return True
     return None
 
+# Mock defusedxml if not installed
+try:
+    import defusedxml.ElementTree
+except ImportError:
+    mock_defusedxml = MagicMock()
+    mock_defusedxml.ElementTree = ET
+    sys.modules["defusedxml"] = mock_defusedxml
+    sys.modules["defusedxml.ElementTree"] = ET
+
 # Mock mcp if not installed
 try:
     import mcp.server.fastmcp  # pylint: disable=unused-import, import-error

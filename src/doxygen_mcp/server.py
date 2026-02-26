@@ -30,7 +30,8 @@ from .utils import (
     detect_primary_language,
     get_ide_environment,
     update_ignore_file,
-    get_active_context
+    get_active_context,
+    get_doxygen_executable
 )
 
 # Configure logging
@@ -89,6 +90,11 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
         return f"🚀 Auto-configured project!\n\n{result}"
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Auto-configuration failed: {str(e)}"
+
+def _write_doxyfile_sync(path: Path, content: str) -> None:
+    """Helper to write Doxyfile synchronously."""
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
 
 @mcp.tool()
 # pylint: disable=too-many-arguments
@@ -150,8 +156,8 @@ async def create_doxygen_project(
                 "Use 'auto_configure' or backup first."
             )
 
-        with open(doxyfile_path, 'w', encoding='utf-8') as f:
-            f.write(config.to_doxyfile())
+        # pylint: disable=no-member
+        await asyncio.to_thread(_write_doxyfile_sync, doxyfile_path, config.to_doxyfile())
 
         # Update .gitignore
         await update_ignore_file(safe_project_path, "docs/")
@@ -180,7 +186,7 @@ async def generate_documentation(
     if not doxyfile_path.exists():
         return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
 
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = get_doxygen_executable()
 
     try:
         # Run Doxygen asynchronously with timeout
@@ -268,7 +274,7 @@ async def scan_project(
 @mcp.tool()
 async def check_doxygen_install() -> str:
     """Verify that Doxygen is installed and accessible"""
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = get_doxygen_executable()
     try:
         process = await asyncio.create_subprocess_exec(
             doxygen_exe,
@@ -569,7 +575,7 @@ def main():
         sys.exit(0)
 
     # Check for Doxygen dependency
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = get_doxygen_executable()
     try:
         subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError):

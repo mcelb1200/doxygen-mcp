@@ -87,8 +87,13 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
 
     # Special bypass for tests to avoid breaking temporary directory usage
     if not is_safe and os.environ.get("PYTEST_CURRENT_TEST"):
-        if str(requested_path).startswith("/tmp") or "temp" in str(requested_path).lower():
-            is_safe = True
+        for temp_base in ["/tmp", "/var/tmp"]:
+            try:
+                requested_path.relative_to(Path(temp_base))
+                is_safe = True
+                break
+            except ValueError:
+                continue
 
     if not is_safe:
         raise ValueError(
@@ -209,6 +214,18 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
     Synchronous helper for updating .gitignore.
     """
+    # Validate input to prevent arbitrary file write/traversal in .gitignore
+    if "\n" in path_to_ignore or "\r" in path_to_ignore:
+        return False
+
+    # Prevent traversal or absolute paths
+    try:
+        path_obj = Path(path_to_ignore)
+        if path_obj.is_absolute() or ".." in path_obj.parts:
+            return False
+    except Exception:
+        return False
+
     ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
 
@@ -249,3 +266,9 @@ async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     """
     # pylint: disable=no-member
     return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
+
+def get_doxygen_executable() -> str:
+    """
+    Get the path to the Doxygen executable from the environment or default to 'doxygen'.
+    """
+    return os.environ.get("DOXYGEN_PATH", "doxygen")
