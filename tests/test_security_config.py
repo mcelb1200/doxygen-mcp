@@ -1,11 +1,14 @@
+"""
+Security tests for DoxygenConfig to prevent configuration injection.
+"""
+import pytest  # pylint: disable=import-error
 
-import pytest
+# pylint: disable=import-error
 from doxygen_mcp.config import DoxygenConfig
+# pylint: enable=import-error
 
 class TestSecurityConfig:
-    """
-    Security tests for DoxygenConfig to prevent configuration injection.
-    """
+    """Security tests for DoxygenConfig."""
 
     def test_project_name_injection(self):
         """Test preventing injection via project_name."""
@@ -60,7 +63,7 @@ class TestSecurityConfig:
         assert expected in doxyfile_content
 
     def test_output_directory_traversal_injection(self):
-        """Test that output directory is sanitized (though path traversal is handled elsewhere)."""
+        """Test that output directory is sanitized."""
         malicious_dir = '../"\nINJECT=YES\n"'
         config = DoxygenConfig(output_directory=malicious_dir)
         doxyfile_content = config.to_doxyfile()
@@ -87,3 +90,15 @@ class TestSecurityConfig:
 
         # Should be escaped as \\
         assert 'PROJECT_NAME           = "Project with \\\\ backslash"' in doxyfile_content
+
+    def test_control_character_injection(self):
+        """Test that control characters (including line breaks) are sanitized."""
+        # Inject vertical tab, form feed, etc.
+        malicious_name = 'My Project\vINJECTED=YES\fREM='
+        config = DoxygenConfig(project_name=malicious_name)
+        doxyfile_content = config.to_doxyfile()
+
+        # Should not contain unescaped control characters
+        assert '\v' not in doxyfile_content
+        assert '\f' not in doxyfile_content
+        assert '\nINJECTED=YES' not in doxyfile_content
