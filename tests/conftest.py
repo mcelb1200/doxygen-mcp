@@ -1,6 +1,8 @@
-import sys
+"""
+Shared test configuration and mocks.
+"""
 import asyncio
-import pytest
+import sys
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock
 
@@ -11,6 +13,7 @@ def pytest_pyfunc_call(pyfuncitem):
     """
     if asyncio.iscoroutinefunction(pyfuncitem.obj):
         funcargs = pyfuncitem.funcargs
+        # pylint: disable=protected-access
         testargs = {arg: funcargs[arg] for arg in pyfuncitem._fixtureinfo.argnames}
         asyncio.run(pyfuncitem.obj(**testargs))
         return True
@@ -27,25 +30,27 @@ except ImportError:
 
 # Mock mcp if not installed
 try:
-    import mcp.server.fastmcp
+    import mcp.server.fastmcp  # pylint: disable=unused-import, import-error
 except ImportError:
     mock_mcp = MagicMock()
     mock_server = MagicMock()
     mock_fastmcp = MagicMock()
 
     class FastMCP:
-        def __init__(self, name, *args, **kwargs):
+        """Mock FastMCP class."""
+        def __init__(self, name, *args, **kwargs):  # pylint: disable=unused-argument
             self.name = name
             self.tools = {}
 
         def tool(self):
+            """Mock tool decorator."""
             def decorator(func):
                 self.tools[func.__name__] = func
                 return func
             return decorator
 
         def run(self):
-            pass
+            """Mock run method."""
 
     mock_fastmcp.FastMCP = FastMCP
     mock_server.fastmcp = mock_fastmcp
