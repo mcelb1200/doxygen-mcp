@@ -5,11 +5,10 @@ This module parses Doxygen XML output and provides an API for querying
 symbols, structures, and documentation.
 """
 import asyncio
-import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
-import defusedxml.ElementTree as ET
+import defusedxml.ElementTree as SafeET
 
 
 class DoxygenQueryEngine:
@@ -56,37 +55,34 @@ class DoxygenQueryEngine:
             return
 
         try:
-            # Use iterparse to handle large XML files with minimal memory usage
-            # pylint: disable=unused-variable
-            context = ET.iterparse(self.index_path, events=("end",))
+            # Use parse instead of iterparse to prevent DTD retrieval (security fix)
+            # Doxygen indices are generally small enough to fit in memory
+            tree = SafeET.parse(self.index_path)
+            root = tree.getroot()
 
-            for _, elem in context:
-                if elem.tag == "compound":
-                    name_elem = elem.find("name")
-                    if name_elem is not None and name_elem.text:
-                        name = name_elem.text
-                        kind = elem.get("kind")
-                        refid = elem.get("refid")
-                        info = {
-                            "kind": kind,
-                            "refid": refid,
-                        }
-                        self.compounds[name] = info
+            for elem in root.findall("compound"):
+                name_elem = elem.find("name")
+                if name_elem is not None and name_elem.text:
+                    name = name_elem.text
+                    kind = elem.get("kind")
+                    refid = elem.get("refid")
+                    info = {
+                        "kind": kind,
+                        "refid": refid,
+                    }
+                    self.compounds[name] = info
 
-                        # Build optimization indices
-                        # 1. Case-insensitive lookup (O(1))
-                        self._lower_map[name.lower()] = info
+                    # Build optimization indices
+                    # 1. Case-insensitive lookup (O(1))
+                    self._lower_map[name.lower()] = info
 
-                        # 2. File lookup by basename (O(1))
-                        if kind == "file":
-                            self._files.append((name, info))
-                            file_name = Path(name).name
-                            if file_name not in self._file_map:
-                                self._file_map[file_name] = []
-                            self._file_map[file_name].append(info)
-
-                    # Clear the element to free memory
-                    elem.clear()
+                    # 2. File lookup by basename (O(1))
+                    if kind == "file":
+                        self._files.append((name, info))
+                        file_name = Path(name).name
+                        if file_name not in self._file_map:
+                            self._file_map[file_name] = []
+                        self._file_map[file_name].append(info)
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Error loading index: {e}")
@@ -149,9 +145,9 @@ class DoxygenQueryEngine:
             return {"error": f"Details file {xml_file} not found"}
 
         try:
-            tree = ET.parse(xml_file)
-            xml_root = tree.getroot()
-            compounddef = xml_root.find("compounddef")
+            tree = SafeET.parse(xml_file)
+            root = tree.getroot()
+            compounddef = root.find("compounddef")
 
             details = {
                 "name": compounddef.find("compoundname").text,
