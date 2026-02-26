@@ -357,8 +357,10 @@ async def query_project_reference(
 
         output = f"🔍 Documentation for {result['kind']} {result['name']}\n"
         output += "=" * len(output) + "\n\n"
-        if result["brief"]: output += f"Brief: {result['brief']}\n\n"
-        if result["detailed"]: output += f"Detailed:\n{result['detailed']}\n\n"
+        if result["brief"]:
+            output += f"Brief: {result['brief']}\n\n"
+        if result["detailed"]:
+            output += f"Detailed:\n{result['detailed']}\n\n"
 
         return output
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -578,7 +580,7 @@ def main():
         if get_package_version is not None:
             try:
                 pkg_v = get_package_version("doxygen-mcp")
-            except:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
         print(f"doxygen-mcp {pkg_v}")
         sys.exit(0)
