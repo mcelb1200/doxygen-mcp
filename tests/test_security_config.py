@@ -1,7 +1,6 @@
 """
 Security tests for DoxygenConfig to prevent configuration injection.
 """
-import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.config import DoxygenConfig

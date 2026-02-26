@@ -6,6 +6,14 @@ import sys
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock
 
+import pytest  # pylint: disable=import-error
+
+# Mock defusedxml to use standard xml.etree.ElementTree
+mock_defusedxml = MagicMock()
+mock_defusedxml.ElementTree = ET
+sys.modules["defusedxml"] = mock_defusedxml
+sys.modules["defusedxml.ElementTree"] = ET
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_pyfunc_call(pyfuncitem):
     """

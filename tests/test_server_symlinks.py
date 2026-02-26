@@ -5,7 +5,6 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.server import create_doxygen_project

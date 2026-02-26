@@ -164,7 +164,7 @@ def test_manual_doxygen_run():
     if not example_path.exists():
         return True
 
-    doxyfile_content = f"""
+    doxyfile_content = """
 PROJECT_NAME           = "Calculator Example Test"
 OUTPUT_DIRECTORY       = "test_docs"
 INPUT                  = .
@@ -238,5 +238,5 @@ def main(auto_install: bool = False):
 
 if __name__ == "__main__":
     auto = "--install" in sys.argv
-    is_success = main(auto_install=auto)
-    sys.exit(0 if is_success else 1)
+    SUCCESS = main(auto_install=auto)
+    sys.exit(0 if SUCCESS else 1)

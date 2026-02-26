@@ -1,4 +1,0 @@
-# doxygen-mcp: Full background update on push
-if (Get-Command doxygen -ErrorAction SilentlyContinue) {
-    Start-Process doxygen -ArgumentList "Doxyfile" -WindowStyle Hidden
-}

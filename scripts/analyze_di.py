@@ -1,15 +1,16 @@
 """
 Analyze Dependency Injection compliance using Doxygen XML data.
 """
+# pylint: disable=duplicate-code
 import os
 import sys
 from pathlib import Path
 
 # Add src to path to import DoxygenQueryEngine
 sys.path.append(str(Path("src").resolve()))
-# pylint: disable=import-error
+# pylint: disable=import-error, wrong-import-position
 from doxygen_mcp.query_engine import DoxygenQueryEngine
-# pylint: enable=import-error
+# pylint: enable=import-error, wrong-import-position
 
 # Force UTF-8 output for Windows console redirection
 if hasattr(sys.stdout, 'reconfigure'):
@@ -22,6 +23,50 @@ def is_logic_class(name: str) -> bool:
         "Service", "Provider", "View", "Strategy"
     ]
     return any(name.endswith(s) for s in suffixes)
+
+def _check_class_di(class_name, engine):
+    """Check a single class for DI compliance."""
+    details = engine.query_symbol(class_name)
+    if not details or "error" in details:
+        return None
+
+    members = details.get("members", [])
+
+    # Find constructor
+    constructors = [m for m in members if m["name"] == class_name]
+
+    has_dependencies = False
+    constructor_args = ""
+
+    if constructors:
+        for constructor in constructors:
+            args = constructor["args"]
+            constructor_args = args
+            # Heuristic: Check for references (&) or pointers (*)
+            if "&" in args or "*" in args:
+                has_dependencies = True
+                break
+
+    # Check for singleton pattern (getInstance method)
+    has_get_instance = any(m["name"] == "getInstance" for m in members)
+
+    if not has_dependencies:
+        reason = "No dependencies in constructor"
+        if not constructors:
+            if has_get_instance:
+                reason = "Singleton (getInstance found, no public injection)"
+            elif any(m.get("static") == "yes" for m in members):
+                reason = "Static Utility Class (likely)"
+            else:
+                reason = "No Code Constructor / Implicit"
+
+        return {
+            "name": class_name,
+            "reason": reason,
+            "args": constructor_args,
+            "has_get_instance": has_get_instance
+        }
+    return None
 
 def analyze_di_compliance(xml_dir: str):
     """Analyze the project for DI compliance and print a report."""
@@ -39,53 +84,9 @@ def analyze_di_compliance(xml_dir: str):
     flagged_classes = []
 
     for class_name in logic_classes:
-        details = engine.query_symbol(class_name)
-        if not details or "error" in details:
-            continue
-
-        members = details.get("members", [])
-
-        # Find constructor
-        constructors = [m for m in members if m["name"] == class_name]
-
-        has_dependencies = False
-        constructor_args = ""
-
-        if constructors:
-            for constructor in constructors:
-                args = constructor["args"]
-                constructor_args = args
-                # Heuristic: Check for references (&) or pointers (*) which
-                # usually restrict dependencies.
-                # And check if it's not just "void" or empty
-                if "&" in args or "*" in args:
-                    has_dependencies = True
-                    break
-
-        # Check for singleton pattern (getInstance method)
-        has_get_instance = any(m["name"] == "getInstance" for m in members)
-
-        if not has_dependencies:
-            reason = "No dependencies in constructor"
-            if not constructors:
-                # Check if it has a singleton getInstance, which confirms it's
-                # a singleton violating DI
-                if has_get_instance:
-                    reason = "Singleton (getInstance found, no public injection)"
-                else:
-                    # Might be a simple struct or implicit constructor, checking members
-                    # If it has static methods, might be a static utility class
-                    if any(m.get("static") == "yes" for m in members):
-                        reason = "Static Utility Class (likely)"
-                    else:
-                        reason = "No Code Constructor / Implicit"
-
-            flagged_classes.append({
-                "name": class_name,
-                "reason": reason,
-                "args": constructor_args,
-                "has_get_instance": has_get_instance
-            })
+        flagged = _check_class_di(class_name, engine)
+        if flagged:
+            flagged_classes.append(flagged)
 
     print("\n## 🚨 Potential DI Violations")
     print("| Class Name | Reason | Singleton? |")

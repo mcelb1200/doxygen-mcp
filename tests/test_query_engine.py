@@ -1,6 +1,7 @@
 """
 Unit tests for the DoxygenQueryEngine.
 """
+# pylint: disable=redefined-outer-name
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
