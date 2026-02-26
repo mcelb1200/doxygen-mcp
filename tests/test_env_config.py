@@ -72,9 +72,14 @@ class TestEnvConfig:
         (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test", encoding="utf-8")
 
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            # Patch asyncio.create_subprocess_exec instead of subprocess.run for generate_documentation
+            # Need to patch asyncio.create_subprocess_exec because generate_documentation uses it
             with patch('asyncio.create_subprocess_exec') as mock_exec:
-                mock_process = MagicMock()
+                process = MagicMock()
+                process.communicate.return_value = asyncio.Future()
+                process.communicate.return_value.set_result((b"stdout", b"stderr"))
+                process.returncode = 0
+
+                mock_exec.return_value = process
                 
                 # communicate needs to be awaitable
                 comm_future = asyncio.Future()
