@@ -1,18 +1,13 @@
-"""
-Tests for verifying symlink traversal protection.
-"""
-# pylint: disable=duplicate-code
 import os
+import pytest
+from unittest.mock import patch, MagicMock
 from pathlib import Path
-from unittest.mock import patch
-
-
-# pylint: disable=import-error
 from doxygen_mcp.config import DoxygenConfig
-# pylint: enable=import-error
 
 class TestSymlinkSecurity:
-    """Test suite for symlink security configuration."""
+    """
+    Tests for verifying symlink traversal protection.
+    """
 
     def test_exclude_symlinks_default_true(self):
         """Test that exclude_symlinks defaults to True."""
@@ -46,7 +41,7 @@ class TestSymlinkSecurity:
                 assert config.exclude_symlinks is False
 
         with patch.dict(os.environ, {"DOXYGEN_MCP_EXCLUDE_SYMLINKS": "true"}, clear=True):
-            with patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve, \
+             with patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve, \
                  patch("doxygen_mcp.utils.get_project_name") as mock_get_name:
 
                 mock_resolve.return_value = Path("/tmp/test_project")

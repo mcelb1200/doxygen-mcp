@@ -3,19 +3,18 @@ Tests for Doxygen MCP Server
 
 Basic test suite to verify core functionality of the Doxygen MCP server.
 """
-
+# pylint: disable=import-error
 import os
 import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
-import pytest  # pylint: disable=import-error
+import pytest
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
-# pylint: disable=import-error, wrong-import-position
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
@@ -23,8 +22,6 @@ from doxygen_mcp.server import (
     check_doxygen_install
 )
 from doxygen_mcp.config import DoxygenConfig
-# pylint: enable=import-error, wrong-import-position
-
 
 class TestDoxygenConfig:
     """Test the DoxygenConfig model"""
@@ -198,14 +195,7 @@ async def test_generate_documentation_success(mock_exec):
 @pytest.mark.asyncio
 async def test_path_traversal_protection():
     """Test protection against path traversal"""
-    # Attempt to access a path outside of the project root
-    # Since we are not in a test (according to PYTEST_CURRENT_TEST being absent if not careful,
-    # but here we ARE in pytest), we need to make sure we test the logic.
-
-    # In our implementation, /tmp is allowed during tests.
-    # So let's try something that is NOT /tmp and not the project root.
-    # We'll mock the project root to something specific.
-
+    # Use patch.dict to set DOXYGEN_PROJECT_ROOT for the duration of the test
     with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "/app/project"}):
         # This should fail as /etc is not under /app/project
         result = await create_doxygen_project(

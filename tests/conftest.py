@@ -1,18 +1,23 @@
 """
 Shared test configuration and mocks.
 """
+# pylint: disable=import-error, unused-import
 import asyncio
 import sys
 import xml.etree.ElementTree as ET
 from unittest.mock import MagicMock
 
-import pytest  # pylint: disable=import-error
+import pytest
 
 # Mock defusedxml to use standard xml.etree.ElementTree
-mock_defusedxml = MagicMock()
-mock_defusedxml.ElementTree = ET
-sys.modules["defusedxml"] = mock_defusedxml
-sys.modules["defusedxml.ElementTree"] = ET
+# This is necessary because some environments might not have defusedxml
+try:
+    import defusedxml.ElementTree as SafeET
+except ImportError:
+    mock_defusedxml = MagicMock()
+    mock_defusedxml.ElementTree = ET
+    sys.modules["defusedxml"] = mock_defusedxml
+    sys.modules["defusedxml.ElementTree"] = ET
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_pyfunc_call(pyfuncitem):
@@ -27,18 +32,9 @@ def pytest_pyfunc_call(pyfuncitem):
         return True
     return None
 
-# Mock defusedxml if not installed
-try:
-    import defusedxml.ElementTree
-except ImportError:
-    mock_defusedxml = MagicMock()
-    mock_defusedxml.ElementTree = ET
-    sys.modules["defusedxml"] = mock_defusedxml
-    sys.modules["defusedxml.ElementTree"] = ET
-
 # Mock mcp if not installed
 try:
-    import mcp.server.fastmcp  # pylint: disable=unused-import, import-error
+    import mcp.server.fastmcp
 except ImportError:
     mock_mcp = MagicMock()
     mock_server = MagicMock()
@@ -46,7 +42,7 @@ except ImportError:
 
     class FastMCP:
         """Mock FastMCP class."""
-        def __init__(self, name, *args, **kwargs):  # pylint: disable=unused-argument
+        def __init__(self, name, *args, **kwargs):
             self.name = name
             self.tools = {}
 
@@ -59,6 +55,7 @@ except ImportError:
 
         def run(self):
             """Mock run method."""
+            pass
 
     mock_fastmcp.FastMCP = FastMCP
     mock_server.fastmcp = mock_fastmcp

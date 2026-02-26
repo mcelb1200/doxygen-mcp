@@ -1,15 +1,10 @@
 """
-Mock implementation of pydantic for CI and tests.
+Mock module for Pylint.
 """
-
 class BaseModel:
-    """Mock BaseModel class."""
     def __init__(self, **kwargs):
-        """Mock constructor."""
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
+        for k, v in kwargs.items():
+            setattr(self, k, v)
     @classmethod
     def from_env(cls, **kwargs):
-        """Mock from_env method."""
         return cls(**kwargs)

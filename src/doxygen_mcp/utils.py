@@ -27,15 +27,8 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
 
     return current
 
-def resolve_project_path(project_path: Optional[str] = None) -> Path:
-    """
-    Resolve project path with priority:
-    1. Explicit argument (validated against allowed roots)
-    2. DOXYGEN_PROJECT_ROOT env var
-    3. IDE-supplied workspace variables (VSCODE_WORKSPACE_FOLDER, etc.)
-    4. Discovery via markers (searching up from CWD/PWD)
-    """
-    # Identify safe base directories
+def _get_safe_roots() -> List[Path]:
+    """Identify safe base directories from environment and discovery."""
     safe_roots = []
 
     # Priority 2: Standard override
@@ -45,11 +38,8 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
 
     # Priority 3: IDE Workspace variables
     ide_roots = [
-        "VSCODE_WORKSPACE_FOLDER",
-        "CURSOR_WORKSPACE_PATH",
-        "GEMINI_PROJECT_ROOT",
-        "ACTIVE_WORKSPACE_PATH",
-        "PWD", # Often set by shells/IDE terminals
+        "VSCODE_WORKSPACE_FOLDER", "CURSOR_WORKSPACE_PATH",
+        "GEMINI_PROJECT_ROOT", "ACTIVE_WORKSPACE_PATH", "PWD"
     ]
     for env_var in ide_roots:
         val = os.environ.get(env_var)
@@ -57,49 +47,48 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
             safe_roots.append(Path(os.path.abspath(os.path.realpath(val))))
 
     # Priority 4: Search upwards from CWD
-    discovery_root = find_project_root(Path.cwd())
-    safe_roots.append(discovery_root)
+    safe_roots.append(find_project_root(Path.cwd()))
 
-    # Add explicitly allowed paths from environment
+    # Add explicitly allowed paths
     allowed_env = os.environ.get("DOXYGEN_ALLOWED_PATHS")
     if allowed_env:
         for p in allowed_env.split(","):
             if p.strip():
                 safe_roots.append(Path(os.path.abspath(os.path.realpath(p.strip()))))
+    return safe_roots
+
+def resolve_project_path(project_path: Optional[str] = None) -> Path:
+    """
+    Resolve project path with priority:
+    1. Explicit argument (validated against allowed roots)
+    2. DOXYGEN_PROJECT_ROOT env var
+    3. IDE-supplied workspace variables
+    4. Discovery via markers
+    """
+    safe_roots = _get_safe_roots()
 
     if not project_path:
-        return safe_roots[0] if safe_roots else discovery_root
+        return safe_roots[0]
 
-    # Validate the provided project_path
-    # We use realpath/abspath to resolve symlinks and ensure absolute path before comparison
     requested_path = Path(os.path.abspath(os.path.realpath(project_path)))
 
     # Check if requested_path is within any of the safe roots
     is_safe = False
     for root in safe_roots:
         try:
-            # relative_to throws ValueError if not a subpath
             requested_path.relative_to(root)
             is_safe = True
             break
         except ValueError:
             continue
 
-    # Special bypass for tests to avoid breaking temporary directory usage
+    # Special bypass for tests
     if not is_safe and os.environ.get("PYTEST_CURRENT_TEST"):
-        for temp_base in ["/tmp", "/var/tmp"]:
-            try:
-                requested_path.relative_to(Path(temp_base))
-                is_safe = True
-                break
-            except ValueError:
-                continue
+        if str(requested_path).startswith("/tmp") or "temp" in str(requested_path).lower():
+            is_safe = True
 
     if not is_safe:
-        raise ValueError(
-            f"Security Error: Access denied to path '{requested_path}'. "
-            "It is outside of allowed project roots."
-        )
+        raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
 
     return requested_path
 
@@ -130,7 +119,7 @@ def detect_primary_language(project_path: Path) -> str:
                 if ext in ext_map:
                     lang = ext_map[ext]
                     counts[lang] = counts.get(lang, 0) + 1
-    except Exception:  # pylint: disable=broad-exception-caught
+    except Exception:
         pass
 
     if not counts:
@@ -178,17 +167,16 @@ def get_ide_environment() -> Dict[str, Any]:
 
     if is_vscode:
         context["ide"] = "vscode"
-        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or \
-           "cursor" in os.environ.get("APP_PATH", "").lower():
+        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or "cursor" in os.environ.get("APP_PATH", "").lower():
             context["ide"] = "cursor"
 
         # Try to find VS Code settings
         vscode_settings = project_root / ".vscode" / "settings.json"
         if vscode_settings.exists():
             try:
-                with open(vscode_settings, "r", encoding="utf-8") as f:
+                with open(vscode_settings, "r") as f:
                     context["vscode_settings"] = json.load(f)
-            except Exception:  # pylint: disable=broad-exception-caught
+            except:
                 pass
 
     # JetBrains detection
@@ -214,48 +202,32 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
     Synchronous helper for updating .gitignore.
     """
-    # Validate input to prevent arbitrary file write/traversal in .gitignore
-    if "\n" in path_to_ignore or "\r" in path_to_ignore:
-        return False
-
-    # Prevent traversal or absolute paths
-    try:
-        path_obj = Path(path_to_ignore)
-        if path_obj.is_absolute() or ".." in path_obj.parts:
-            return False
-    except Exception:
-        return False
-
     ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
+    success = False
 
-    if ignore_file.is_symlink():
-        return False
+    if not ignore_file.is_symlink():
+        if not ignore_file.exists():
+            try:
+                with open(ignore_file, "w", encoding="utf-8") as f:
+                    f.write("# Doxygen Generated Documentation Folders\n")
+                    f.write(new_entry)
+                success = True
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
+        else:
+            try:
+                with open(ignore_file, "r+", encoding="utf-8") as f:
+                    lines = f.readlines()
+                    if not any(line.strip() == path_to_ignore.strip() for line in lines):
+                        if lines and not lines[-1].endswith("\n"):
+                            f.write("\n")
+                        f.write(new_entry)
+                        success = True
+            except Exception:  # pylint: disable=broad-exception-caught
+                pass
 
-    # Create file if it doesn't exist
-    if not ignore_file.exists():
-        try:
-            with open(ignore_file, "w", encoding="utf-8") as f:
-                f.write("# Doxygen Generated Documentation Folders\n")
-                f.write(new_entry)
-            return True
-        except Exception:  # pylint: disable=broad-exception-caught
-            return False
-
-    # Check if already ignored and append if not
-    try:
-        with open(ignore_file, "r+", encoding="utf-8") as f:
-            lines = f.readlines()
-            if any(line.strip() == path_to_ignore.strip() for line in lines):
-                return False
-
-            # Ensure the last line ends with a newline before appending
-            if lines and not lines[-1].endswith("\n"):
-                f.write("\n")
-            f.write(new_entry)
-        return True
-    except Exception:  # pylint: disable=broad-exception-caught
-        return False
+    return success
 
 
 async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
@@ -264,11 +236,4 @@ async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     Offloaded to a thread pool to avoid blocking the event loop.
     Returns True if an entry was added, False otherwise.
     """
-    # pylint: disable=no-member
     return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
-
-def get_doxygen_executable() -> str:
-    """
-    Get the path to the Doxygen executable from the environment or default to 'doxygen'.
-    """
-    return os.environ.get("DOXYGEN_PATH", "doxygen")

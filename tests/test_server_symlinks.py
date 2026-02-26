@@ -1,17 +1,11 @@
-"""
-Tests for Doxygen MCP Server - Symlink handling.
-"""
+
 import asyncio
+import pytest
 import tempfile
 from pathlib import Path
-
-
-# pylint: disable=import-error
 from doxygen_mcp.server import create_doxygen_project
-# pylint: enable=import-error
 
 def run_async(coro):
-    """Helper to run a coroutine synchronously."""
     return asyncio.run(coro)
 
 def test_create_project_follow_symlinks():
@@ -30,7 +24,7 @@ def test_create_project_follow_symlinks():
             doxyfile_path = Path(temp_dir) / "Doxyfile"
             assert doxyfile_path.exists()
 
-            with open(doxyfile_path, 'r', encoding='utf-8') as f:
+            with open(doxyfile_path, 'r') as f:
                 content = f.read()
 
             assert "EXCLUDE_SYMLINKS       = NO" in content
@@ -52,7 +46,7 @@ def test_create_project_default_no_symlinks():
             doxyfile_path = Path(temp_dir) / "Doxyfile"
             assert doxyfile_path.exists()
 
-            with open(doxyfile_path, 'r', encoding='utf-8') as f:
+            with open(doxyfile_path, 'r') as f:
                 content = f.read()
 
             assert "EXCLUDE_SYMLINKS       = YES" in content

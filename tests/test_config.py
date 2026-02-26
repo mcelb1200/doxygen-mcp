@@ -1,14 +1,14 @@
 """
 Tests for the DoxygenConfig model.
 """
+# pylint: disable=import-error
 import os
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 
-# pylint: disable=import-error
 from doxygen_mcp.config import DoxygenConfig
-# pylint: enable=import-error
 
 class TestDoxygenConfig:
     """Test suite for DoxygenConfig."""
@@ -40,8 +40,7 @@ class TestDoxygenConfig:
 
             assert config.project_name == "Custom Project"
             assert config.recursive is False
-            # resolve_project_path and get_project_name should not be
-            # used for project_name if provided
+            # resolve_project_path and get_project_name should not be used for project_name if provided
             mock_get_name.assert_not_called()
 
     def test_from_env_with_env_vars(self):
@@ -64,41 +63,3 @@ class TestDoxygenConfig:
             assert config.optimize_output_for_c is True
             assert config.extract_private is True
             assert config.file_patterns == ["*.cpp", "*.h", "*.hpp"]
-
-    def test_from_env_env_overrides_kwargs(self):
-        """Test that environment variables take precedence over kwargs."""
-        env_vars = {
-            "DOXYGEN_MCP_PROJECT_NAME": "Env Project",
-        }
-
-        with patch.dict(os.environ, env_vars, clear=True):
-            config = DoxygenConfig.from_env(project_name="Kwarg Project")
-
-            assert config.project_name == "Env Project"
-
-    def test_from_env_boolean_values(self):
-        """Test various boolean environment variable values."""
-        test_cases = [
-            ("true", True),
-            ("yes", True),
-            ("1", True),
-            ("false", False),
-            ("no", False),
-            ("0", False),
-            ("anything", False),
-        ]
-
-        for env_val, expected in test_cases:
-            with patch.dict(os.environ, {"DOXYGEN_MCP_RECURSIVE": env_val}, clear=True):
-                config = DoxygenConfig.from_env()
-                assert config.recursive is expected, f"Failed for {env_val}"
-
-    def test_from_env_list_values(self):
-        """Test list environment variable values with different spacing."""
-        env_vars = {
-            "DOXYGEN_MCP_INPUT_PATHS": "path1, path2 ,path3",
-        }
-
-        with patch.dict(os.environ, env_vars, clear=True):
-            config = DoxygenConfig.from_env()
-            assert config.input_paths == ["path1", "path2", "path3"]

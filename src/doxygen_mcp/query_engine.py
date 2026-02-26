@@ -1,23 +1,15 @@
-"""
-Doxygen XML Query Engine.
-
-This module parses Doxygen XML output and provides an API for querying
-symbols, structures, and documentation.
-"""
 import asyncio
-from functools import lru_cache
+import os
+import defusedxml.ElementTree as ET
 from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar
-
-import defusedxml.ElementTree as ET  # pylint: disable=import-error
+from functools import lru_cache
 
 
 class DoxygenQueryEngine:
-    """Engine for querying Doxygen XML documentation."""
     _cache: ClassVar[Dict[str, "DoxygenQueryEngine"]] = {}
 
     def __init__(self, xml_dir: str):
-        """Initialize the query engine with an XML directory."""
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
@@ -29,20 +21,17 @@ class DoxygenQueryEngine:
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
-        """Factory method to create or retrieve a cached engine instance."""
         xml_path = str(Path(xml_dir).absolute())
         if xml_path in cls._cache:
             return cls._cache[xml_path]
 
         self = cls(xml_dir)
-        # pylint: disable=no-member
         await asyncio.to_thread(self._load_index)
         cls._cache[xml_path] = self
         return self
 
     @classmethod
     def clear_cache(cls, xml_dir: Optional[str] = None):
-        """Clear the engine instance cache."""
         if xml_dir:
             xml_path = str(Path(xml_dir).absolute())
             if xml_path in cls._cache:
@@ -119,8 +108,7 @@ class DoxygenQueryEngine:
         file_name = Path(file_path).name
 
         # 1. Optimization: Use pre-built file map for exact basename match (O(1))
-        # This covers the common case where the user provides the correct
-        # filename (e.g. "test_file.h")
+        # This covers the common case where the user provides the correct filename (e.g. "test_file.h")
         candidates = self._file_map.get(file_name)
         if candidates:
             # Return the first match
@@ -138,7 +126,6 @@ class DoxygenQueryEngine:
 
     @lru_cache(maxsize=128)
     def _fetch_compound_details(self, refid: str) -> Dict[str, Any]:
-        """Fetch and parse detailed information for a specific compound ID."""
         try:
             # self.xml_dir is already resolved in __init__
             xml_file = (self.xml_dir / f"{refid}.xml").resolve()
@@ -152,7 +139,7 @@ class DoxygenQueryEngine:
             return {"error": f"Details file {xml_file} not found"}
 
         try:
-            tree = SafeET.parse(xml_file)
+            tree = ET.parse(xml_file)
             root = tree.getroot()
             compounddef = root.find("compounddef")
 
@@ -183,11 +170,10 @@ class DoxygenQueryEngine:
                     )
 
             return details
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             return {"error": f"Error parsing {xml_file}: {e}"}
 
     def _get_location(self, element) -> Dict[str, Any]:
-        """Extract location information from an XML element."""
         loc = element.find("location")
         if loc is not None:
             return {
@@ -198,7 +184,6 @@ class DoxygenQueryEngine:
         return {}
 
     def _get_text_recursive(self, element) -> str:
-        """Recursively extract text from an XML element and its children."""
         if element is None:
             return ""
         # Optimization: use itertext() which is implemented in C and much faster
@@ -206,7 +191,6 @@ class DoxygenQueryEngine:
         return "".join(element.itertext()).strip()
 
     def list_all_symbols(self, kind_filter: Optional[str] = None) -> List[str]:
-        """List all symbols, optionally filtered by kind (e.g., 'class', 'namespace')."""
         if kind_filter:
             return [
                 name

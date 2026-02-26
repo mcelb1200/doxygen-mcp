@@ -9,16 +9,14 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
-import pytest  # pylint: disable=import-error
+import pytest
 
-# pylint: disable=import-error
 from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
     query_project_reference
 )
 from doxygen_mcp.utils import resolve_project_path
-# pylint: enable=import-error
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
@@ -29,7 +27,6 @@ def temp_project_dir():
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
 
-# pylint: disable=redefined-outer-name
 class TestEnvConfig:
     """Test suite for environment-based configuration."""
 
@@ -72,33 +69,15 @@ class TestEnvConfig:
         (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test", encoding="utf-8")
 
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            # Need to patch asyncio.create_subprocess_exec because generate_documentation uses it
-            with patch('asyncio.create_subprocess_exec') as mock_exec:
-                process = MagicMock()
-                process.communicate.return_value = asyncio.Future()
-                process.communicate.return_value.set_result((b"stdout", b"stderr"))
-                process.returncode = 0
+            # Mock successful doxygen execution
+            process = MagicMock()
+            process.communicate = AsyncMock(return_value=(b"", b""))
+            process.returncode = 0
+            mock_exec.return_value = process
 
-                mock_exec.return_value = process
-                
-                # communicate needs to be awaitable
-                comm_future = asyncio.Future()
-                comm_future.set_result((b"", b""))
-                mock_process.communicate.return_value = comm_future
+            result = await generate_documentation()
 
-                mock_process.returncode = 0
-
-                # Handle both MagicMock and AsyncMock behavior by using side_effect with a coroutine
-                async def get_mock_process(*args, **kwargs):
-                    return mock_process
-
-                mock_exec.side_effect = get_mock_process
-
-                result = await generate_documentation(
-                    # project_path is None
-                )
-                
-                assert "✅ Documentation generated successfully" in result
+            assert "✅ Documentation generated successfully" in result
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):
