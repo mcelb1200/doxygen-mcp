@@ -4,7 +4,6 @@ Security tests for resolve_project_path utility.
 # pylint: disable=import-error, wrong-import-position
 import os
 import sys
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 

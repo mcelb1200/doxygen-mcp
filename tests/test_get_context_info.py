@@ -1,10 +1,10 @@
 """
 Tests for get_context_info tool.
 """
-# pylint: disable=import-error
+# pylint: disable=import-error, redefined-outer-name
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import pytest
 
@@ -32,9 +32,11 @@ async def test_get_context_info_success():
         }
 
         with patch("doxygen_mcp.server.resolve_project_path", return_value=temp_path), \
-             patch("doxygen_mcp.server.detect_primary_language", return_value="python"), \
+             patch("doxygen_mcp.server.detect_primary_language", new_callable=AsyncMock) as mock_lang, \
              patch("doxygen_mcp.server.get_ide_environment", return_value=ide_env), \
              patch("doxygen_mcp.server.get_active_context", return_value=active_ctx):
+
+            mock_lang.return_value = "python"
 
             result = await get_context_info()
 
@@ -54,9 +56,11 @@ async def test_get_context_info_no_doxyfile():
         # Mock dependencies in server.py
         ide_env = {"ide": "unknown", "workspace_root": str(temp_path)}
         with patch("doxygen_mcp.server.resolve_project_path", return_value=temp_path), \
-             patch("doxygen_mcp.server.detect_primary_language", return_value="mixed"), \
+             patch("doxygen_mcp.server.detect_primary_language", new_callable=AsyncMock) as mock_lang, \
              patch("doxygen_mcp.server.get_ide_environment", return_value=ide_env), \
              patch("doxygen_mcp.server.get_active_context", return_value={}):
+
+            mock_lang.return_value = "mixed"
 
             result = await get_context_info()
 

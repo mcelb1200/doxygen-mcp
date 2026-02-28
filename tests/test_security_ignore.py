@@ -2,7 +2,6 @@
 Security tests for update_ignore_file utility.
 """
 # pylint: disable=import-error
-import pytest
 from doxygen_mcp.utils import _update_ignore_file_sync
 
 def test_ignore_newline_injection(tmp_path):
@@ -10,7 +9,6 @@ def test_ignore_newline_injection(tmp_path):
     project_root = tmp_path
     malicious_path = "docs/\n/etc/passwd"
 
-    # In my current implementation, it will just try to match "docs/\n/etc/passwd"
     result = _update_ignore_file_sync(project_root, malicious_path)
     assert result is True
 

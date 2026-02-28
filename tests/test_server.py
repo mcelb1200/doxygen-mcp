@@ -1,8 +1,10 @@
 """
+# pylint: disable=import-error, redefined-outer-name
 Tests for Doxygen MCP Server
 
 Basic test suite to verify core functionality of the Doxygen MCP server.
 """
+# pylint: disable=import-error, redefined-outer-name
 # pylint: disable=import-error
 import os
 import sys
@@ -25,9 +27,11 @@ from doxygen_mcp.config import DoxygenConfig
 
 class TestDoxygenConfig:
     """Test the DoxygenConfig model"""
+# pylint: disable=import-error, redefined-outer-name
 
     def test_default_config(self):
         """Test default configuration values"""
+# pylint: disable=import-error, redefined-outer-name
         config = DoxygenConfig()
         assert config.project_name == "My Project"
         assert config.extract_all is True
@@ -36,6 +40,7 @@ class TestDoxygenConfig:
 
     def test_config_serialization(self):
         """Test Doxyfile generation"""
+# pylint: disable=import-error, redefined-outer-name
         config = DoxygenConfig(
             project_name="Test Project",
             output_directory="./test_docs",
@@ -51,6 +56,7 @@ class TestDoxygenConfig:
 
     def test_language_optimization(self):
         """Test language-specific optimizations"""
+# pylint: disable=import-error, redefined-outer-name
         config = DoxygenConfig()
         config.optimize_output_for_c = True
         config.optimize_output_java = False
@@ -64,6 +70,7 @@ class TestDoxygenConfig:
 @pytest.mark.asyncio
 async def test_create_project_success():
     """Test successful project creation"""
+# pylint: disable=import-error, redefined-outer-name
     with tempfile.TemporaryDirectory() as temp_dir:
         result = await create_doxygen_project(
             project_name="Test Project",
@@ -89,6 +96,7 @@ async def test_create_project_success():
 @pytest.mark.asyncio
 async def test_create_project_invalid_path():
     """Test project creation with invalid path"""
+# pylint: disable=import-error, redefined-outer-name
     result = await create_doxygen_project(
         project_name="Test Project",
         project_path="/invalid/path/that/cannot/be/created",
@@ -100,6 +108,7 @@ async def test_create_project_invalid_path():
 @pytest.mark.asyncio
 async def test_scan_project_nonexistent():
     """Test scanning a non-existent project"""
+# pylint: disable=import-error, redefined-outer-name
     result = await scan_project(
         project_path="/nonexistent/path"
     )
@@ -110,6 +119,7 @@ async def test_scan_project_nonexistent():
 @pytest.mark.asyncio
 async def test_scan_project_success():
     """Test successful project scanning"""
+# pylint: disable=import-error, redefined-outer-name
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create some test files
         test_files = [
@@ -138,6 +148,7 @@ async def test_scan_project_success():
 @patch('asyncio.create_subprocess_exec')
 async def test_check_doxygen_install_success(mock_exec):
     """Test successful Doxygen installation check"""
+# pylint: disable=import-error, redefined-outer-name
     # Create a mock process
     process = MagicMock()
     process.communicate = AsyncMock(return_value=(b"1.9.4\n", b""))
@@ -153,6 +164,7 @@ async def test_check_doxygen_install_success(mock_exec):
 @patch('asyncio.create_subprocess_exec')
 async def test_check_doxygen_install_not_found(mock_exec):
     """Test Doxygen not found"""
+# pylint: disable=import-error, redefined-outer-name
     mock_exec.side_effect = FileNotFoundError()
 
     result = await check_doxygen_install()
@@ -162,6 +174,7 @@ async def test_check_doxygen_install_not_found(mock_exec):
 @pytest.mark.asyncio
 async def test_generate_documentation_no_doxyfile():
     """Test documentation generation without Doxyfile"""
+# pylint: disable=import-error, redefined-outer-name
     with tempfile.TemporaryDirectory() as temp_dir:
         result = await generate_documentation(
             project_path=temp_dir,
@@ -174,6 +187,7 @@ async def test_generate_documentation_no_doxyfile():
 @patch('asyncio.create_subprocess_exec')
 async def test_generate_documentation_success(mock_exec):
     """Test successful documentation generation"""
+# pylint: disable=import-error, redefined-outer-name
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a mock Doxyfile
         doxyfile_path = Path(temp_dir) / "Doxyfile"
@@ -195,6 +209,7 @@ async def test_generate_documentation_success(mock_exec):
 @pytest.mark.asyncio
 async def test_path_traversal_protection():
     """Test protection against path traversal"""
+# pylint: disable=import-error, redefined-outer-name
     # Use patch.dict to set DOXYGEN_PROJECT_ROOT for the duration of the test
     with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "/app/project"}):
         # This should fail as /etc is not under /app/project
@@ -207,9 +222,11 @@ async def test_path_traversal_protection():
 
 class TestLanguageDetection:
     """Test language-specific configuration"""
+# pylint: disable=import-error, redefined-outer-name
 
     def test_cpp_language_config(self):
         """Test C++ language configuration"""
+# pylint: disable=import-error, redefined-outer-name
         config = DoxygenConfig()
 
         # Simulate C++ project setup
@@ -223,6 +240,7 @@ class TestLanguageDetection:
 
     def test_python_language_config(self):
         """Test Python language configuration"""
+# pylint: disable=import-error, redefined-outer-name
         config = DoxygenConfig()
 
         # Simulate Python project setup
@@ -236,6 +254,7 @@ class TestLanguageDetection:
 
     def test_c_language_config(self):
         """Test C language configuration"""
+# pylint: disable=import-error, redefined-outer-name
         config = DoxygenConfig()
 
         # Simulate C project setup

@@ -1,0 +1,3 @@
+"""
+Mock module for Pylint.
+"""

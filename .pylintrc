@@ -1,0 +1,23 @@
+[MASTER]
+ignore=mock_modules
+
+[MESSAGES CONTROL]
+disable=
+    C0114, # missing-module-docstring
+    C0115, # missing-class-docstring
+    C0116, # missing-function-docstring
+    R0903, # too-few-public-methods
+    R0913, # too-many-arguments
+    R0914, # too-many-locals
+    R0917, # too-many-positional-arguments
+    W0613, # unused-argument
+    W0718, # broad-exception-caught
+    C0301, # line-too-long
+    W1510, # subprocess-run-check
+    C0415, # import-outside-toplevel
+    W1203, # logging-fstring-interpolation
+    W1514, # unspecified-encoding
+    R0801, # duplicate-code
+
+[FORMAT]
+max-line-length=120

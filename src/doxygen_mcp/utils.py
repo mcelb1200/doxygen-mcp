@@ -88,14 +88,17 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
             is_safe = True
 
     if not is_safe:
-        raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
+        raise ValueError(
+            f"Security Error: Access denied to path '{requested_path}'. "
+            "It is outside of allowed project roots."
+        )
 
     return requested_path
 
 
-def detect_primary_language(project_path: Path) -> str:
+def _detect_primary_language_sync(project_path: Path) -> str:
     """
-    Identify the dominant programming language in the project to optimize Doxygen settings.
+    Identify the dominant programming language in the project.
     """
     ext_map = {
         ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp", ".hh": "cpp", ".cxx": "cpp",
@@ -119,13 +122,27 @@ def detect_primary_language(project_path: Path) -> str:
                 if ext in ext_map:
                     lang = ext_map[ext]
                     counts[lang] = counts.get(lang, 0) + 1
-    except Exception:
+    except Exception: # pylint: disable=broad-exception-caught
         pass
 
     if not counts:
         return "mixed"
 
     return max(counts, key=counts.get)
+
+async def detect_primary_language(project_path: Path) -> str:
+    """
+    Identify the dominant programming language in the project.
+    Offloaded to a thread pool.
+    """
+    # pylint: disable=no-member
+    if hasattr(asyncio, "to_thread"):
+        return await asyncio.to_thread(_detect_primary_language_sync, project_path)
+
+    import concurrent.futures # pylint: disable=import-outside-toplevel
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(pool, _detect_primary_language_sync, project_path)
 
 def get_project_name(resolved_path: Path) -> str:
     """
@@ -137,11 +154,7 @@ def get_project_name(resolved_path: Path) -> str:
         return env_name
 
     # Priority 2: IDE specific variables
-    ide_name_vars = [
-        "VSCODE_WORKSPACE_NAME",
-        "CURSOR_PROJECT_NAME",
-        "PROJECT_NAME",
-    ]
+    ide_name_vars = ["VSCODE_WORKSPACE_NAME", "CURSOR_PROJECT_NAME", "PROJECT_NAME"]
     for var in ide_name_vars:
         val = os.environ.get(var)
         if val:
@@ -167,16 +180,17 @@ def get_ide_environment() -> Dict[str, Any]:
 
     if is_vscode:
         context["ide"] = "vscode"
-        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or "cursor" in os.environ.get("APP_PATH", "").lower():
+        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or \
+           "cursor" in os.environ.get("APP_PATH", "").lower():
             context["ide"] = "cursor"
 
         # Try to find VS Code settings
         vscode_settings = project_root / ".vscode" / "settings.json"
         if vscode_settings.exists():
             try:
-                with open(vscode_settings, "r") as f:
+                with open(vscode_settings, "r", encoding="utf-8") as f:
                     context["vscode_settings"] = json.load(f)
-            except:
+            except Exception: # pylint: disable=broad-exception-caught
                 pass
 
     # JetBrains detection
@@ -189,7 +203,6 @@ def get_ide_environment() -> Dict[str, Any]:
 def get_active_context() -> Dict[str, Any]:
     """
     Retrieve active file information if provided by the environment.
-    Some MCP clients or IDE extensions might inject these into the environment.
     """
     return {
         "active_file": os.environ.get("MCP_ACTIVE_FILE"),
@@ -213,7 +226,7 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
                     f.write("# Doxygen Generated Documentation Folders\n")
                     f.write(new_entry)
                 success = True
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception: # pylint: disable=broad-exception-caught
                 pass
         else:
             try:
@@ -224,7 +237,7 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
                             f.write("\n")
                         f.write(new_entry)
                         success = True
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception: # pylint: disable=broad-exception-caught
                 pass
 
     return success
@@ -233,7 +246,12 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
 async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     """
     Ensure a path is added to the project-specific .gitignore file.
-    Offloaded to a thread pool to avoid blocking the event loop.
-    Returns True if an entry was added, False otherwise.
     """
-    return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
+    # pylint: disable=no-member
+    if hasattr(asyncio, "to_thread"):
+        return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
+
+    import concurrent.futures # pylint: disable=import-outside-toplevel
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(pool, _update_ignore_file_sync, project_root, path_to_ignore)

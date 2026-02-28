@@ -1,15 +1,19 @@
 """
+# pylint: disable=import-error, redefined-outer-name
 Security tests for DoxygenConfig to prevent configuration injection.
 """
+# pylint: disable=import-error, redefined-outer-name
 # pylint: disable=import-error
 import pytest
 from doxygen_mcp.config import DoxygenConfig
 
 class TestSecurityConfig:
     """Security tests for DoxygenConfig."""
+# pylint: disable=import-error, redefined-outer-name
 
     def test_project_name_injection(self):
         """Test preventing injection via project_name."""
+# pylint: disable=import-error, redefined-outer-name
         malicious_name = 'My Project"\nINPUT_FILTER = "echo HACKED > hacked.txt"\nREM="'
         config = DoxygenConfig(project_name=malicious_name)
         doxyfile_content = config.to_doxyfile()

@@ -1,6 +1,8 @@
 """
+# pylint: disable=import-error, redefined-outer-name
 Tests for the DoxygenConfig model.
 """
+# pylint: disable=import-error, redefined-outer-name
 # pylint: disable=import-error
 import os
 from pathlib import Path
@@ -12,9 +14,11 @@ from doxygen_mcp.config import DoxygenConfig
 
 class TestDoxygenConfig:
     """Test suite for DoxygenConfig."""
+# pylint: disable=import-error, redefined-outer-name
 
     def test_from_env_basic(self):
         """Test from_env with default values and no environment variables."""
+# pylint: disable=import-error, redefined-outer-name
         # Mocking utils to avoid side effects and dependency on environment
         with patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve, \
              patch("doxygen_mcp.utils.get_project_name") as mock_get_name, \
@@ -32,6 +36,7 @@ class TestDoxygenConfig:
 
     def test_from_env_with_kwargs(self):
         """Test from_env with explicit kwargs."""
+# pylint: disable=import-error, redefined-outer-name
         with patch("doxygen_mcp.utils.resolve_project_path"), \
              patch("doxygen_mcp.utils.get_project_name") as mock_get_name, \
              patch.dict(os.environ, {}, clear=True):
@@ -45,6 +50,7 @@ class TestDoxygenConfig:
 
     def test_from_env_with_env_vars(self):
         """Test from_env with environment variable overrides."""
+# pylint: disable=import-error, redefined-outer-name
         env_vars = {
             "DOXYGEN_MCP_PROJECT_NAME": "Env Project",
             "DOXYGEN_MCP_RECURSIVE": "false",
