@@ -1,23 +1,15 @@
-"""
-Doxygen XML Query Engine.
-
-This module parses Doxygen XML output and provides an API for querying
-symbols, structures, and documentation.
-"""
-# pylint: disable=import-error
 import asyncio
-from functools import lru_cache
+import os
+import defusedxml.ElementTree as ET
 from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar
+from functools import lru_cache
 
-import defusedxml.ElementTree as ET
 
 class DoxygenQueryEngine:
-    """Engine for querying Doxygen XML documentation."""
     _cache: ClassVar[Dict[str, "DoxygenQueryEngine"]] = {}
 
     def __init__(self, xml_dir: str):
-        """Initialize the query engine with an XML directory."""
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
@@ -29,28 +21,17 @@ class DoxygenQueryEngine:
 
     @classmethod
     async def create(cls, xml_dir: str) -> "DoxygenQueryEngine":
-        """Factory method to create or retrieve a cached engine instance."""
         xml_path = str(Path(xml_dir).absolute())
         if xml_path in cls._cache:
             return cls._cache[xml_path]
 
         self = cls(xml_dir)
-        # Handle asyncio.to_thread for Python < 3.9
-        # pylint: disable=no-member
-        if hasattr(asyncio, "to_thread"):
-            await asyncio.to_thread(self._load_index)
-        else:
-            import concurrent.futures # pylint: disable=import-outside-toplevel
-            loop = asyncio.get_event_loop()
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                await loop.run_in_executor(pool, self._load_index)
-
+        await asyncio.to_thread(self._load_index)
         cls._cache[xml_path] = self
         return self
 
     @classmethod
     def clear_cache(cls, xml_dir: Optional[str] = None):
-        """Clear the engine instance cache."""
         if xml_dir:
             xml_path = str(Path(xml_dir).absolute())
             if xml_path in cls._cache:
@@ -58,48 +39,43 @@ class DoxygenQueryEngine:
         else:
             cls._cache.clear()
 
-    def _process_compound(self, elem):
-        """Process a compound element from the index."""
-        name_elem = elem.find("name")
-        if name_elem is not None and name_elem.text:
-            name = name_elem.text
-            kind = elem.get("kind")
-            refid = elem.get("refid")
-            info = {
-                "kind": kind,
-                "refid": refid,
-            }
-            self.compounds[name] = info
-
-            # Build optimization indices
-            # 1. Case-insensitive lookup (O(1))
-            self._lower_map[name.lower()] = info
-
-            # 2. File lookup by basename (O(1))
-            if kind == "file":
-                self._files.append((name, info))
-                file_name = Path(name).name
-                if file_name not in self._file_map:
-                    self._file_map[file_name] = []
-                self._file_map[file_name].append(info)
-
     def _load_index(self):
-        """Load and parse the Doxygen index.xml file."""
         if not self.index_path.exists():
             return
 
         try:
             # Use iterparse to handle large XML files with minimal memory usage
-            # pylint: disable=unused-variable
             context = ET.iterparse(self.index_path, events=("end",))
 
             for event, elem in context:
                 if elem.tag == "compound":
-                    self._process_compound(elem)
+                    name_elem = elem.find("name")
+                    if name_elem is not None and name_elem.text:
+                        name = name_elem.text
+                        kind = elem.get("kind")
+                        refid = elem.get("refid")
+                        info = {
+                            "kind": kind,
+                            "refid": refid,
+                        }
+                        self.compounds[name] = info
+
+                        # Build optimization indices
+                        # 1. Case-insensitive lookup (O(1))
+                        self._lower_map[name.lower()] = info
+
+                        # 2. File lookup by basename (O(1))
+                        if kind == "file":
+                            self._files.append((name, info))
+                            file_name = Path(name).name
+                            if file_name not in self._file_map:
+                                self._file_map[file_name] = []
+                            self._file_map[file_name].append(info)
+
                     # Clear the element to free memory
                     elem.clear()
 
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             print(f"Error loading index: {e}")
 
     def query_symbol(self, symbol_name: str) -> Optional[Dict[str, Any]]:
@@ -145,7 +121,6 @@ class DoxygenQueryEngine:
 
     @lru_cache(maxsize=128)
     def _fetch_compound_details(self, refid: str) -> Dict[str, Any]:
-        """Fetch and parse detailed information for a specific compound ID."""
         try:
             # self.xml_dir is already resolved in __init__
             xml_file = (self.xml_dir / f"{refid}.xml").resolve()
@@ -160,8 +135,8 @@ class DoxygenQueryEngine:
 
         try:
             tree = ET.parse(xml_file)
-            xml_root = tree.getroot()
-            compounddef = xml_root.find("compounddef")
+            root = tree.getroot()
+            compounddef = root.find("compounddef")
 
             details = {
                 "name": compounddef.find("compoundname").text,
@@ -190,11 +165,10 @@ class DoxygenQueryEngine:
                     )
 
             return details
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:
             return {"error": f"Error parsing {xml_file}: {e}"}
 
     def _get_location(self, element) -> Dict[str, Any]:
-        """Extract location information from an XML element."""
         loc = element.find("location")
         if loc is not None:
             return {
@@ -205,7 +179,6 @@ class DoxygenQueryEngine:
         return {}
 
     def _get_text_recursive(self, element) -> str:
-        """Recursively extract text from an XML element and its children."""
         if element is None:
             return ""
         # Optimization: use itertext() which is implemented in C and much faster
@@ -213,7 +186,6 @@ class DoxygenQueryEngine:
         return "".join(element.itertext()).strip()
 
     def list_all_symbols(self, kind_filter: Optional[str] = None) -> List[str]:
-        """List all symbols, optionally filtered by kind (e.g., 'class', 'namespace')."""
         if kind_filter:
             return [
                 name

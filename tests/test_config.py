@@ -1,24 +1,13 @@
-"""
-# pylint: disable=import-error, redefined-outer-name
-Tests for the DoxygenConfig model.
-"""
-# pylint: disable=import-error, redefined-outer-name
-# pylint: disable=import-error
+
 import os
-from pathlib import Path
-from unittest.mock import patch
-
 import pytest
-
+from unittest.mock import patch, MagicMock
+from pathlib import Path
 from doxygen_mcp.config import DoxygenConfig
 
 class TestDoxygenConfig:
-    """Test suite for DoxygenConfig."""
-# pylint: disable=import-error, redefined-outer-name
-
     def test_from_env_basic(self):
         """Test from_env with default values and no environment variables."""
-# pylint: disable=import-error, redefined-outer-name
         # Mocking utils to avoid side effects and dependency on environment
         with patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve, \
              patch("doxygen_mcp.utils.get_project_name") as mock_get_name, \
@@ -36,8 +25,7 @@ class TestDoxygenConfig:
 
     def test_from_env_with_kwargs(self):
         """Test from_env with explicit kwargs."""
-# pylint: disable=import-error, redefined-outer-name
-        with patch("doxygen_mcp.utils.resolve_project_path"), \
+        with patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve, \
              patch("doxygen_mcp.utils.get_project_name") as mock_get_name, \
              patch.dict(os.environ, {}, clear=True):
 
@@ -50,7 +38,6 @@ class TestDoxygenConfig:
 
     def test_from_env_with_env_vars(self):
         """Test from_env with environment variable overrides."""
-# pylint: disable=import-error, redefined-outer-name
         env_vars = {
             "DOXYGEN_MCP_PROJECT_NAME": "Env Project",
             "DOXYGEN_MCP_RECURSIVE": "false",
@@ -69,3 +56,41 @@ class TestDoxygenConfig:
             assert config.optimize_output_for_c is True
             assert config.extract_private is True
             assert config.file_patterns == ["*.cpp", "*.h", "*.hpp"]
+
+    def test_from_env_env_overrides_kwargs(self):
+        """Test that environment variables take precedence over kwargs."""
+        env_vars = {
+            "DOXYGEN_MCP_PROJECT_NAME": "Env Project",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = DoxygenConfig.from_env(project_name="Kwarg Project")
+
+            assert config.project_name == "Env Project"
+
+    def test_from_env_boolean_values(self):
+        """Test various boolean environment variable values."""
+        test_cases = [
+            ("true", True),
+            ("yes", True),
+            ("1", True),
+            ("false", False),
+            ("no", False),
+            ("0", False),
+            ("anything", False),
+        ]
+
+        for env_val, expected in test_cases:
+            with patch.dict(os.environ, {"DOXYGEN_MCP_RECURSIVE": env_val}, clear=True):
+                config = DoxygenConfig.from_env()
+                assert config.recursive is expected, f"Failed for {env_val}"
+
+    def test_from_env_list_values(self):
+        """Test list environment variable values with different spacing."""
+        env_vars = {
+            "DOXYGEN_MCP_INPUT_PATHS": "path1, path2 ,path3",
+        }
+
+        with patch.dict(os.environ, env_vars, clear=True):
+            config = DoxygenConfig.from_env()
+            assert config.input_paths == ["path1", "path2", "path3"]

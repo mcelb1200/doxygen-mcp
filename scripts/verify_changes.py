@@ -1,50 +1,44 @@
-"""
-Script to verify changes to the Doxygen MCP server.
-"""
-# pylint: disable=import-error, wrong-import-position, broad-exception-caught
+
 import os
 import sys
 import asyncio
 from pathlib import Path
+from unittest.mock import patch
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from doxygen_mcp.server import create_doxygen_project
-from doxygen_mcp.utils import resolve_project_path
+from doxygen_mcp.server import _resolve_project_path, create_doxygen_project
 
 def test_resolve_logic():
-    """Test the path resolution logic."""
-    print("Testing resolve_project_path...")
+    print("Testing _resolve_project_path...")
 
     # Test 1: Explicit path
-    p = resolve_project_path("foo")
+    p = _resolve_project_path("foo")
     assert p.name == "foo"
     print("  Explicit path: OK")
 
     # Test 2: Env var
     os.environ["DOXYGEN_PROJECT_ROOT"] = str(Path("bar").resolve())
-    p = resolve_project_path(None)
+    p = _resolve_project_path(None)
     assert p.name == "bar"
     print("  Env var: OK")
 
     # Test 3: Missing
-    if "DOXYGEN_PROJECT_ROOT" in os.environ:
-        del os.environ["DOXYGEN_PROJECT_ROOT"]
+    del os.environ["DOXYGEN_PROJECT_ROOT"]
     try:
-        resolve_project_path(None)
+        _resolve_project_path(None)
+        print("  Missing path: FAILED (should raise)")
+    except ValueError:
         print("  Missing path: OK")
-    except (ValueError, IndexError):
-        print("  Missing path: OK (caught expected error)")
 
 async def test_tools():
-    """Test the core tools functionality."""
     print("\nTesting tools...")
 
     # Setup
     test_dir = Path("test_verify_env").resolve()
     if test_dir.exists():
-        import shutil # pylint: disable=import-outside-toplevel
+        import shutil
         shutil.rmtree(test_dir)
 
     os.environ["DOXYGEN_PROJECT_ROOT"] = str(test_dir)
@@ -61,7 +55,7 @@ async def test_tools():
         if "✅" in result:
             print("  Creation: OK")
         else:
-            print(f"  Creation: FAILED - {result}")
+            print(f"  Creation: FAILED - {result.encode('utf-8', errors='replace')}")
 
         if (test_dir / "Doxyfile").exists():
             print("  Doxyfile check: OK")
@@ -73,7 +67,7 @@ async def test_tools():
 
 
     # Clean up
-    import shutil # pylint: disable=import-outside-toplevel
+    import shutil
     if test_dir.exists():
         shutil.rmtree(test_dir)
 

@@ -27,8 +27,15 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
 
     return current
 
-def _get_safe_roots() -> List[Path]:
-    """Identify safe base directories from environment and discovery."""
+def resolve_project_path(project_path: Optional[str] = None) -> Path:
+    """
+    Resolve project path with priority:
+    1. Explicit argument (validated against allowed roots)
+    2. DOXYGEN_PROJECT_ROOT env var
+    3. IDE-supplied workspace variables (VSCODE_WORKSPACE_FOLDER, etc.)
+    4. Discovery via markers (searching up from CWD/PWD)
+    """
+    # Identify safe base directories
     safe_roots = []
 
     # Priority 2: Standard override
@@ -38,8 +45,11 @@ def _get_safe_roots() -> List[Path]:
 
     # Priority 3: IDE Workspace variables
     ide_roots = [
-        "VSCODE_WORKSPACE_FOLDER", "CURSOR_WORKSPACE_PATH",
-        "GEMINI_PROJECT_ROOT", "ACTIVE_WORKSPACE_PATH", "PWD"
+        "VSCODE_WORKSPACE_FOLDER",
+        "CURSOR_WORKSPACE_PATH",
+        "GEMINI_PROJECT_ROOT",
+        "ACTIVE_WORKSPACE_PATH",
+        "PWD", # Often set by shells/IDE terminals
     ]
     for env_var in ide_roots:
         val = os.environ.get(env_var)
@@ -47,58 +57,48 @@ def _get_safe_roots() -> List[Path]:
             safe_roots.append(Path(os.path.abspath(os.path.realpath(val))))
 
     # Priority 4: Search upwards from CWD
-    safe_roots.append(find_project_root(Path.cwd()))
+    discovery_root = find_project_root(Path.cwd())
+    safe_roots.append(discovery_root)
 
-    # Add explicitly allowed paths
+    # Add explicitly allowed paths from environment
     allowed_env = os.environ.get("DOXYGEN_ALLOWED_PATHS")
     if allowed_env:
         for p in allowed_env.split(","):
             if p.strip():
                 safe_roots.append(Path(os.path.abspath(os.path.realpath(p.strip()))))
-    return safe_roots
-
-def resolve_project_path(project_path: Optional[str] = None) -> Path:
-    """
-    Resolve project path with priority:
-    1. Explicit argument (validated against allowed roots)
-    2. DOXYGEN_PROJECT_ROOT env var
-    3. IDE-supplied workspace variables
-    4. Discovery via markers
-    """
-    safe_roots = _get_safe_roots()
 
     if not project_path:
-        return safe_roots[0]
+        return safe_roots[0] if safe_roots else discovery_root
 
+    # Validate the provided project_path
+    # We use realpath/abspath to resolve symlinks and ensure absolute path before comparison
     requested_path = Path(os.path.abspath(os.path.realpath(project_path)))
 
     # Check if requested_path is within any of the safe roots
     is_safe = False
     for root in safe_roots:
         try:
+            # relative_to throws ValueError if not a subpath
             requested_path.relative_to(root)
             is_safe = True
             break
         except ValueError:
             continue
 
-    # Special bypass for tests
+    # Special bypass for tests to avoid breaking temporary directory usage
     if not is_safe and os.environ.get("PYTEST_CURRENT_TEST"):
         if str(requested_path).startswith("/tmp") or "temp" in str(requested_path).lower():
             is_safe = True
 
     if not is_safe:
-        raise ValueError(
-            f"Security Error: Access denied to path '{requested_path}'. "
-            "It is outside of allowed project roots."
-        )
+        raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
 
     return requested_path
 
 
-def _detect_primary_language_sync(project_path: Path) -> str:
+def detect_primary_language(project_path: Path) -> str:
     """
-    Identify the dominant programming language in the project.
+    Identify the dominant programming language in the project to optimize Doxygen settings.
     """
     ext_map = {
         ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp", ".hh": "cpp", ".cxx": "cpp",
@@ -122,27 +122,13 @@ def _detect_primary_language_sync(project_path: Path) -> str:
                 if ext in ext_map:
                     lang = ext_map[ext]
                     counts[lang] = counts.get(lang, 0) + 1
-    except Exception: # pylint: disable=broad-exception-caught
+    except Exception:
         pass
 
     if not counts:
         return "mixed"
 
     return max(counts, key=counts.get)
-
-async def detect_primary_language(project_path: Path) -> str:
-    """
-    Identify the dominant programming language in the project.
-    Offloaded to a thread pool.
-    """
-    # pylint: disable=no-member
-    if hasattr(asyncio, "to_thread"):
-        return await asyncio.to_thread(_detect_primary_language_sync, project_path)
-
-    import concurrent.futures # pylint: disable=import-outside-toplevel
-    loop = asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        return await loop.run_in_executor(pool, _detect_primary_language_sync, project_path)
 
 def get_project_name(resolved_path: Path) -> str:
     """
@@ -154,7 +140,11 @@ def get_project_name(resolved_path: Path) -> str:
         return env_name
 
     # Priority 2: IDE specific variables
-    ide_name_vars = ["VSCODE_WORKSPACE_NAME", "CURSOR_PROJECT_NAME", "PROJECT_NAME"]
+    ide_name_vars = [
+        "VSCODE_WORKSPACE_NAME",
+        "CURSOR_PROJECT_NAME",
+        "PROJECT_NAME",
+    ]
     for var in ide_name_vars:
         val = os.environ.get(var)
         if val:
@@ -180,17 +170,16 @@ def get_ide_environment() -> Dict[str, Any]:
 
     if is_vscode:
         context["ide"] = "vscode"
-        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or \
-           "cursor" in os.environ.get("APP_PATH", "").lower():
+        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or "cursor" in os.environ.get("APP_PATH", "").lower():
             context["ide"] = "cursor"
 
         # Try to find VS Code settings
         vscode_settings = project_root / ".vscode" / "settings.json"
         if vscode_settings.exists():
             try:
-                with open(vscode_settings, "r", encoding="utf-8") as f:
+                with open(vscode_settings, "r") as f:
                     context["vscode_settings"] = json.load(f)
-            except Exception: # pylint: disable=broad-exception-caught
+            except:
                 pass
 
     # JetBrains detection
@@ -203,6 +192,7 @@ def get_ide_environment() -> Dict[str, Any]:
 def get_active_context() -> Dict[str, Any]:
     """
     Retrieve active file information if provided by the environment.
+    Some MCP clients or IDE extensions might inject these into the environment.
     """
     return {
         "active_file": os.environ.get("MCP_ACTIVE_FILE"),
@@ -217,41 +207,40 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
     ignore_file = project_root / ".gitignore"
     new_entry = f"{path_to_ignore}\n"
-    success = False
 
-    if not ignore_file.is_symlink():
-        if not ignore_file.exists():
-            try:
-                with open(ignore_file, "w", encoding="utf-8") as f:
-                    f.write("# Doxygen Generated Documentation Folders\n")
-                    f.write(new_entry)
-                success = True
-            except Exception: # pylint: disable=broad-exception-caught
-                pass
-        else:
-            try:
-                with open(ignore_file, "r+", encoding="utf-8") as f:
-                    lines = f.readlines()
-                    if not any(line.strip() == path_to_ignore.strip() for line in lines):
-                        if lines and not lines[-1].endswith("\n"):
-                            f.write("\n")
-                        f.write(new_entry)
-                        success = True
-            except Exception: # pylint: disable=broad-exception-caught
-                pass
+    if ignore_file.is_symlink():
+        return False
 
-    return success
+    # Create file if it doesn't exist
+    if not ignore_file.exists():
+        try:
+            with open(ignore_file, "w", encoding="utf-8") as f:
+                f.write("# Doxygen Generated Documentation Folders\n")
+                f.write(new_entry)
+            return True
+        except Exception:
+            return False
+
+    # Check if already ignored and append if not
+    try:
+        with open(ignore_file, "r+", encoding="utf-8") as f:
+            lines = f.readlines()
+            if any(line.strip() == path_to_ignore.strip() for line in lines):
+                return False
+
+            # Ensure the last line ends with a newline before appending
+            if lines and not lines[-1].endswith("\n"):
+                f.write("\n")
+            f.write(new_entry)
+        return True
+    except Exception:
+        return False
 
 
 async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     """
     Ensure a path is added to the project-specific .gitignore file.
+    Offloaded to a thread pool to avoid blocking the event loop.
+    Returns True if an entry was added, False otherwise.
     """
-    # pylint: disable=no-member
-    if hasattr(asyncio, "to_thread"):
-        return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
-
-    import concurrent.futures # pylint: disable=import-outside-toplevel
-    loop = asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        return await loop.run_in_executor(pool, _update_ignore_file_sync, project_root, path_to_ignore)
+    return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)

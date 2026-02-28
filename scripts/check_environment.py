@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Basic functionality test for Doxygen MCP Server.
-Run this script to verify core functionality before MCP integration.
+Basic functionality test for Doxygen MCP Server
+Run this script to verify core functionality before MCP integration
 """
 
-import os
 import subprocess
 import sys
+import os
 from pathlib import Path
+import json
 
 def install_with_winget(package_id: str, name: str) -> bool:
     """Attempt to install a package using Windows Package Manager (winget)"""
@@ -18,22 +19,18 @@ def install_with_winget(package_id: str, name: str) -> bool:
 
         # Install the package
         result = subprocess.run(
-            [
-                "winget", "install", "--id", package_id, "--exact",
-                "--accept-package-agreements", "--accept-source-agreements"
-            ],
+            ["winget", "install", "--id", package_id, "--exact", "--accept-package-agreements", "--accept-source-agreements"],
             capture_output=True,
-            text=True,
-            check=False
+            text=True
         )
 
         if result.returncode == 0:
             print(f"[PASS] Successfully installed {name}!")
             return True
-
-        print(f"[FAIL] winget failed to install {name}.")
-        print(f"Error: {result.stderr}")
-        return False
+        else:
+            print(f"[FAIL] winget failed to install {name}.")
+            print(f"Error: {result.stderr}")
+            return False
     except (FileNotFoundError, subprocess.CalledProcessError):
         print("[FAIL] winget is not available. Please install manually.")
         return False
@@ -41,17 +38,17 @@ def install_with_winget(package_id: str, name: str) -> bool:
 def test_doxygen_installation(auto_install: bool = False):
     """Test if Doxygen is installed and accessible"""
     print("Testing Doxygen installation...")
-    d_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
     try:
-        result = subprocess.run([d_exe, "--version"], capture_output=True, text=True, check=False)
+        result = subprocess.run([doxygen_exe, "--version"], capture_output=True, text=True)
         if result.returncode == 0:
             version = result.stdout.strip()
-            print(f"[PASS] Doxygen {version} is installed and working at '{d_exe}'!")
+            print(f"[PASS] Doxygen {version} is installed and working at '{doxygen_exe}'!")
             return True
     except FileNotFoundError:
         pass
 
-    print(f"[FAIL] Doxygen is not installed or not in PATH (checked '{d_exe}')")
+    print(f"[FAIL] Doxygen is not installed or not in PATH (checked '{doxygen_exe}')")
     if auto_install and sys.platform == "win32":
         return install_with_winget("Doxygen.Doxygen", "Doxygen")
 
@@ -62,7 +59,7 @@ def test_graphviz_installation(auto_install: bool = False):
     """Test if Graphviz (dot) is installed"""
     print("\nTesting Graphviz (dot) installation...")
     try:
-        result = subprocess.run(["dot", "-V"], capture_output=True, text=True, check=False)
+        result = subprocess.run(["dot", "-V"], capture_output=True, text=True)
         if result.returncode == 0:
             version_info = result.stderr.strip()
             print(f"[PASS] Graphviz found: {version_info}")
@@ -164,7 +161,7 @@ def test_manual_doxygen_run():
     if not example_path.exists():
         return True
 
-    doxyfile_content = \"\"\"
+    doxyfile_content = f"""
 PROJECT_NAME           = "Calculator Example Test"
 OUTPUT_DIRECTORY       = "test_docs"
 INPUT                  = .
@@ -173,28 +170,27 @@ RECURSIVE              = NO
 GENERATE_XML           = YES
 GENERATE_HTML          = NO
 EXTRACT_ALL            = YES
-\"\"\"
+"""
 
     doxyfile_path = example_path / "Doxyfile.test"
-    doxyfile_path.write_text(doxyfile_content, encoding='utf-8')
+    doxyfile_path.write_text(doxyfile_content)
 
     try:
-        d_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+        doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
         result = subprocess.run(
-            [d_exe, str(doxyfile_path)],
+            [doxygen_exe, str(doxyfile_path)],
             cwd=example_path,
             capture_output=True,
-            text=True,
-            check=False
+            text=True
         )
 
         if result.returncode == 0:
             print("[PASS] Doxygen ran successfully!")
             return True
-
-        print("[FAIL] Doxygen failed to run")
-        return False
-    except Exception as e: # pylint: disable=broad-exception-caught
+        else:
+            print("[FAIL] Doxygen failed to run")
+            return False
+    except Exception as e:
         print(f"[FAIL] Error running Doxygen test: {e}")
         return False
     finally:
@@ -215,28 +211,27 @@ def main(auto_install: bool = False):
         ("Manual Doxygen Run", test_manual_doxygen_run)
     ]
 
-    test_results = []
+    results = []
     for test_name, test_func in tests:
         try:
             success = test_func()
-            test_results.append((test_name, success))
-        except Exception as e: # pylint: disable=broad-exception-caught
+            results.append((test_name, success))
+        except Exception as e:
             print(f"[FAIL] {test_name} failed with exception: {e}")
-            test_results.append((test_name, False))
+            results.append((test_name, False))
 
     print("\n" + "=" * 60)
     print("Test Results Summary:")
-    passed_count = 0
-    for test_name, success in test_results:
+    passed = 0
+    for test_name, success in results:
         status = "[PASS]" if success else "[FAIL]"
         print(f"{status} {test_name}")
-        if success:
-            passed_count += 1
+        if success: passed += 1
 
-    print(f"\nOverall: {passed_count}/{len(tests)} tests passed")
-    return passed_count == len(tests)
+    print(f"\nOverall: {passed}/{len(results)} tests passed")
+    return passed == len(results)
 
 if __name__ == "__main__":
     auto = "--install" in sys.argv
-    SUCCESS = main(auto_install=auto)
-    sys.exit(0 if SUCCESS else 1)
+    success = main(auto_install=auto)
+    sys.exit(0 if success else 1)
