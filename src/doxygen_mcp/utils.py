@@ -5,6 +5,7 @@ Utility functions for Doxygen MCP context discovery and environment integration.
 import os
 import json
 import asyncio
+import shutil
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -264,6 +265,25 @@ async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
 
 def get_doxygen_executable() -> str:
     """
-    Get the path to the Doxygen executable from the environment or default to 'doxygen'.
+    Get and validate the path to the Doxygen executable.
+    Prioritizes DOXYGEN_PATH environment variable, otherwise defaults to 'doxygen' in PATH.
+    @raises ValueError if the executable is not found or is invalid (security check).
     """
-    return os.environ.get("DOXYGEN_PATH", "doxygen")
+    doxygen_path = os.environ.get("DOXYGEN_PATH", "doxygen")
+
+    # Resolve the absolute path of the executable
+    resolved_path = shutil.which(doxygen_path)
+    if not resolved_path:
+        raise ValueError(f"Doxygen executable not found: {doxygen_path}")
+
+    # Security check: Ensure we are actually running doxygen
+    # This prevents DOXYGEN_PATH from being used for arbitrary command execution
+    # (e.g., DOXYGEN_PATH=bash)
+    exe_name = Path(resolved_path).name.lower()
+    if exe_name not in ("doxygen", "doxygen.exe"):
+        raise ValueError(
+            f"Security Error: Invalid Doxygen executable name '{exe_name}' "
+            f"at '{resolved_path}'. Only 'doxygen' is allowed."
+        )
+
+    return resolved_path
