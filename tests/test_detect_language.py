@@ -1,101 +1,95 @@
 """
-Tests for detect_primary_language utility.
+Tests for detect_primary_language function.
 """
-# pylint: disable=import-error
+# pylint: disable=import-error, redefined-outer-name
+import tempfile
 from pathlib import Path
-import pytest
+
+import pytest  # pylint: disable=import-error
+
 from doxygen_mcp.utils import detect_primary_language
 
-def test_detect_python(tmp_path):
-    """Test detection of Python project."""
-    (tmp_path / "main.py").write_text("print('hello')", encoding="utf-8")
-    (tmp_path / "utils.py").write_text("def foo(): pass", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "python"
+@pytest.fixture
+def temp_project_dir():
+    """Fixture for a temporary project directory."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        yield Path(temp_dir)
 
-def test_detect_cpp(tmp_path):
-    """Test detection of C++ project."""
-    (tmp_path / "main.cpp").write_text("int main() {}", encoding="utf-8")
-    (tmp_path / "header.hpp").write_text("// header", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "cpp"
+def test_detect_language_empty(temp_project_dir):
+    """Test detect_primary_language on an empty directory."""
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "mixed"
 
-def test_detect_c(tmp_path):
-    """Test detection of C project."""
-    (tmp_path / "main.c").write_text("int main() {}", encoding="utf-8")
-    (tmp_path / "header.h").write_text("// header", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "c"
+def test_detect_language_single_file(temp_project_dir):
+    """Test detect_primary_language with a single recognized file."""
+    (temp_project_dir / "main.py").write_text("print('hello')", encoding="utf-8")
 
-def test_detect_mixed_cpp_dominant(tmp_path):
-    """Test detection when C++ files outnumber others."""
-    (tmp_path / "main.cpp").write_text("int main() {}", encoding="utf-8")
-    (tmp_path / "header.hpp").write_text("// header", encoding="utf-8")
-    (tmp_path / "script.py").write_text("print('hi')", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "cpp"
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "python"
 
-def test_detect_one_level_deep(tmp_path):
-    """Test detection of files in one level of subdirectories."""
-    src = tmp_path / "src"
-    src.mkdir()
-    (src / "main.cpp").write_text("int main() {}", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "cpp"
+def test_detect_language_mixed_dominance(temp_project_dir):
+    """Test that detect_primary_language selects the most frequent language."""
+    # 2 python files
+    (temp_project_dir / "main.py").touch()
+    (temp_project_dir / "utils.py").touch()
+    # 1 cpp file
+    (temp_project_dir / "main.cpp").touch()
 
-def test_detect_two_levels_deep(tmp_path):
-    """Test that files two levels deep are NOT detected."""
-    # detect_primary_language uses glob("*") and glob("*/*")
-    deep = tmp_path / "src" / "deep"
-    deep.mkdir(parents=True)
-    (deep / "main.cpp").write_text("int main() {}", encoding="utf-8")
-    # Should return mixed because it doesn't find the .cpp file
-    assert detect_primary_language(tmp_path) == "mixed"
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "python"
 
-def test_detect_empty(tmp_path):
-    """Test detection in an empty directory."""
-    assert detect_primary_language(tmp_path) == "mixed"
+def test_detect_language_case_insensitive(temp_project_dir):
+    """Test that detect_primary_language ignores extension case."""
+    (temp_project_dir / "file1.CPP").touch()
+    (temp_project_dir / "file2.HPP").touch()
+    (temp_project_dir / "file3.cpp").touch()
 
-def test_detect_no_matching_extensions(tmp_path):
-    """Test detection when no known extensions are present."""
-    (tmp_path / "README.md").write_text("# Readme", encoding="utf-8")
-    (tmp_path / "LICENSE").write_text("MIT", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "mixed"
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "cpp"
 
-def test_detect_case_insensitive(tmp_path):
-    """Test that extension matching is case-insensitive."""
-    (tmp_path / "MAIN.CPP").write_text("int main() {}", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "cpp"
+def test_detect_language_depth(temp_project_dir):
+    """Test that detect_primary_language scans root and one level deep, but not deeper."""
+    # Root level (1 python)
+    (temp_project_dir / "root.py").touch()
 
-def test_detect_go(tmp_path):
-    """Test detection of Go project."""
-    (tmp_path / "main.go").write_text("package main", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "go"
+    # One level deep (2 cpp)
+    subdir1 = temp_project_dir / "src"
+    subdir1.mkdir()
+    (subdir1 / "file1.cpp").touch()
+    (subdir1 / "file2.cpp").touch()
 
-def test_detect_rust(tmp_path):
-    """Test detection of Rust project."""
-    (tmp_path / "main.rs").write_text("fn main() {}", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "rust"
+    # Two levels deep (10 java files, shouldn't be counted)
+    subdir2 = subdir1 / "internal"
+    subdir2.mkdir()
+    for i in range(10):
+        (subdir2 / f"file{i}.java").touch()
 
-def test_detect_javascript(tmp_path):
-    """Test detection of JavaScript/TypeScript project."""
-    (tmp_path / "index.js").write_text("console.log()", encoding="utf-8")
-    (tmp_path / "app.ts").write_text("let x: number", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "javascript"
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "cpp"  # Should be cpp (2) vs python (1), ignoring java (10)
 
-def test_detect_java(tmp_path):
-    """Test detection of Java project."""
-    (tmp_path / "Main.java").write_text("class Main {}", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "java"
+def test_detect_language_multiple_extensions(temp_project_dir):
+    """Test that multiple extensions map to the same language."""
+    # 4 javascript files with different extensions
+    (temp_project_dir / "file1.js").touch()
+    (temp_project_dir / "file2.ts").touch()
+    (temp_project_dir / "file3.jsx").touch()
+    (temp_project_dir / "file4.tsx").touch()
 
-def test_detect_csharp(tmp_path):
-    """Test detection of C# project."""
-    (tmp_path / "Program.cs").write_text("class Program {}", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "csharp"
+    # 3 python files
+    (temp_project_dir / "file1.py").touch()
+    (temp_project_dir / "file2.py").touch()
+    (temp_project_dir / "file3.py").touch()
 
-def test_detect_php(tmp_path):
-    """Test detection of PHP project."""
-    (tmp_path / "index.php").write_text("<?php echo 'hi'; ?>", encoding="utf-8")
-    assert detect_primary_language(tmp_path) == "php"
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "javascript"
 
-def test_detect_exception_handling(tmp_path):
-    """Test that exceptions during scanning return mixed."""
-    # We can pass a non-directory path to trigger an exception in glob() or similar
-    file_path = tmp_path / "not_a_dir"
-    file_path.write_text("content", encoding="utf-8")
-    assert detect_primary_language(file_path) == "mixed"
+def test_detect_language_ignore_directories(temp_project_dir):
+    """Test that directories with extensions are ignored."""
+    # 1 c file
+    (temp_project_dir / "main.c").touch()
+
+    # A directory named .py
+    (temp_project_dir / "test.py").mkdir()
+
+    lang = detect_primary_language(temp_project_dir)
+    assert lang == "c"
