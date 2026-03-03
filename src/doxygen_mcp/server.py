@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -275,11 +276,11 @@ async def scan_project(
 @mcp.tool()
 async def check_doxygen_install() -> str:
     """Verify that Doxygen is installed and accessible"""
-    doxygen_exe = get_doxygen_executable()
-    if doxygen_exe in _DOXYGEN_VERSION_CACHE:
-        return _DOXYGEN_VERSION_CACHE[doxygen_exe]
-
     try:
+        doxygen_exe = get_doxygen_executable()
+        if doxygen_exe in _DOXYGEN_VERSION_CACHE:
+            return _DOXYGEN_VERSION_CACHE[doxygen_exe]
+
         process = await asyncio.create_subprocess_exec(
             doxygen_exe,
             "--version",
@@ -301,6 +302,12 @@ async def check_doxygen_install() -> str:
             return "❌ Doxygen is not installed or returned an error"
 
         doxygen_version = stdout.decode(errors='replace').strip()
+
+        # Validate version string to ensure it looks like Doxygen output
+        # Doxygen version is typically like 1.9.4 or 1.8.17
+        if not re.match(r'^\d+\.\d+\.\d+', doxygen_version):
+            return f"❌ Unexpected Doxygen version format: {doxygen_version}"
+
         result = f"✅ Doxygen {doxygen_version} is installed and working"
         _DOXYGEN_VERSION_CACHE[doxygen_exe] = result
         return result
