@@ -6,6 +6,7 @@ import os
 import json
 import asyncio
 import shutil
+import itertools
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -21,9 +22,10 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
         ]
 
     current = start_path.resolve()
-    for parent in [current] + list(current.parents):
+    for parent in itertools.chain([current], current.parents):
+        parent_str = str(parent)
         for marker in markers:
-            if (parent / marker).exists():
+            if os.path.exists(os.path.join(parent_str, marker)):
                 return parent
 
     return current
