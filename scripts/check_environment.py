@@ -9,6 +9,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Add src to sys.path to allow importing from doxygen_mcp
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+try:
+    from doxygen_mcp.utils import get_doxygen_executable
+except ImportError:
+    # Fallback for environments where src isn't structured as expected
+    def get_doxygen_executable() -> str:
+        """Fallback that replicates the core logic if import fails"""
+        return os.environ.get("DOXYGEN_PATH", "doxygen")
+
 def install_with_winget(package_id: str, name: str) -> bool:
     """Attempt to install a package using Windows Package Manager (winget)"""
     print(f"Attempting to install {name} via winget...")
@@ -41,17 +52,19 @@ def install_with_winget(package_id: str, name: str) -> bool:
 def test_doxygen_installation(auto_install: bool = False):
     """Test if Doxygen is installed and accessible"""
     print("Testing Doxygen installation...")
-    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
     try:
+        doxygen_exe = get_doxygen_executable()
         result = subprocess.run([doxygen_exe, "--version"], capture_output=True, text=True, check=False)
         if result.returncode == 0:
             version = result.stdout.strip()
             print(f"[PASS] Doxygen {version} is installed and working at '{doxygen_exe}'!")
             return True
-    except FileNotFoundError:
-        pass
+        print(f"[FAIL] Doxygen returned error code {result.returncode} at '{doxygen_exe}'")
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[FAIL] Doxygen installation check failed: {e}")
 
-    print(f"[FAIL] Doxygen is not installed or not in PATH (checked '{doxygen_exe}')")
+    # Fallback/Default path for error message if get_doxygen_executable failed
+    doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
     if auto_install and sys.platform == "win32":
         return install_with_winget("Doxygen.Doxygen", "Doxygen")
 
@@ -179,7 +192,7 @@ EXTRACT_ALL            = YES
     doxyfile_path.write_text(doxyfile_content, encoding='utf-8')
 
     try:
-        doxygen_exe = os.environ.get("DOXYGEN_PATH", "doxygen")
+        doxygen_exe = get_doxygen_executable()
         result = subprocess.run(
             [doxygen_exe, str(doxyfile_path)],
             cwd=example_path,

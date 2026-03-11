@@ -24,6 +24,10 @@ __version__ = "1.0.0"
 __author__ = "Positronikal"
 __email__ = "hoyt.harness@gmail.com"
 
-from .server import main
-
-__all__ = ["main"]
+try:
+    from .server import main
+    __all__ = ["main"]
+except (ImportError, ModuleNotFoundError):
+    # Allow importing the package even if dependencies aren't met
+    # (e.g. for basic utility access in scripts)
+    __all__ = []
