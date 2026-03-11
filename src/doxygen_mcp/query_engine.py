@@ -5,7 +5,6 @@ This module parses Doxygen XML output and provides an API for querying
 symbols, structures, and documentation.
 """
 import asyncio
-import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
