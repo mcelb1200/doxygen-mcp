@@ -121,7 +121,8 @@ def detect_primary_language(project_path: Path) -> str:
     counts: Dict[str, int] = {}
     try:
         # Scan root and one level deep for performance
-        files = list(project_path.glob("*")) + list(project_path.glob("*/*"))
+        # Use itertools.chain to avoid creating a large intermediate list in memory
+        files = itertools.chain(project_path.glob("*"), project_path.glob("*/*"))
         for f in files:
             if f.is_file():
                 ext = f.suffix.lower()
