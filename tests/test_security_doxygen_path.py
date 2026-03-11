@@ -55,6 +55,14 @@ async def test_get_doxygen_executable_invalid_name():
                 get_doxygen_executable()
 
 @pytest.mark.asyncio
+async def test_get_doxygen_executable_shutil_which_invalid():
+    """Test get_doxygen_executable by mocking shutil.which to return an invalid executable"""
+    with patch("doxygen_mcp.utils.shutil.which", return_value="/usr/bin/bash"):
+        with patch.dict(os.environ, {"DOXYGEN_PATH": "bash"}):
+            with pytest.raises(ValueError, match="Security Error: Invalid Doxygen executable name 'bash'"):
+                get_doxygen_executable()
+
+@pytest.mark.asyncio
 async def test_get_doxygen_executable_not_found():
     """Test get_doxygen_executable when the executable is not found"""
     with patch.dict(os.environ, {"DOXYGEN_PATH": "/nonexistent/path/to/doxygen"}):
