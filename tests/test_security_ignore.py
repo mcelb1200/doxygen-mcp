@@ -42,3 +42,17 @@ async def test_update_ignore_file_valid(tmp_path):
     assert ignore_file.exists()
     content = ignore_file.read_text(encoding="utf-8")
     assert "docs/" in content
+
+@pytest.mark.asyncio
+async def test_update_ignore_file_security_regex(tmp_path):
+    """Test that special characters are rejected by regex."""
+    dangerous_paths = [
+        "docs/;rm",
+        "docs/$HOME",
+        "docs/`whoami`",
+        "docs/|",
+        "docs/ ",
+    ]
+    for path in dangerous_paths:
+        result = await update_ignore_file(tmp_path, path)
+        assert result is False, f"Should have rejected {path}"
