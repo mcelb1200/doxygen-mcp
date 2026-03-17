@@ -99,12 +99,13 @@ async def get_context_info() -> Dict[str, Any]:
     Get information about the current project context, detected language, and IDE environment.
     """
     try:
-        project_path = await _get_project_path()
-        language = detect_primary_language(project_path)
-        ide_info = get_ide_environment()
+        # pylint: disable=no-member
+        project_path = await asyncio.to_thread(resolve_project_path)
+        language = await asyncio.to_thread(detect_primary_language, project_path)
+        ide_info = await asyncio.to_thread(get_ide_environment)
         active_context = get_active_context()
 
-        has_doxyfile = (project_path / "Doxyfile").exists()
+        has_doxyfile = await asyncio.to_thread((project_path / "Doxyfile").exists)
 
         return {
             "project_root": str(project_path),
@@ -125,13 +126,15 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
     Automatically detect project settings and create a Doxyfile if one doesn't exist.
     """
     try:
-        project_path = await _get_project_path()
+        # pylint: disable=no-member
+        project_path = await asyncio.to_thread(resolve_project_path)
         if not project_name:
             project_name = project_path.name
 
-        language = detect_primary_language(project_path)
+        language = await asyncio.to_thread(detect_primary_language, project_path)
 
-        if (project_path / "Doxyfile").exists():
+        doxyfile_exists = await asyncio.to_thread((project_path / "Doxyfile").exists)
+        if doxyfile_exists:
             return f"✨ Project already configured at {project_path}. Detected language: {language}."
 
         result = await create_doxygen_project(
@@ -161,15 +164,18 @@ async def create_doxygen_project(
     """Initialize a new Doxygen documentation project with configuration"""
     try:
         # Resolve project path and detect language if not provided
-        safe_project_path = await _get_project_path(project_path)
+        # pylint: disable=no-member
+        safe_project_path = await asyncio.to_thread(resolve_project_path, project_path)
         if language is None:
-            language = detect_primary_language(safe_project_path)
+            language = await asyncio.to_thread(detect_primary_language, safe_project_path)
 
-        if safe_project_path.exists() and not safe_project_path.is_dir():
+        path_exists = await asyncio.to_thread(safe_project_path.exists)
+        path_is_dir = await asyncio.to_thread(safe_project_path.is_dir)
+        if path_exists and not path_is_dir:
             return f"❌ Path exists but is not a directory: {safe_project_path}"
 
         # Create project directory if it doesn't exist
-        safe_project_path.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(safe_project_path.mkdir, parents=True, exist_ok=True)
 
         # Create configuration based on language
         config = DoxygenConfig(
@@ -199,9 +205,11 @@ async def create_doxygen_project(
         # Save configuration
         doxyfile_path = safe_project_path / "Doxyfile"
 
-        if doxyfile_path.is_symlink():
+        doxyfile_is_symlink = await asyncio.to_thread(doxyfile_path.is_symlink)
+        if doxyfile_is_symlink:
             return f"❌ Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
-        if doxyfile_path.exists():
+        doxyfile_exists = await asyncio.to_thread(doxyfile_path.exists)
+        if doxyfile_exists:
             return (
                 f"❌ Doxyfile already exists at {doxyfile_path}. "
                 "Use 'auto_configure' or backup first."
@@ -385,8 +393,32 @@ async def query_project_reference(
         )
 
     try:
-        engine, _ = await _get_engine(project_path)
-        result = engine.query_symbol(symbol_name)
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = os.environ.get("DOXYGEN_XML_DIR")
+
+        if not xml_dir:
+            potential_paths = [
+                resolved_path / "docs" / "xml",
+                resolved_path / "xml",
+            ]
+            for p in potential_paths:
+                p_exists = await asyncio.to_thread(p.exists)
+                index_exists = await asyncio.to_thread((p / "index.xml").exists)
+                if p_exists and index_exists:
+                    xml_dir = str(p)
+                    break
+
+        if not xml_dir:
+            return (
+                "❌ Error: Could not find Doxygen XML directory. "
+                "Ensure XML generation is enabled in Doxyfile and "
+                "documentation has been generated."
+            )
+
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        # pylint: disable=no-member
+        result = await asyncio.to_thread(engine.query_symbol, symbol_name)
 
         if not result:
             return f"❓ Symbol '{symbol_name}' not found."
@@ -410,7 +442,14 @@ async def get_project_structure(project_path: Optional[str] = None) -> Dict[str,
     Provide a tree-like overview of the project's documented components.
     """
     try:
-        engine, resolved_path = await _get_engine(project_path)
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+
+        if not xml_dir:
+            return {"error": "Doxygen XML not found. Generate documentation first."}
+
+        engine = await DoxygenQueryEngine.create(xml_dir)
 
         structure = {
             "project_root": str(resolved_path),
@@ -429,8 +468,16 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
     Trigger a re-scan/parse of Doxygen XML files.
     """
     try:
-        # Using force_refresh=True to clear cache before creating engine
-        await _get_engine(project_path, force_refresh=True)
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+
+        if not xml_dir:
+            return "❌ Doxygen XML not found. Generate documentation first."
+
+        # Re-initializing the engine effectively refreshes the index
+        DoxygenQueryEngine.clear_cache(xml_dir)
+        await DoxygenQueryEngine.create(xml_dir)
         return "✅ Doxygen index refreshed successfully."
     except ValueError as e:
         return f"❌ {str(e)}"
@@ -447,8 +494,16 @@ async def get_symbol_at_location(
     Find symbol context for the IDE's cursor.
     """
     try:
-        engine, _ = await _get_engine(project_path)
-        file_symbols = engine.get_file_structure(file_path)
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+
+        if not xml_dir:
+            return {"error": "Doxygen XML not found. Generate documentation first."}
+
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        # pylint: disable=no-member
+        file_symbols = await asyncio.to_thread(engine.get_file_structure, file_path)
 
         # Simple heuristic: find the symbol that contains this line
         best_match = None
@@ -505,8 +560,16 @@ async def get_file_structure(
     Retrieve all symbols defined in a specific file.
     """
     try:
-        engine, _ = await _get_engine(project_path)
-        return engine.get_file_structure(file_path)
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+
+        if not xml_dir:
+            return [{"error": "Doxygen XML not found. Generate documentation first."}]
+
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        # pylint: disable=no-member
+        return await asyncio.to_thread(engine.get_file_structure, file_path)
     except Exception as e:  # pylint: disable=broad-exception-caught
         return [{"error": str(e)}]
 
