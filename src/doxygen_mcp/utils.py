@@ -3,6 +3,7 @@ Utility functions for Doxygen MCP context discovery and environment integration.
 """
 
 import os
+import re
 import json
 import asyncio
 import shutil
@@ -214,7 +215,11 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     Synchronous helper for updating .gitignore.
     """
     # Validate input to prevent arbitrary file write/traversal in .gitignore
-    if "\n" in path_to_ignore or "\r" in path_to_ignore:
+    if not path_to_ignore or "\n" in path_to_ignore or "\r" in path_to_ignore:
+        return False
+
+    # Strict validation: only allow alphanumeric and common path symbols
+    if not re.match(r"^[a-zA-Z0-9._\-/]+$", path_to_ignore):
         return False
 
     # Prevent traversal or absolute paths
