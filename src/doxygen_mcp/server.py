@@ -44,6 +44,12 @@ mcp = FastMCP("Doxygen")
 # Cache for Doxygen version check
 _DOXYGEN_VERSION_CACHE: Dict[str, str] = {}
 
+# Common directories to skip for performance during filesystem scans
+SCAN_SKIP_DIRS = {
+    'node_modules', 'build', 'dist', 'target', 'venv', 'env', '__pycache__',
+    'bower_components', 'extern', 'external', 'vendor'
+}
+
 def _find_xml_dir(resolved_path: Path) -> Optional[str]:
     """
     Find the Doxygen XML directory with preference for:
@@ -273,8 +279,8 @@ def _perform_scan(safe_project_path: Path):
     total_files = 0
 
     for _, dirs, files in os.walk(safe_project_path):
-        # Skip hidden directories
-        dirs[:] = [d for d in dirs if not d.startswith('.')]
+        # Skip hidden directories and common large/irrelevant folders
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d not in SCAN_SKIP_DIRS]
 
         for file in files:
             if file.startswith('.'):
