@@ -5,10 +5,13 @@ This module parses Doxygen XML output and provides an API for querying
 symbols, structures, and documentation.
 """
 import asyncio
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
 import defusedxml.ElementTree as ET
+
+logger = logging.getLogger(__name__)
 
 
 class DoxygenQueryEngine:
@@ -88,7 +91,7 @@ class DoxygenQueryEngine:
                     elem.clear()
 
         except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"Error loading index: {e}")
+            logger.error("Error loading index: %s", e)
 
     def query_symbol(self, symbol_name: str) -> Optional[Dict[str, Any]]:
         """Query a class or namespace by name"""
