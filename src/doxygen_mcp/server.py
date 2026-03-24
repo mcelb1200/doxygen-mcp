@@ -12,7 +12,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 try:
     from importlib.metadata import version as get_package_version
 except ImportError:
@@ -81,23 +81,6 @@ async def _get_project_path(project_path: Optional[str] = None) -> Path:
     """Helper to resolve project path in a thread pool."""
     # pylint: disable=no-member
     return await asyncio.to_thread(resolve_project_path, project_path)
-
-async def _get_engine(
-    project_path: Optional[str] = None,
-    force_refresh: bool = False
-) -> Tuple[DoxygenQueryEngine, Path]:
-    """Helper to get a DoxygenQueryEngine and resolved path."""
-    resolved_path = await _get_project_path(project_path)
-    xml_dir = _find_xml_dir(resolved_path)
-
-    if not xml_dir:
-        raise ValueError("Doxygen XML not found. Generate documentation first.")
-
-    if force_refresh:
-        DoxygenQueryEngine.clear_cache(xml_dir)
-
-    engine = await DoxygenQueryEngine.create(xml_dir)
-    return engine, resolved_path
 
 @mcp.tool()
 async def get_context_info() -> Dict[str, Any]:
