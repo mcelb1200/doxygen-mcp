@@ -125,3 +125,23 @@ def test_get_ide_environment_vscode_settings_invalid_json():
             context = get_ide_environment()
             assert context["ide"] == "vscode"
             assert "vscode_settings" not in context
+
+
+def test_get_ide_environment_vscode_settings_read_exception():
+    """Test handling of read exception for .vscode/settings.json."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        vscode_dir = temp_path / ".vscode"
+        vscode_dir.mkdir()
+        settings_file = vscode_dir / "settings.json"
+        # Create the file so .exists() returns True
+        settings_file.touch()
+
+        with patch("doxygen_mcp.utils.resolve_project_path", return_value=temp_path), \
+             patch("doxygen_mcp.utils.get_project_name", return_value="test_project"), \
+             patch.dict(os.environ, {"TERM_PROGRAM": "vscode"}, clear=True), \
+             patch("builtins.open", side_effect=PermissionError("Access denied")):
+
+            context = get_ide_environment()
+            assert context["ide"] == "vscode"
+            assert "vscode_settings" not in context
