@@ -213,13 +213,10 @@ def get_active_context() -> Dict[str, Any]:
 def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
     Synchronous helper for updating .gitignore.
+    Optimized for memory by iterating over lines and reducing return statements.
     """
     # Validate input to prevent arbitrary file write/traversal in .gitignore
-    if not path_to_ignore or "\n" in path_to_ignore or "\r" in path_to_ignore or ".." in path_to_ignore:
-        return False
-
-    # Strict validation: only allow alphanumeric and common path symbols
-    if not re.match(r"^[a-zA-Z0-9._\-/]+$", path_to_ignore):
+    if not path_to_ignore or "\n" in path_to_ignore or "\r" in path_to_ignore or ".." in path_to_ignore or not re.match(r"^[a-zA-Z0-9._\-/]+$", path_to_ignore):
         return False
 
     # Prevent traversal or absolute paths
@@ -227,39 +224,45 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
         path_obj = Path(path_to_ignore)
         if path_obj.is_absolute() or ".." in path_obj.parts:
             return False
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         return False
 
     ignore_file = project_root / ".gitignore"
-    new_entry = f"{path_to_ignore}\n"
-
     if ignore_file.is_symlink():
         return False
 
-    # Create file if it doesn't exist
-    if not ignore_file.exists():
-        try:
+    result = False
+    try:
+        if not ignore_file.exists():
             with open(ignore_file, "w", encoding="utf-8") as f:
                 f.write("# Doxygen Generated Documentation Folders\n")
-                f.write(new_entry)
-            return True
-        except Exception:  # pylint: disable=broad-exception-caught
-            return False
+                f.write(f"{path_to_ignore}\n")
+            result = True
+        else:
+            # Open for reading and appending (r+) to avoid loading everything at once
+            with open(ignore_file, "r+", encoding="utf-8") as f:
+                found = False
+                last_line = ""
+                # Iterate line-by-line to minimize memory footprint
+                for line in f:
+                    if line.strip() == path_to_ignore.strip():
+                        found = True
+                        break
+                    last_line = line
 
-    # Check if already ignored and append if not
-    try:
-        with open(ignore_file, "r+", encoding="utf-8") as f:
-            lines = f.readlines()
-            if any(line.strip() == path_to_ignore.strip() for line in lines):
-                return False
-
-            # Ensure the last line ends with a newline before appending
-            if lines and not lines[-1].endswith("\n"):
-                f.write("\n")
-            f.write(new_entry)
-        return True
+                if not found:
+                    # Explicitly seek to end of file before writing to ensure correct appending
+                    # across all platforms and Python versions.
+                    f.seek(0, os.SEEK_END)
+                    # Ensure the last line ends with a newline before appending
+                    if last_line and not last_line.endswith("\n"):
+                        f.write("\n")
+                    f.write(f"{path_to_ignore}\n")
+                    result = True
     except Exception:  # pylint: disable=broad-exception-caught
-        return False
+        pass
+
+    return result
 
 
 async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
