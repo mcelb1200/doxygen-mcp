@@ -1,3 +1,0 @@
-"""
-Mock mcp.server module.
-"""

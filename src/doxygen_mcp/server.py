@@ -136,10 +136,38 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Auto-configuration failed: {str(e)}"
 
-def _write_doxyfile_sync(path: Path, content: str) -> None:
-    """Helper to write Doxyfile synchronously."""
-    with open(path, 'w', encoding='utf-8') as f:
-        f.write(content)
+def _initialize_project_sync(project_path: Path, config: DoxygenConfig) -> Optional[str]:
+    """
+    Consolidated helper to initialize project directory and Doxyfile synchronously.
+    Returns None on success, or an error message on failure.
+    """
+    try:
+        if project_path.exists() and not project_path.is_dir():
+            return f"❌ Path exists but is not a directory: {project_path}"
+
+        # Create project directory if it doesn't exist
+        project_path.mkdir(parents=True, exist_ok=True)
+
+        doxyfile_path = project_path / "Doxyfile"
+
+        if doxyfile_path.is_symlink():
+            return f"❌ Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
+
+        if doxyfile_path.exists():
+            return (
+                f"❌ Doxyfile already exists at {doxyfile_path}. "
+                "Use 'auto_configure' or backup first."
+            )
+
+        # Generate and write configuration
+        content = config.to_doxyfile()
+        with open(doxyfile_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        return None
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"❌ Error during project initialization: {str(e)}"
+
 
 @mcp.tool()
 async def create_doxygen_project(
@@ -157,14 +185,6 @@ async def create_doxygen_project(
         safe_project_path = await asyncio.to_thread(resolve_project_path, project_path)
         if language is None:
             language = await asyncio.to_thread(detect_primary_language, safe_project_path)
-
-        path_exists = await asyncio.to_thread(safe_project_path.exists)
-        path_is_dir = await asyncio.to_thread(safe_project_path.is_dir)
-        if path_exists and not path_is_dir:
-            return f"❌ Path exists but is not a directory: {safe_project_path}"
-
-        # Create project directory if it doesn't exist
-        await asyncio.to_thread(safe_project_path.mkdir, parents=True, exist_ok=True)
 
         # Create configuration based on language
         config = DoxygenConfig(
@@ -191,21 +211,11 @@ async def create_doxygen_project(
             for key, value in lang_settings[language].items():
                 setattr(config, key, value)
 
-        # Save configuration
-        doxyfile_path = safe_project_path / "Doxyfile"
-
-        doxyfile_is_symlink = await asyncio.to_thread(doxyfile_path.is_symlink)
-        if doxyfile_is_symlink:
-            return f"❌ Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
-        doxyfile_exists = await asyncio.to_thread(doxyfile_path.exists)
-        if doxyfile_exists:
-            return (
-                f"❌ Doxyfile already exists at {doxyfile_path}. "
-                "Use 'auto_configure' or backup first."
-            )
-
+        # Consolidated initialization (directory creation and Doxyfile writing)
         # pylint: disable=no-member
-        await asyncio.to_thread(_write_doxyfile_sync, doxyfile_path, config.to_doxyfile())
+        error_msg = await asyncio.to_thread(_initialize_project_sync, safe_project_path, config)
+        if error_msg:
+            return error_msg
 
         # Update .gitignore
         await update_ignore_file(safe_project_path, "docs/")
