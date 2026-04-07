@@ -562,7 +562,7 @@ async def get_file_structure(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return [{"error": str(e)}]
 
-def generate_config(args):  # pylint: disable=unused-argument
+def generate_config(args):
     """Generate MCP configuration for various clients."""
     script_path = Path(__file__).resolve()
     # Check if running from source (presence of pyproject.toml in parent)
@@ -594,11 +594,8 @@ def generate_config(args):  # pylint: disable=unused-argument
         }
     }
 
-    if args.gemini:
-        # Gemini specific format might differ, but for now we output standard MCP
-        print(json.dumps(config, indent=2))
-    else:
-        print(json.dumps(config, indent=2))
+    # Gemini specific format might differ, but for now we output standard MCP
+    print(json.dumps(config, indent=2))
 
 
 def main():
