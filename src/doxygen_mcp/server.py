@@ -631,7 +631,7 @@ def main():
     # Check for Doxygen dependency
     doxygen_exe = get_doxygen_executable()
     try:
-        subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
+        subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True, shell=False)
     except (FileNotFoundError, subprocess.CalledProcessError):
         logger.warning(
             "Doxygen not found at '%s'. Attempting automatic setup...",
@@ -642,9 +642,18 @@ def main():
         script_path = Path(__file__).parent.parent.parent / "scripts" / "check_environment.py"
         if script_path.exists():
             try:
-                subprocess.run([sys.executable, str(script_path), "--install"], check=True)
+                subprocess.run(
+                    [sys.executable, str(script_path), "--install"],
+                    check=True,
+                    shell=False
+                )
                 # Re-verify after install
-                subprocess.run([doxygen_exe, "--version"], capture_output=True, check=True)
+                subprocess.run(
+                    [doxygen_exe, "--version"],
+                    capture_output=True,
+                    check=True,
+                    shell=False
+                )
                 logger.info("Doxygen successfully installed and verified.")
             except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error("Automatic setup failed or Doxygen still not found: %s", e)
