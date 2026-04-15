@@ -231,7 +231,8 @@ async def generate_documentation(
         return f"❌ {str(e)}"
 
     doxyfile_path = safe_project_path / "Doxyfile"
-    if not doxyfile_path.exists():
+    doxyfile_exists = await asyncio.to_thread(doxyfile_path.exists)
+    if not doxyfile_exists:
         return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
 
     doxygen_exe = get_doxygen_executable()
@@ -303,7 +304,8 @@ async def scan_project(
     except ValueError as e:
         return f"❌ {str(e)}"
 
-    if not safe_project_path.exists():
+    path_exists = await asyncio.to_thread(safe_project_path.exists)
+    if not path_exists:
         return f"❌ Project path does not exist: {safe_project_path}"
 
     # pylint: disable=no-member
