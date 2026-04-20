@@ -310,14 +310,16 @@ async def scan_project(
     extensions, total_files = await asyncio.to_thread(_perform_scan, safe_project_path)
 
     sorted_extensions = sorted(extensions.items(), key=lambda x: x[1], reverse=True)
-    result_text = (
-        f"📁 Project Scan Results: {safe_project_path}\n"
-        f"📊 Total Files Found: {total_files}\n\n📋 Files by Type:\n"
-    )
+    lines = [
+        f"📁 Project Scan Results: {safe_project_path}",
+        f"📊 Total Files Found: {total_files}",
+        "",
+        "📋 Files by Type:"
+    ]
     for ext, count in sorted_extensions[:10]:
-        result_text += f"  📄 {ext}: {count} files\n"
+        lines.append(f"  📄 {ext}: {count} files")
 
-    return result_text
+    return "\n".join(lines) + "\n"
 
 @mcp.tool()
 async def check_doxygen_install() -> str:
@@ -412,14 +414,17 @@ async def query_project_reference(
         if not result:
             return f"❓ Symbol '{symbol_name}' not found."
 
-        output = f"🔍 Documentation for {result['kind']} {result['name']}\n"
-        output += "=" * len(output) + "\n\n"
+        header = f"🔍 Documentation for {result['kind']} {result['name']}"
+        lines = [header, "=" * (len(header) + 1), ""]
         if result["brief"]:
-            output += f"Brief: {result['brief']}\n\n"
+            lines.append(f"Brief: {result['brief']}")
+            lines.append("")
         if result["detailed"]:
-            output += f"Detailed:\n{result['detailed']}\n\n"
+            lines.append("Detailed:")
+            lines.append(result["detailed"])
+            lines.append("")
 
-        return output
+        return "\n".join(lines) + "\n"
     except ValueError as e:
         return f"❌ {str(e)}"
     except Exception as e:  # pylint: disable=broad-exception-caught
@@ -594,11 +599,8 @@ def generate_config(args):  # pylint: disable=unused-argument
         }
     }
 
-    if args.gemini:
-        # Gemini specific format might differ, but for now we output standard MCP
-        print(json.dumps(config, indent=2))
-    else:
-        print(json.dumps(config, indent=2))
+    # Gemini specific format might differ, but for now we output standard MCP
+    print(json.dumps(config, indent=2))
 
 
 def main():
