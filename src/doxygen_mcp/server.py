@@ -594,11 +594,8 @@ def generate_config(args):  # pylint: disable=unused-argument
         }
     }
 
-    if args.gemini:
-        # Gemini specific format might differ, but for now we output standard MCP
-        print(json.dumps(config, indent=2))
-    else:
-        print(json.dumps(config, indent=2))
+    # Gemini specific format might differ, but for now we output standard MCP
+    print(json.dumps(config, indent=2))
 
 
 def main():
