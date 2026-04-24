@@ -23,6 +23,10 @@ class DoxygenQueryEngine:
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
+        
+        from .search import DoxygenSearchIndex
+        self.search_index = DoxygenSearchIndex(self.xml_dir)
+        
         self.compounds: Dict[str, Any] = {}
         # Optimization indices
         self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
@@ -56,6 +60,9 @@ class DoxygenQueryEngine:
         """Load and parse the Doxygen index.xml file."""
         if not self.index_path.exists():
             return
+
+        # Initialize and build the FTS5 semantic search index
+        self.search_index.initialize()
 
         try:
             # Use iterparse to handle large XML files with minimal memory usage
@@ -275,3 +282,7 @@ class DoxygenQueryEngine:
                 if info["kind"] == kind_filter
             ]
         return list(self.compounds.keys())
+
+    def semantic_search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """Perform a semantic search across the Doxygen FTS5 index."""
+        return self.search_index.search(query, limit)

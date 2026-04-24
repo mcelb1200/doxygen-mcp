@@ -124,7 +124,7 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
 
         doxyfile_exists = await asyncio.to_thread((project_path / "Doxyfile").exists)
         if doxyfile_exists:
-            return f"✨ Project already configured at {project_path}. Detected language: {language}."
+            return f"[SUCCESS] Project already configured at {project_path}. Detected language: {language}."
 
         result = await create_doxygen_project(
             project_name=project_name,
@@ -132,9 +132,9 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
             language=language
         )
 
-        return f"🚀 Auto-configured project!\n\n{result}"
+        return f"[INFO] Auto-configured project!\n\n{result}"
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Auto-configuration failed: {str(e)}"
+        return f"[ERROR] Auto-configuration failed: {str(e)}"
 
 def _write_doxyfile_sync(path: Path, content: str) -> None:
     """Helper to write Doxyfile synchronously."""
@@ -161,7 +161,7 @@ async def create_doxygen_project(
         path_exists = await asyncio.to_thread(safe_project_path.exists)
         path_is_dir = await asyncio.to_thread(safe_project_path.is_dir)
         if path_exists and not path_is_dir:
-            return f"❌ Path exists but is not a directory: {safe_project_path}"
+            return f"[ERROR] Path exists but is not a directory: {safe_project_path}"
 
         # Create project directory if it doesn't exist
         await asyncio.to_thread(safe_project_path.mkdir, parents=True, exist_ok=True)
@@ -196,11 +196,11 @@ async def create_doxygen_project(
 
         doxyfile_is_symlink = await asyncio.to_thread(doxyfile_path.is_symlink)
         if doxyfile_is_symlink:
-            return f"❌ Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
+            return f"[ERROR] Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
         doxyfile_exists = await asyncio.to_thread(doxyfile_path.exists)
         if doxyfile_exists:
             return (
-                f"❌ Doxyfile already exists at {doxyfile_path}. "
+                f"[ERROR] Doxyfile already exists at {doxyfile_path}. "
                 "Use 'auto_configure' or backup first."
             )
 
@@ -211,12 +211,12 @@ async def create_doxygen_project(
         await update_ignore_file(safe_project_path, "docs/")
 
         return (
-            f"✅ Doxygen project '{project_name}' created successfully "
+            f"[SUCCESS] Doxygen project '{project_name}' created successfully "
             f"at {safe_project_path} (Language: {language})"
         )
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Failed to create project: {str(e)}"
+        return f"[ERROR] Failed to create project: {str(e)}"
 
 @mcp.tool()
 async def generate_documentation(
@@ -228,11 +228,11 @@ async def generate_documentation(
     try:
         safe_project_path = await _get_project_path(project_path)
     except ValueError as e:
-        return f"❌ {str(e)}"
+        return f"[ERROR] {str(e)}"
 
     doxyfile_path = safe_project_path / "Doxyfile"
     if not doxyfile_path.exists():
-        return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
+        return "[ERROR] No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
 
     doxygen_exe = get_doxygen_executable()
 
@@ -255,7 +255,7 @@ async def generate_documentation(
             except ProcessLookupError:
                 pass  # Process already finished
             await process.wait()
-            return "❌ Documentation generation timed out after 300 seconds."
+            return "[ERROR] Documentation generation timed out after 300 seconds."
 
         stdout_text = stdout.decode(errors='replace') if stdout else ""
         stderr_text = stderr.decode(errors='replace') if stderr else ""
@@ -264,14 +264,14 @@ async def generate_documentation(
             # Clear all caches as documentation has been regenerated
             DoxygenQueryEngine.clear_cache()
             return (
-                "✅ Documentation generated successfully at "
+                "[SUCCESS] Documentation generated successfully at "
                 f"{safe_project_path / 'docs' / 'html' / 'index.html'}"
             )
 
-        return f"❌ Documentation generation failed:\n{stderr_text or stdout_text}"
+        return f"[ERROR] Documentation generation failed:\n{stderr_text or stdout_text}"
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Error generating documentation: {str(e)}"
+        return f"[ERROR] Error generating documentation: {str(e)}"
 
 def _perform_scan(safe_project_path: Path):
     """Sync helper to scan the filesystem without blocking the event loop"""
@@ -301,23 +301,23 @@ async def scan_project(
     try:
         safe_project_path = await _get_project_path(project_path)
     except ValueError as e:
-        return f"❌ {str(e)}"
+        return f"[ERROR] {str(e)}"
 
     if not safe_project_path.exists():
-        return f"❌ Project path does not exist: {safe_project_path}"
+        return f"[ERROR] Project path does not exist: {safe_project_path}"
 
     # pylint: disable=no-member
     extensions, total_files = await asyncio.to_thread(_perform_scan, safe_project_path)
 
     sorted_extensions = sorted(extensions.items(), key=lambda x: x[1], reverse=True)
     lines = [
-        f"📁 Project Scan Results: {safe_project_path}",
-        f"📊 Total Files Found: {total_files}",
+        f"[INFO] Project Scan Results: {safe_project_path}",
+        f"[INFO] Total Files Found: {total_files}",
         "",
-        "📋 Files by Type:"
+        "[INFO] Files by Type:"
     ]
     for ext, count in sorted_extensions[:10]:
-        lines.append(f"  📄 {ext}: {count} files")
+        lines.append(f"  - {ext}: {count} files")
 
     return "\n".join(lines) + "\n"
 
@@ -344,25 +344,25 @@ async def check_doxygen_install() -> str:
             except ProcessLookupError:
                 pass
             await process.wait()
-            return "❌ Doxygen check timed out"
+            return "[ERROR] Doxygen check timed out"
 
         if process.returncode != 0:
-            return "❌ Doxygen is not installed or returned an error"
+            return "[ERROR] Doxygen is not installed or returned an error"
 
         doxygen_version = stdout.decode(errors='replace').strip()
 
         # Validate version string to ensure it looks like Doxygen output
         # Doxygen version is typically like 1.9.4 or 1.8.17
         if not re.match(r'^\d+\.\d+\.\d+', doxygen_version):
-            return f"❌ Unexpected Doxygen version format: {doxygen_version}"
+            return f"[ERROR] Unexpected Doxygen version format: {doxygen_version}"
 
-        result = f"✅ Doxygen {doxygen_version} is installed and working"
+        result = f"[SUCCESS] Doxygen {doxygen_version} is installed and working"
         _DOXYGEN_VERSION_CACHE[doxygen_exe] = result
         return result
     except (FileNotFoundError, OSError):
-        return "❌ Doxygen is not installed"
+        return "[ERROR] Doxygen is not installed"
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Error checking Doxygen: {str(e)}"
+        return f"[ERROR] Error checking Doxygen: {str(e)}"
 
 @mcp.tool()
 async def query_project_reference(
@@ -379,7 +379,7 @@ async def query_project_reference(
 
     if not symbol_name:
         return (
-            "❌ Error: No symbol name provided and no text selection "
+            "[ERROR] Error: No symbol name provided and no text selection "
             "detected in the active context."
         )
 
@@ -402,7 +402,7 @@ async def query_project_reference(
 
         if not xml_dir:
             return (
-                "❌ Error: Could not find Doxygen XML directory. "
+                "[ERROR] Error: Could not find Doxygen XML directory. "
                 "Ensure XML generation is enabled in Doxyfile and "
                 "documentation has been generated."
             )
@@ -411,11 +411,22 @@ async def query_project_reference(
         # pylint: disable=no-member
         result = await asyncio.to_thread(engine.query_symbol, symbol_name)
 
-        if not result:
-            return f"❓ Symbol '{symbol_name}' not found."
+        # Timeline integration
+        timeline = ""
+        from .git_tracker import get_file_timeline
 
-        header = f"🔍 Documentation for {result['kind']} {result['name']}"
-        lines = [header, "=" * (len(header) + 1), ""]
+        if not result:
+            # Fallback check: is there an uncommitted file matching this name?
+            # It's an AI agent, they might have created NewClass.cpp
+            return f"[WARNING] Symbol '{symbol_name}' not found in index. Ensure it is committed or indexed."
+
+        filepath = result.get("location", {}).get("file", "")
+        if filepath:
+            full_path = resolved_path / filepath
+            timeline = get_file_timeline(str(full_path), is_indexed=True) + "\n\n"
+
+        header = f"[INFO] Documentation for {result['kind']} {result['name']}"
+        lines = [timeline.strip(), "", header, "=" * (len(header) + 1), ""]
         if result["brief"]:
             lines.append(f"Brief: {result['brief']}")
             lines.append("")
@@ -424,11 +435,61 @@ async def query_project_reference(
             lines.append(result["detailed"])
             lines.append("")
 
-        return "\n".join(lines) + "\n"
+        return "\n".join(lines).strip() + "\n"
     except ValueError as e:
-        return f"❌ {str(e)}"
+        return f"[ERROR] {str(e)}"
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Error querying symbol: {str(e)}"
+        return f"[ERROR] Error querying symbol: {str(e)}"
+
+@mcp.tool()
+async def semantic_search(
+    query: str,
+    limit: int = 5,
+    project_path: Optional[str] = None,
+) -> str:
+    """
+    Perform a semantic search across the Doxygen codebase and architecture specifications.
+    This uses an internal SQLite FTS5 index to find conceptually relevant symbols, classes, and documentation files.
+    """
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+
+        if not xml_dir:
+            return "[ERROR] Could not find Doxygen XML directory."
+
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        # pylint: disable=no-member
+        results = await asyncio.to_thread(engine.semantic_search, query, limit)
+
+        if not results:
+            return f"[INFO] No semantic matches found for '{query}'."
+
+        if len(results) > 0 and "error" in results[0]:
+            return f"[ERROR] {results[0]['error']}"
+
+        lines = [f"[INFO] Semantic Search Results for '{query}' (Limit: {limit})", "=" * 60, ""]
+        
+        from .git_tracker import get_file_timeline
+        
+        for r in results:
+            lines.append(f"- {r['kind'].upper()}: {r['name']}")
+            if r.get('filepath'):
+                full_path = resolved_path / r['filepath']
+                # Compact timeline for search results
+                timeline = get_file_timeline(str(full_path), is_indexed=True).replace("\\n", " | ")
+                lines.append(f"   {timeline}")
+            if r.get('brief'):
+                # Truncate brief if too long
+                brief = r['brief'][:200] + "..." if len(r['brief']) > 200 else r['brief']
+                lines.append(f"   Brief: {brief}")
+            lines.append(f"   Relevance Score: {r['rank']}")
+            lines.append("")
+
+        return "\n".join(lines).strip() + "\n"
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"[ERROR] Semantic search failed: {str(e)}"
 
 @mcp.tool()
 async def get_symbol_usage(
@@ -444,19 +505,19 @@ async def get_symbol_usage(
         xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
 
         if not xml_dir:
-            return "❌ Error: Could not find Doxygen XML directory."
+            return "[ERROR] Error: Could not find Doxygen XML directory."
 
         engine = await DoxygenQueryEngine.create(xml_dir)
         # pylint: disable=no-member
         result = await asyncio.to_thread(engine.get_symbol_connections, symbol_name)
 
         if not result:
-            return f"❓ Symbol '{symbol_name}' not found."
+            return f"[WARNING] Symbol '{symbol_name}' not found."
 
         if "error" in result:
-            return f"❌ {result['error']}"
+            return f"[ERROR] {result['error']}"
 
-        output = f"🔗 Connection Graph for {result['kind']} {result['name']}\n"
+        output = f"[INFO] Connection Graph for {result['kind']} {result['name']}\n"
         output += "=" * len(output) + "\n\n"
         
         if result.get("base_classes"):
@@ -477,7 +538,7 @@ async def get_symbol_usage(
 
         return output
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Error querying symbol usage: {str(e)}"
+        return f"[ERROR] Error querying symbol usage: {str(e)}"
 
 @mcp.tool()
 async def configure_repo_context(
@@ -496,10 +557,10 @@ async def configure_repo_context(
         success, msg = await asyncio.to_thread(setup_funnel, resolved_path)
         
         if success:
-            return f"✅ {msg}"
-        return f"❌ {msg}"
+            return f"[SUCCESS] {msg}"
+        return f"[ERROR] {msg}"
     except Exception as e:
-        return f"❌ Error configuring repository: {str(e)}"
+        return f"[ERROR] Error configuring repository: {str(e)}"
 
 @mcp.tool()
 async def get_project_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
@@ -538,16 +599,37 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
         xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
 
         if not xml_dir:
-            return "❌ Doxygen XML not found. Generate documentation first."
+            return "[ERROR] Doxygen XML not found. Generate documentation first."
+
+        # Run Doxygen build and SNR filter
+        import subprocess
+        try:
+            await asyncio.to_thread(
+                subprocess.run, 
+                ["doxygen", "Doxyfile.fast"], 
+                cwd=resolved_path, 
+                check=True,
+                capture_output=True
+            )
+            
+            # Run SNR filter
+            from .funnel import minify_xml_file
+            import glob
+            xml_files = glob.glob(os.path.join(xml_dir, "*.xml"))
+            for f in xml_files:
+                await asyncio.to_thread(minify_xml_file, f)
+                
+        except Exception as build_err:
+            return f"[ERROR] Failed to rebuild Doxygen index: {build_err}"
 
         # Re-initializing the engine effectively refreshes the index
         DoxygenQueryEngine.clear_cache(xml_dir)
         await DoxygenQueryEngine.create(xml_dir)
-        return "✅ Doxygen index refreshed successfully."
+        return "[SUCCESS] Doxygen index rebuilt and refreshed successfully."
     except ValueError as e:
-        return f"❌ {str(e)}"
+        return f"[ERROR] {str(e)}"
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"❌ Error refreshing index: {str(e)}"
+        return f"[ERROR] Error refreshing index: {str(e)}"
 
 @mcp.tool()
 async def get_symbol_at_location(
@@ -600,19 +682,19 @@ async def query_active_symbol(project_path: Optional[str] = None) -> str:
 
     if not file_path or not line_str:
         return (
-            "❓ No active file or cursor position detected in the environment. "
+            "[WARNING] No active file or cursor position detected in the environment. "
             "Ensure your MCP client provides 'MCP_ACTIVE_FILE' and 'MCP_CURSOR_LINE'."
         )
 
     try:
         line_number = int(line_str)
     except ValueError:
-        return f"❌ Invalid cursor line position: {line_str}"
+        return f"[ERROR] Invalid cursor line position: {line_str}"
 
     symbol = await get_symbol_at_location(file_path, line_number, project_path)
 
     if not symbol or (isinstance(symbol, dict) and "error" in symbol):
-        return f"❓ No symbol found at {file_path}:{line_number}."
+        return f"[WARNING] No symbol found at {file_path}:{line_number}."
 
     return await query_project_reference(symbol["name"], project_path)
 

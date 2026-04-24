@@ -82,7 +82,7 @@ def setup_funnel(repo_path: str):
     # 1. Ensure a base Doxyfile exists
     base_doxyfile = repo / "Doxyfile"
     if not base_doxyfile.exists():
-        print(f"⚠️  Base Doxyfile not found in {repo.name}. Generating a default one...")
+        print(f"[WARNING] Base Doxyfile not found in {repo.name}. Generating a default one...")
         import subprocess
         try:
             subprocess.run(["doxygen", "-g", str(base_doxyfile)], check=True, capture_output=True)
@@ -92,7 +92,7 @@ def setup_funnel(repo_path: str):
     # 2. Create Doxyfile.fast
     doxy_fast = repo / "Doxyfile.fast"
     if doxy_fast.exists():
-        print(f"ℹ️  Doxyfile.fast already exists in {repo.name}. Overwriting with standard AI-Context overrides...")
+        print(f"[INFO] Doxyfile.fast already exists in {repo.name}. Overwriting with standard AI-Context overrides...")
 
     doxyfile_content = """# Doxyfile.fast - Optimized for AI Context
 @INCLUDE               = Doxyfile
