@@ -79,7 +79,21 @@ def setup_funnel(repo_path: str):
     if not (repo / ".git").exists():
         return False, f"Not a git repository: {repo}"
 
-    # 1. Create Doxyfile.fast
+    # 1. Ensure a base Doxyfile exists
+    base_doxyfile = repo / "Doxyfile"
+    if not base_doxyfile.exists():
+        print(f"⚠️  Base Doxyfile not found in {repo.name}. Generating a default one...")
+        import subprocess
+        try:
+            subprocess.run(["doxygen", "-g", str(base_doxyfile)], check=True, capture_output=True)
+        except Exception as e:
+            return False, f"Failed to generate base Doxyfile: {e}"
+
+    # 2. Create Doxyfile.fast
+    doxy_fast = repo / "Doxyfile.fast"
+    if doxy_fast.exists():
+        print(f"ℹ️  Doxyfile.fast already exists in {repo.name}. Overwriting with standard AI-Context overrides...")
+
     doxyfile_content = """# Doxyfile.fast - Optimized for AI Context
 @INCLUDE               = Doxyfile
 GENERATE_HTML          = NO
@@ -95,7 +109,7 @@ CALLER_GRAPH           = NO
 INCLUDE_GRAPH          = NO
 INCLUDED_BY_GRAPH      = NO
 """
-    with open(repo / "Doxyfile.fast", "w") as f:
+    with open(doxy_fast, "w") as f:
         f.write(doxyfile_content)
 
     # 2. Install post-commit hook
