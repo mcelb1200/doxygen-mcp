@@ -431,6 +431,77 @@ async def query_project_reference(
         return f"❌ Error querying symbol: {str(e)}"
 
 @mcp.tool()
+async def get_symbol_usage(
+    symbol_name: str,
+    project_path: Optional[str] = None,
+) -> str:
+    """
+    Get the connection graph for a symbol (what it calls, what calls it, and inheritance).
+    """
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+
+        if not xml_dir:
+            return "❌ Error: Could not find Doxygen XML directory."
+
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        # pylint: disable=no-member
+        result = await asyncio.to_thread(engine.get_symbol_connections, symbol_name)
+
+        if not result:
+            return f"❓ Symbol '{symbol_name}' not found."
+
+        if "error" in result:
+            return f"❌ {result['error']}"
+
+        output = f"🔗 Connection Graph for {result['kind']} {result['name']}\n"
+        output += "=" * len(output) + "\n\n"
+        
+        if result.get("base_classes"):
+            output += f"Inherits from: {', '.join(result['base_classes'])}\n"
+        if result.get("derived_classes"):
+            output += f"Inherited by: {', '.join(result['derived_classes'])}\n\n"
+
+        if not result.get("members"):
+            output += "No member-level references found.\n"
+            return output
+
+        for member in result["members"]:
+            output += f"- {member['kind']} {member['name']}:\n"
+            if member["references"]:
+                output += f"  Calls: {', '.join(member['references'])}\n"
+            if member["referencedby"]:
+                output += f"  Called by: {', '.join(member['referencedby'])}\n"
+
+        return output
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        return f"❌ Error querying symbol usage: {str(e)}"
+
+@mcp.tool()
+async def configure_repo_context(
+    project_path: Optional[str] = None,
+) -> str:
+    """
+    Onboard a repository to the High-SNR Context Funnel.
+    Installs Doxyfile.fast and a background post-commit hook.
+    """
+    try:
+        from .funnel import setup_funnel
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        
+        # pylint: disable=no-member
+        success, msg = await asyncio.to_thread(setup_funnel, resolved_path)
+        
+        if success:
+            return f"✅ {msg}"
+        return f"❌ {msg}"
+    except Exception as e:
+        return f"❌ Error configuring repository: {str(e)}"
+
+@mcp.tool()
 async def get_project_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
     """
     Provide a tree-like overview of the project's documented components.

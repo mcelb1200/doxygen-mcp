@@ -112,6 +112,68 @@ class DoxygenQueryEngine:
 
         return None
 
+    def get_symbol_connections(self, symbol_name: str) -> Optional[Dict[str, Any]]:
+        """Retrieve the call graph (references/referencedby) for a symbol."""
+        # Find the symbol's compound refid
+        refid = None
+        if symbol_name in self.compounds:
+            refid = self.compounds[symbol_name]["refid"]
+        else:
+            lower_name = symbol_name.lower()
+            if lower_name in self._lower_map:
+                refid = self._lower_map[lower_name]["refid"]
+            else:
+                for name_lower, info in self._lower_map.items():
+                    if lower_name in name_lower:
+                        refid = info["refid"]
+                        break
+
+        if not refid:
+            return None
+
+        return self._fetch_compound_connections(refid)
+
+    @lru_cache(maxsize=128)
+    def _fetch_compound_connections(self, refid: str) -> Dict[str, Any]:
+        """Fetch connection metadata (references, referencedby, inheritance)."""
+        try:
+            xml_file = (self.xml_dir / f"{refid}.xml").resolve()
+            xml_file.relative_to(self.xml_dir)
+        except (ValueError, RuntimeError):
+            return {"error": f"Security Error: Access denied to path '{refid}'"}
+
+        if not xml_file.exists():
+            return {"error": f"Details file {xml_file} not found"}
+
+        try:
+            tree = ET.parse(xml_file)
+            xml_root = tree.getroot()
+            compounddef = xml_root.find("compounddef")
+
+            connections = {
+                "name": compounddef.find("compoundname").text,
+                "kind": compounddef.get("kind"),
+                "base_classes": [p.text for p in compounddef.findall("basecompoundref")],
+                "derived_classes": [p.text for p in compounddef.findall("derivedcompoundref")],
+                "members": []
+            }
+
+            for section in compounddef.findall("sectiondef"):
+                for member in section.findall("memberdef"):
+                    mem_info = {
+                        "name": member.find("name").text,
+                        "kind": member.get("kind"),
+                        "references": [ref.text for ref in member.findall("references") if ref.text],
+                        "referencedby": [ref.text for ref in member.findall("referencedby") if ref.text]
+                    }
+                    
+                    if mem_info["references"] or mem_info["referencedby"]:
+                        connections["members"].append(mem_info)
+
+            return connections
+        except Exception as e:
+            return {"error": f"Error parsing {xml_file}: {e}"}
+
     def get_file_structure(self, file_path: str) -> List[Dict[str, Any]]:
         """Identify all symbols defined in a specific file"""
         # In Doxygen XML, files are also compounds
