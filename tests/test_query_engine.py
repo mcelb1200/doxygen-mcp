@@ -4,6 +4,7 @@ Unit tests for the DoxygenQueryEngine.
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest  # pylint: disable=import-error
 
@@ -206,6 +207,13 @@ def test_get_location_missing(engine):  # pylint: disable=redefined-outer-name
     element = ET.Element("node")
     # pylint: disable=protected-access
     assert engine._get_location(element) == {}
+
+def test_get_location_mock(engine):  # pylint: disable=redefined-outer-name
+    """Test location extraction using a Mock, specifically when find returns None."""
+    mock_element = Mock()
+    mock_element.find.return_value = None
+    # pylint: disable=protected-access
+    assert engine._get_location(mock_element) == {}
 
 def test_get_text_recursive(engine):  # pylint: disable=redefined-outer-name
     """Test recursive text extraction."""
