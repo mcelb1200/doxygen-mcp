@@ -720,7 +720,7 @@ async def get_file_structure(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return [{"error": str(e)}]
 
-def generate_config(args):  # pylint: disable=unused-argument
+def generate_config(args):
     """Generate MCP configuration for various clients."""
     script_path = Path(__file__).resolve()
     # Check if running from source (presence of pyproject.toml in parent)
