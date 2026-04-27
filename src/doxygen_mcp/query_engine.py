@@ -23,10 +23,6 @@ class DoxygenQueryEngine:
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
-        
-        from .search import DoxygenSearchIndex
-        self.search_index = DoxygenSearchIndex(self.xml_dir)
-        
         self.compounds: Dict[str, Any] = {}
         # Optimization indices
         self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
@@ -56,13 +52,35 @@ class DoxygenQueryEngine:
         else:
             cls._cache.clear()
 
+    def _process_compound(self, elem):
+        """Process a compound element from the index."""
+        name_elem = elem.find("name")
+        if name_elem is not None and name_elem.text:
+            name = name_elem.text
+            kind = elem.get("kind")
+            refid = elem.get("refid")
+            info = {
+                "kind": kind,
+                "refid": refid,
+            }
+            self.compounds[name] = info
+
+            # Build optimization indices
+            # 1. Case-insensitive lookup (O(1))
+            self._lower_map[name.lower()] = info
+
+            # 2. File lookup by basename (O(1))
+            if kind == "file":
+                self._files.append((name, info))
+                file_name = Path(name).name
+                if file_name not in self._file_map:
+                    self._file_map[file_name] = []
+                self._file_map[file_name].append(info)
+
     def _load_index(self):
         """Load and parse the Doxygen index.xml file."""
         if not self.index_path.exists():
             return
-
-        # Initialize and build the FTS5 semantic search index
-        self.search_index.initialize()
 
         try:
             # Use iterparse to handle large XML files with minimal memory usage
@@ -71,29 +89,7 @@ class DoxygenQueryEngine:
 
             for _, elem in context:
                 if elem.tag == "compound":
-                    name_elem = elem.find("name")
-                    if name_elem is not None and name_elem.text:
-                        name = name_elem.text
-                        kind = elem.get("kind")
-                        refid = elem.get("refid")
-                        info = {
-                            "kind": kind,
-                            "refid": refid,
-                        }
-                        self.compounds[name] = info
-
-                        # Build optimization indices
-                        # 1. Case-insensitive lookup (O(1))
-                        self._lower_map[name.lower()] = info
-
-                        # 2. File lookup by basename (O(1))
-                        if kind == "file":
-                            self._files.append((name, info))
-                            file_name = Path(name).name
-                            if file_name not in self._file_map:
-                                self._file_map[file_name] = []
-                            self._file_map[file_name].append(info)
-
+                    self._process_compound(elem)
                     # Clear the element to free memory
                     elem.clear()
 
@@ -118,68 +114,6 @@ class DoxygenQueryEngine:
                 return self._fetch_compound_details(info["refid"])
 
         return None
-
-    def get_symbol_connections(self, symbol_name: str) -> Optional[Dict[str, Any]]:
-        """Retrieve the call graph (references/referencedby) for a symbol."""
-        # Find the symbol's compound refid
-        refid = None
-        if symbol_name in self.compounds:
-            refid = self.compounds[symbol_name]["refid"]
-        else:
-            lower_name = symbol_name.lower()
-            if lower_name in self._lower_map:
-                refid = self._lower_map[lower_name]["refid"]
-            else:
-                for name_lower, info in self._lower_map.items():
-                    if lower_name in name_lower:
-                        refid = info["refid"]
-                        break
-
-        if not refid:
-            return None
-
-        return self._fetch_compound_connections(refid)
-
-    @lru_cache(maxsize=128)
-    def _fetch_compound_connections(self, refid: str) -> Dict[str, Any]:
-        """Fetch connection metadata (references, referencedby, inheritance)."""
-        try:
-            xml_file = (self.xml_dir / f"{refid}.xml").resolve()
-            xml_file.relative_to(self.xml_dir)
-        except (ValueError, RuntimeError):
-            return {"error": f"Security Error: Access denied to path '{refid}'"}
-
-        if not xml_file.exists():
-            return {"error": f"Details file {xml_file} not found"}
-
-        try:
-            tree = ET.parse(xml_file)
-            xml_root = tree.getroot()
-            compounddef = xml_root.find("compounddef")
-
-            connections = {
-                "name": compounddef.find("compoundname").text,
-                "kind": compounddef.get("kind"),
-                "base_classes": [p.text for p in compounddef.findall("basecompoundref")],
-                "derived_classes": [p.text for p in compounddef.findall("derivedcompoundref")],
-                "members": []
-            }
-
-            for section in compounddef.findall("sectiondef"):
-                for member in section.findall("memberdef"):
-                    mem_info = {
-                        "name": member.find("name").text,
-                        "kind": member.get("kind"),
-                        "references": [ref.text for ref in member.findall("references") if ref.text],
-                        "referencedby": [ref.text for ref in member.findall("referencedby") if ref.text]
-                    }
-                    
-                    if mem_info["references"] or mem_info["referencedby"]:
-                        connections["members"].append(mem_info)
-
-            return connections
-        except Exception as e:
-            return {"error": f"Error parsing {xml_file}: {e}"}
 
     def get_file_structure(self, file_path: str) -> List[Dict[str, Any]]:
         """Identify all symbols defined in a specific file"""
@@ -282,7 +216,3 @@ class DoxygenQueryEngine:
                 if info["kind"] == kind_filter
             ]
         return list(self.compounds.keys())
-
-    def semantic_search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
-        """Perform a semantic search across the Doxygen FTS5 index."""
-        return self.search_index.search(query, limit)

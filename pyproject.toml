@@ -45,8 +45,6 @@ full = [
 
 [project.scripts]
 doxygen-mcp = "doxygen_mcp.__main__:main"
-doxygen-snr-filter = "doxygen_mcp.funnel:filter_main"
-doxygen-setup-funnel = "doxygen_mcp.funnel:setup_main"
 
 [build-system]
 requires = ["hatchling"]
