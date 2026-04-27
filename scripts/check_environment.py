@@ -25,7 +25,7 @@ def install_with_winget(package_id: str, name: str) -> bool:
     print(f"Attempting to install {name} via winget...")
     try:
         # Check if winget is available
-        subprocess.run(["winget", "--version"], capture_output=True, check=True)
+        subprocess.run(["winget", "--version"], capture_output=True, check=True, shell=False)
 
         # Install the package
         result = subprocess.run(
@@ -35,7 +35,8 @@ def install_with_winget(package_id: str, name: str) -> bool:
             ],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
+            shell=False
         )
 
         if result.returncode == 0:
@@ -54,7 +55,13 @@ def test_doxygen_installation(auto_install: bool = False):
     print("Testing Doxygen installation...")
     try:
         doxygen_exe = get_doxygen_executable()
-        result = subprocess.run([doxygen_exe, "--version"], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            [doxygen_exe, "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+            shell=False
+        )
         if result.returncode == 0:
             version = result.stdout.strip()
             print(f"[PASS] Doxygen {version} is installed and working at '{doxygen_exe}'!")
@@ -75,7 +82,13 @@ def test_graphviz_installation(auto_install: bool = False):
     """Test if Graphviz (dot) is installed"""
     print("\nTesting Graphviz (dot) installation...")
     try:
-        result = subprocess.run(["dot", "-V"], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["dot", "-V"],
+            capture_output=True,
+            text=True,
+            check=False,
+            shell=False
+        )
         if result.returncode == 0:
             version_info = result.stderr.strip()
             print(f"[PASS] Graphviz found: {version_info}")
@@ -198,7 +211,8 @@ EXTRACT_ALL            = YES
             cwd=example_path,
             capture_output=True,
             text=True,
-            check=False
+            check=False,
+            shell=False
         )
 
         if result.returncode == 0:
