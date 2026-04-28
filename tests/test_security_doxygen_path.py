@@ -85,7 +85,7 @@ async def test_check_doxygen_install_invalid_version(mock_exec):
     # so it passes the name check
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
         result = await check_doxygen_install()
-        assert "❌ Unexpected Doxygen version format" in result
+        assert "[ERROR] Unexpected Doxygen version format" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -98,4 +98,4 @@ async def test_check_doxygen_install_valid_version(mock_exec):
 
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
         result = await check_doxygen_install()
-        assert "✅ Doxygen 1.9.4 is installed and working" in result
+        assert "[SUCCESS] Doxygen 1.9.4 is installed and working" in result
