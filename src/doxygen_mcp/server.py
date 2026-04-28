@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+import glob
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 try:
@@ -34,6 +35,8 @@ from .utils import (
     get_active_context,
     get_doxygen_executable
 )
+from .git_tracker import get_file_timeline
+from .funnel import setup_funnel, minify_xml_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -337,7 +340,7 @@ async def check_doxygen_install() -> str:
         )
 
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=10.0)
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=10.0)
         except asyncio.TimeoutError:
             try:
                 process.kill()
@@ -411,15 +414,12 @@ async def query_project_reference(
         # pylint: disable=no-member
         result = await asyncio.to_thread(engine.query_symbol, symbol_name)
 
-        # Timeline integration
-        timeline = ""
-        from .git_tracker import get_file_timeline
-
         if not result:
             # Fallback check: is there an uncommitted file matching this name?
             # It's an AI agent, they might have created NewClass.cpp
             return f"[WARNING] Symbol '{symbol_name}' not found in index. Ensure it is committed or indexed."
 
+        timeline = ""
         filepath = result.get("location", {}).get("file", "")
         if filepath:
             full_path = resolved_path / filepath
@@ -470,15 +470,13 @@ async def semantic_search(
             return f"[ERROR] {results[0]['error']}"
 
         lines = [f"[INFO] Semantic Search Results for '{query}' (Limit: {limit})", "=" * 60, ""]
-        
-        from .git_tracker import get_file_timeline
-        
+
         for r in results:
             lines.append(f"- {r['kind'].upper()}: {r['name']}")
             if r.get('filepath'):
                 full_path = resolved_path / r['filepath']
                 # Compact timeline for search results
-                timeline = get_file_timeline(str(full_path), is_indexed=True).replace("\\n", " | ")
+                timeline = get_file_timeline(str(full_path), is_indexed=True).replace("\n", " | ")
                 lines.append(f"   {timeline}")
             if r.get('brief'):
                 # Truncate brief if too long
@@ -519,7 +517,7 @@ async def get_symbol_usage(
 
         output = f"[INFO] Connection Graph for {result['kind']} {result['name']}\n"
         output += "=" * len(output) + "\n\n"
-        
+
         if result.get("base_classes"):
             output += f"Inherits from: {', '.join(result['base_classes'])}\n"
         if result.get("derived_classes"):
@@ -549,13 +547,12 @@ async def configure_repo_context(
     Installs Doxyfile.fast and a background post-commit hook.
     """
     try:
-        from .funnel import setup_funnel
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
-        
+
         # pylint: disable=no-member
-        success, msg = await asyncio.to_thread(setup_funnel, resolved_path)
-        
+        success, msg = await asyncio.to_thread(setup_funnel, str(resolved_path))
+
         if success:
             return f"[SUCCESS] {msg}"
         return f"[ERROR] {msg}"
@@ -602,23 +599,21 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
             return "[ERROR] Doxygen XML not found. Generate documentation first."
 
         # Run Doxygen build and SNR filter
-        import subprocess
         try:
             await asyncio.to_thread(
-                subprocess.run, 
-                ["doxygen", "Doxyfile.fast"], 
-                cwd=resolved_path, 
+                subprocess.run,
+                ["doxygen", "Doxyfile.fast"],
+                cwd=resolved_path,
                 check=True,
-                capture_output=True
+                capture_output=True,
+                shell=False
             )
-            
+
             # Run SNR filter
-            from .funnel import minify_xml_file
-            import glob
             xml_files = glob.glob(os.path.join(xml_dir, "*.xml"))
             for f in xml_files:
                 await asyncio.to_thread(minify_xml_file, f)
-                
+
         except Exception as build_err:
             return f"[ERROR] Failed to rebuild Doxygen index: {build_err}"
 

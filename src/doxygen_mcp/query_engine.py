@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
 import defusedxml.ElementTree as ET
+from .search import DoxygenSearchIndex
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +24,9 @@ class DoxygenQueryEngine:
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
-        
-        from .search import DoxygenSearchIndex
-        self.search_index = DoxygenSearchIndex(self.xml_dir)
-        
+
+        self.search_index = DoxygenSearchIndex(str(self.xml_dir))
+
         self.compounds: Dict[str, Any] = {}
         # Optimization indices
         self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
@@ -157,8 +157,14 @@ class DoxygenQueryEngine:
             xml_root = tree.getroot()
             compounddef = xml_root.find("compounddef")
 
+            if compounddef is None:
+                return {"error": "No compounddef found"}
+
+            name_elem = compounddef.find("compoundname")
+            name_text = name_elem.text if name_elem is not None else ""
+
             connections = {
-                "name": compounddef.find("compoundname").text,
+                "name": name_text,
                 "kind": compounddef.get("kind"),
                 "base_classes": [p.text for p in compounddef.findall("basecompoundref")],
                 "derived_classes": [p.text for p in compounddef.findall("derivedcompoundref")],
@@ -167,13 +173,15 @@ class DoxygenQueryEngine:
 
             for section in compounddef.findall("sectiondef"):
                 for member in section.findall("memberdef"):
+                    mem_name_elem = member.find("name")
+                    mem_name = mem_name_elem.text if mem_name_elem is not None else ""
                     mem_info = {
-                        "name": member.find("name").text,
+                        "name": mem_name,
                         "kind": member.get("kind"),
                         "references": [ref.text for ref in member.findall("references") if ref.text],
                         "referencedby": [ref.text for ref in member.findall("referencedby") if ref.text]
                     }
-                    
+
                     if mem_info["references"] or mem_info["referencedby"]:
                         connections["members"].append(mem_info)
 
@@ -224,8 +232,14 @@ class DoxygenQueryEngine:
             xml_root = tree.getroot()
             compounddef = xml_root.find("compounddef")
 
+            if compounddef is None:
+                return {"error": "No compounddef found"}
+
+            name_elem = compounddef.find("compoundname")
+            name_text = name_elem.text if name_elem is not None else ""
+
             details = {
-                "name": compounddef.find("compoundname").text,
+                "name": name_text,
                 "kind": compounddef.get("kind"),
                 "location": self._get_location(compounddef),
                 "brief": self._get_text_recursive(compounddef.find("briefdescription")),
@@ -237,9 +251,11 @@ class DoxygenQueryEngine:
 
             for section in compounddef.findall("sectiondef"):
                 for member in section.findall("memberdef"):
+                    m_name_elem = member.find("name")
+                    m_name = m_name_elem.text if m_name_elem is not None else ""
                     details["members"].append(
                         {
-                            "name": member.find("name").text,
+                            "name": m_name,
                             "kind": member.get("kind"),
                             "type": self._get_text_recursive(member.find("type")),
                             "args": self._get_text_recursive(member.find("argsstring")),

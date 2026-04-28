@@ -7,6 +7,7 @@ import sys
 import xml.etree.ElementTree as ET
 import glob
 import argparse
+import subprocess
 from pathlib import Path
 
 def minify_xml_file(filepath):
@@ -14,7 +15,6 @@ def minify_xml_file(filepath):
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
-        changed = False
 
         # Tags to completely remove (graphs and redundant lists)
         tags_to_remove = [
@@ -31,7 +31,6 @@ def minify_xml_file(filepath):
             for parent in root.findall(f".//{tag}/.."):
                 for elem in parent.findall(tag):
                     parent.remove(elem)
-                    changed = True
 
         # Strip empty detaileddescription or briefdescription
         for desc_tag in ['briefdescription', 'detaileddescription']:
@@ -39,7 +38,6 @@ def minify_xml_file(filepath):
                 for elem in parent.findall(desc_tag):
                     if len(elem) == 0 and (elem.text is None or elem.text.strip() == ""):
                         parent.remove(elem)
-                        changed = True
 
         # Minify text (collapse whitespace) to save tokens
         for elem in root.iter():
@@ -50,7 +48,7 @@ def minify_xml_file(filepath):
 
         tree.write(filepath, encoding='utf-8', xml_declaration=True)
         return True
-            
+
     except Exception as e:
         print(f"Error processing {filepath}: {e}")
         return False
@@ -70,7 +68,7 @@ def filter_main():
     for f in xml_files:
         if minify_xml_file(f):
             processed += 1
-            
+
     print(f"Minified {processed}/{len(xml_files)} XML files in {args.xml_dir}")
 
 def setup_funnel(repo_path: str):
@@ -83,7 +81,6 @@ def setup_funnel(repo_path: str):
     base_doxyfile = repo / "Doxyfile"
     if not base_doxyfile.exists():
         print(f"[WARNING] Base Doxyfile not found in {repo.name}. Generating a default one...")
-        import subprocess
         try:
             subprocess.run(["doxygen", "-g", str(base_doxyfile)], check=True, capture_output=True)
         except Exception as e:
@@ -109,17 +106,17 @@ CALLER_GRAPH           = NO
 INCLUDE_GRAPH          = NO
 INCLUDED_BY_GRAPH      = NO
 """
-    with open(doxy_fast, "w") as f:
+    with open(doxy_fast, "w", encoding='utf-8') as f:
         f.write(doxyfile_content)
 
     # 2. Install post-commit hook
     hook_dir = repo / ".git" / "hooks"
     hook_dir.mkdir(parents=True, exist_ok=True)
     hook_path = hook_dir / "post-commit"
-    
+
     # Resolve absolute path to the filter binary
     filter_bin = Path(sys.executable).parent / "doxygen-snr-filter"
-    
+
     hook_content = f"""#!/bin/bash
 # Doxygen Context Funnel Hook
 # Automatically triggered by doxygen-mcp
@@ -134,9 +131,9 @@ if echo "$changed_files" | grep -E "\\.(h|hpp|cpp|c|py|ts|tsx)$" > /dev/null; th
     ) &
 fi
 """
-    with open(hook_path, "w") as f:
+    with open(hook_path, "w", encoding='utf-8') as f:
         f.write(hook_content)
-    
+
     os.chmod(hook_path, 0o755)
     return True, f"Successfully configured context funnel for {repo.name}"
 
@@ -145,7 +142,7 @@ def setup_main():
     parser = argparse.ArgumentParser(description='Doxygen Context Funnel Setup')
     parser.add_argument('repo_path', nargs='?', default='.', help='Path to the repository root')
     args = parser.parse_args()
-    
+
     success, msg = setup_funnel(args.repo_path)
     print(msg)
     sys.exit(0 if success else 1)
