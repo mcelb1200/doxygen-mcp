@@ -224,7 +224,7 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
         path_obj = Path(path_to_ignore)
         if path_obj.is_absolute() or ".." in path_obj.parts:
             return False
-    except Exception:  # pylint: disable=broad-exception-caught
+    except (TypeError, ValueError):
         return False
 
     ignore_file = project_root / ".gitignore"
@@ -259,7 +259,7 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
                         f.write("\n")
                     f.write(f"{path_to_ignore}\n")
                     result = True
-    except Exception:  # pylint: disable=broad-exception-caught
+    except OSError:
         pass
 
     return result
