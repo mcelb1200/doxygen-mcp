@@ -554,7 +554,7 @@ async def configure_repo_context(
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
         
         # pylint: disable=no-member
-        success, msg = await asyncio.to_thread(setup_funnel, resolved_path)
+        success, msg = await asyncio.to_thread(setup_funnel, str(resolved_path))
         
         if success:
             return f"[SUCCESS] {msg}"
