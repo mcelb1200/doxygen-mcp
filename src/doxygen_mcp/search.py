@@ -75,6 +75,10 @@ class DoxygenSearchIndex:
             tree = ET.parse(self.index_xml)
             root = tree.getroot()
             
+            if root is None:
+                logger.error(f"Empty or invalid index.xml in {self.xml_dir}")
+                return
+
             for compound in root.findall("compound"):
                 refid = compound.get("refid")
                 kind = compound.get("kind")
@@ -91,6 +95,9 @@ class DoxygenSearchIndex:
                     try:
                         ct_tree = ET.parse(xml_file)
                         ct_root = ct_tree.getroot()
+                        if ct_root is None:
+                            continue
+
                         compounddef = ct_root.find("compounddef")
                         if compounddef is not None:
                             brief_elem = compounddef.find("briefdescription")
