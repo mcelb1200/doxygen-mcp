@@ -124,7 +124,7 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
 
         doxyfile_exists = await asyncio.to_thread((project_path / "Doxyfile").exists)
         if doxyfile_exists:
-            return f"[SUCCESS] Project already configured at {project_path}. Detected language: {language}."
+            return f"✅ Project already configured at {project_path}. Detected language: {language}."
 
         result = await create_doxygen_project(
             project_name=project_name,
@@ -211,12 +211,12 @@ async def create_doxygen_project(
         await update_ignore_file(safe_project_path, "docs/")
 
         return (
-            f"[SUCCESS] Doxygen project '{project_name}' created successfully "
+            f"✅ Doxygen project '{project_name}' created successfully "
             f"at {safe_project_path} (Language: {language})"
         )
 
     except Exception as e:  # pylint: disable=broad-exception-caught
-        return f"[ERROR] Failed to create project: {str(e)}"
+        return f"❌ Failed to create project: {str(e)}"
 
 @mcp.tool()
 async def generate_documentation(
@@ -232,7 +232,7 @@ async def generate_documentation(
 
     doxyfile_path = safe_project_path / "Doxyfile"
     if not doxyfile_path.exists():
-        return "[ERROR] No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
+        return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
 
     doxygen_exe = get_doxygen_executable()
 
@@ -264,7 +264,7 @@ async def generate_documentation(
             # Clear all caches as documentation has been regenerated
             DoxygenQueryEngine.clear_cache()
             return (
-                "[SUCCESS] Documentation generated successfully at "
+                "✅ Documentation generated successfully at "
                 f"{safe_project_path / 'docs' / 'html' / 'index.html'}"
             )
 
@@ -311,7 +311,7 @@ async def scan_project(
 
     sorted_extensions = sorted(extensions.items(), key=lambda x: x[1], reverse=True)
     lines = [
-        f"[INFO] Project Scan Results: {safe_project_path}",
+        f"📁 Project Scan Results: {safe_project_path}",
         f"[INFO] Total Files Found: {total_files}",
         "",
         "[INFO] Files by Type:"
@@ -354,9 +354,9 @@ async def check_doxygen_install() -> str:
         # Validate version string to ensure it looks like Doxygen output
         # Doxygen version is typically like 1.9.4 or 1.8.17
         if not re.match(r'^\d+\.\d+\.\d+', doxygen_version):
-            return f"[ERROR] Unexpected Doxygen version format: {doxygen_version}"
+            return f"❌ Unexpected Doxygen version format: {doxygen_version}"
 
-        result = f"[SUCCESS] Doxygen {doxygen_version} is installed and working"
+        result = f"✅ Doxygen {doxygen_version} is installed and working"
         _DOXYGEN_VERSION_CACHE[doxygen_exe] = result
         return result
     except (FileNotFoundError, OSError):
@@ -554,7 +554,7 @@ async def configure_repo_context(
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
         
         # pylint: disable=no-member
-        success, msg = await asyncio.to_thread(setup_funnel, resolved_path)
+        success, msg = await asyncio.to_thread(setup_funnel, str(resolved_path))
         
         if success:
             return f"[SUCCESS] {msg}"
