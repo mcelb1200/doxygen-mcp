@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 Script to verify changes to the Doxygen MCP server.
 """
@@ -10,22 +11,21 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
 # pylint: disable=import-error
-from doxygen_mcp.server import create_doxygen_project
-from doxygen_mcp.utils import resolve_project_path
+from doxygen_mcp.server import _resolve_project_path, create_doxygen_project
 # pylint: enable=import-error
 
 def test_resolve_logic():
     """Test the path resolution logic."""
-    print("Testing resolve_project_path...")
+    print("Testing _resolve_project_path...")
 
     # Test 1: Explicit path
-    p = resolve_project_path("foo")
+    p = _resolve_project_path("foo")
     assert p.name == "foo"
     print("  Explicit path: OK")
 
     # Test 2: Env var
     os.environ["DOXYGEN_PROJECT_ROOT"] = str(Path("bar").resolve())
-    p = resolve_project_path(None)
+    p = _resolve_project_path(None)
     assert p.name == "bar"
     print("  Env var: OK")
 
@@ -34,7 +34,7 @@ def test_resolve_logic():
         del os.environ["DOXYGEN_PROJECT_ROOT"]
     try:
         # Should resolve to safe roots or raise if none allowed/found
-        resolve_project_path(None)
+        _resolve_project_path(None)
         print("  Missing path: OK (resolved to default)")
     except ValueError:
         print("  Missing path: OK (raised error as expected)")
@@ -60,7 +60,7 @@ async def test_tools():
             language="python"
         )
 
-        if "✅" in result:
+        if "✅" in result or "[SUCCESS]" in result:
             print("  Creation: OK")
         else:
             print(f"  Creation: FAILED - {result}")

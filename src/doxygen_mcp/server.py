@@ -35,6 +35,9 @@ from .utils import (
     get_doxygen_executable
 )
 
+# Internal alias for testing
+_resolve_project_path = resolve_project_path
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doxygen-mcp")
