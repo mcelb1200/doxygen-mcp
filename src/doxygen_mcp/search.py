@@ -5,18 +5,19 @@ Provides fast conceptual search across code and specifications.
 import sqlite3
 import logging
 import os
-import defusedxml.ElementTree as ET
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
+import defusedxml.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
 class DoxygenSearchIndex:
+    """FTS5-based search index for Doxygen symbols and repository context."""
     def __init__(self, xml_dir: str):
         self.xml_dir = Path(xml_dir).resolve()
         self.index_xml = self.xml_dir / "index.xml"
         self.db_path = self.xml_dir / "search_index.db"
-        
+
         # Determine repo root by going up until we find .git
         self.repo_root = self.xml_dir
         for p in [self.xml_dir] + list(self.xml_dir.parents):
@@ -31,7 +32,7 @@ class DoxygenSearchIndex:
     def initialize(self) -> bool:
         """Check if index needs rebuilding, and rebuild if necessary."""
         if not self.index_xml.exists():
-            logger.warning(f"No index.xml found in {self.xml_dir}")
+            logger.warning("No index.xml found in %s", self.xml_dir)
             return False
 
         needs_rebuild = False
@@ -45,135 +46,140 @@ class DoxygenSearchIndex:
 
         if needs_rebuild:
             self._build_index()
-            
+
         return True
+
+    def _parse_detailed_xml(self, refid: str):
+        """Parse detailed XML for a compound to extract descriptions and filepath."""
+        xml_file = self.xml_dir / f"{refid}.xml"
+        brief = ""
+        detailed = ""
+        filepath = ""
+
+        if not xml_file.exists():
+            return brief, detailed, filepath
+
+        try:
+            ct_tree = ET.parse(xml_file)
+            ct_root = ct_tree.getroot()
+            if ct_root is not None:
+                compounddef = ct_root.find("compounddef")
+                if compounddef is not None:
+                    brief = self._get_node_text(compounddef, "briefdescription")
+                    detailed = self._get_node_text(compounddef, "detaileddescription")
+                    loc = compounddef.find("location")
+                    if loc is not None:
+                        filepath = loc.get("file", "")
+        except Exception as e:
+            logger.warning("Failed to parse %s: %s", xml_file.name, e)
+
+        return brief, detailed, filepath
+
+    def _get_node_text(self, parent, tag):
+        """Helper to extract text from a subnode."""
+        node = parent.find(tag)
+        if node is not None:
+            return "".join(node.itertext()).strip()
+        return ""
 
     def _build_index(self):
         """Parse XML and broader context to build the FTS5 index."""
-        logger.info(f"Building SQLite FTS5 search index at {self.db_path}")
-        
-        # Remove old db if it exists
+        logger.info("Building SQLite FTS5 search index at %s", self.db_path)
+
         if self.db_path.exists():
             try:
                 self.db_path.unlink()
             except Exception as e:
-                logger.error(f"Failed to delete old db: {e}")
+                logger.error("Failed to delete old db: %s", e)
 
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        # Create FTS5 virtual table
-        # We index name, kind, refid, brief, detailed, and filepath
         cursor.execute("""
             CREATE VIRTUAL TABLE symbols USING fts5(
                 name, kind, refid, brief, detailed, filepath
             )
         """)
 
-        # 1. Ingest Doxygen XML Compounds
         try:
             tree = ET.parse(self.index_xml)
             root = tree.getroot()
+
             if root is None:
-                logger.error(f"Empty or invalid index.xml in {self.xml_dir}")
+                logger.error("Empty or invalid index.xml in %s", self.xml_dir)
                 return
 
             for compound in root.findall("compound"):
-                refid = compound.get("refid")
-                kind = compound.get("kind")
-                name_elem = compound.find("name")
-                name = name_elem.text if name_elem is not None else ""
-                
-                # Parse the detailed XML for this compound to get descriptions
-                xml_file = self.xml_dir / f"{refid}.xml"
-                brief = ""
-                detailed = ""
-                filepath = ""
-                
-                if xml_file.exists():
-                    try:
-                        ct_tree = ET.parse(xml_file)
-                        ct_root = ct_tree.getroot()
-                        if ct_root is None:
-                            continue
-
-                        compounddef = ct_root.find("compounddef")
-                        if compounddef is not None:
-                            brief_elem = compounddef.find("briefdescription")
-                            if brief_elem is not None:
-                                brief = "".join(brief_elem.itertext()).strip()
-                            
-                            det_elem = compounddef.find("detaileddescription")
-                            if det_elem is not None:
-                                detailed = "".join(det_elem.itertext()).strip()
-                                
-                            loc = compounddef.find("location")
-                            if loc is not None:
-                                filepath = loc.get("file", "")
-                    except Exception as e:
-                        logger.warning(f"Failed to parse {xml_file.name}: {e}")
-                
-                cursor.execute(
-                    "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) VALUES (?, ?, ?, ?, ?, ?)",
-                    (name, kind, refid, brief, detailed, filepath)
-                )
+                self._process_compound_element(compound, cursor)
         except Exception as e:
-            logger.error(f"Error parsing Doxygen XML for index: {e}")
+            logger.error("Error parsing Doxygen XML for index: %s", e)
 
-        # 2. Ingest Broader Context (.md, .yaml)
         self._ingest_broader_context(cursor)
-
         conn.commit()
         conn.close()
         logger.info("FTS5 index build complete.")
 
+    def _process_compound_element(self, compound, cursor):
+        """Helper to process a compound element and insert into DB."""
+        refid = compound.get("refid", "")
+        kind = compound.get("kind", "")
+        name_elem = compound.find("name")
+        name = name_elem.text if name_elem is not None else ""
+
+        brief, detailed, filepath = self._parse_detailed_xml(refid)
+
+        cursor.execute(
+            "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (name, kind, refid, brief, detailed, filepath)
+        )
+
     def _ingest_broader_context(self, cursor):
         """Scan repository for documentation files and ingest them."""
         ignore_dirs = {".git", "build", "node_modules", "html", "latex", ".venv", "__pycache__"}
-        
+
         for root, dirs, files in os.walk(self.repo_root):
-            # Prune ignored directories
             dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith('.')]
-            
+
             for file in files:
                 ext = Path(file).suffix.lower()
                 if ext in {'.md', '.yaml', '.yml', '.txt'}:
-                    filepath = Path(root) / file
-                    try:
-                        # Try relative path
-                        rel_path = filepath.relative_to(self.repo_root)
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            
-                        # Use filename as name, content as detailed
-                        cursor.execute(
-                            "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) VALUES (?, ?, ?, ?, ?, ?)",
-                            (file, "documentation", "file_context", "Repository Specification/Documentation", content, str(rel_path))
-                        )
-                    except Exception as e:
-                        # Skip files that can't be read (e.g., binary or encoding issues)
-                        pass
+                    self._ingest_file(cursor, root, file)
+
+    def _ingest_file(self, cursor, root, file):
+        """Ingest a single documentation file into the index."""
+        filepath = Path(root) / file
+        try:
+            rel_path = filepath.relative_to(self.repo_root)
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            cursor.execute(
+                "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (file, "documentation", "file_context", "Repository Specification/Documentation",
+                 content, str(rel_path))
+            )
+        except Exception:
+            pass
 
     def search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Perform a semantic search using SQLite FTS5."""
         if not self.db_path.exists():
             return []
-            
+
         try:
             conn = self.get_connection()
             cursor = conn.cursor()
-            
-            # Use SQLite FTS5 MATCH syntax
-            # By default FTS5 ranks by bm25()
-            # We append a wildcard to the last term for prefix matching if requested, but standard MATCH is safer
+
             cursor.execute("""
                 SELECT name, kind, refid, brief, filepath, bm25(symbols) as rank
-                FROM symbols 
-                WHERE symbols MATCH ? 
-                ORDER BY rank 
+                FROM symbols
+                WHERE symbols MATCH ?
+                ORDER BY rank
                 LIMIT ?
             """, (query, limit))
-            
+
             results = []
             for row in cursor.fetchall():
                 results.append({
@@ -184,9 +190,9 @@ class DoxygenSearchIndex:
                     "filepath": row[4],
                     "rank": round(row[5], 2) # bm25 score
                 })
-                
+
             conn.close()
             return results
         except sqlite3.Error as e:
-            logger.error(f"SQLite search error: {e}")
+            logger.error("SQLite search error: %s", e)
             return [{"error": f"Search failed: {e}"}]

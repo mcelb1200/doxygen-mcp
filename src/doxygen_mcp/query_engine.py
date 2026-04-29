@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, ClassVar, Tuple
 from functools import lru_cache
 import defusedxml.ElementTree as ET
+from .search import DoxygenSearchIndex
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +24,13 @@ class DoxygenQueryEngine:
         # Resolve path once during initialization to avoid repeated syscalls
         self.xml_dir = Path(xml_dir).resolve()
         self.index_path = self.xml_dir / "index.xml"
-        
-        from .search import DoxygenSearchIndex
-        self.search_index = DoxygenSearchIndex(self.xml_dir)
-        
+
+        self.search_index = DoxygenSearchIndex(str(self.xml_dir))
+
         self.compounds: Dict[str, Any] = {}
         # Optimization indices
         self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
-        self._file_map: Dict[str, List[Dict[str, Any]]] = {}  # basename -> list of info (for kind="file")
+        self._file_map: Dict[str, List[Dict[str, Any]]] = {}  # basename -> list of info
         self._files: List[Tuple[str, Dict[str, Any]]] = []  # list of (name, info) for kind="file"
 
     @classmethod
@@ -56,46 +56,44 @@ class DoxygenQueryEngine:
         else:
             cls._cache.clear()
 
+    def _process_compound(self, elem):
+        """Helper to process a single compound element from index.xml."""
+        name_elem = elem.find("name")
+        if name_elem is not None and name_elem.text:
+            name = name_elem.text
+            kind = elem.get("kind")
+            refid = elem.get("refid")
+            info = {
+                "kind": kind,
+                "refid": refid,
+            }
+            self.compounds[name] = info
+
+            # Build optimization indices
+            self._lower_map[name.lower()] = info
+
+            if kind == "file":
+                self._files.append((name, info))
+                file_name = Path(name).name
+                if file_name not in self._file_map:
+                    self._file_map[file_name] = []
+                self._file_map[file_name].append(info)
+
     def _load_index(self):
         """Load and parse the Doxygen index.xml file."""
         if not self.index_path.exists():
             return
 
-        # Initialize and build the FTS5 semantic search index
         self.search_index.initialize()
 
         try:
             # Use iterparse to handle large XML files with minimal memory usage
-            # pylint: disable=unused-variable
             context = ET.iterparse(self.index_path, events=("end",))
 
             for _, elem in context:
                 if elem.tag == "compound":
-                    name_elem = elem.find("name")
-                    if name_elem is not None and name_elem.text:
-                        name = name_elem.text
-                        kind = elem.get("kind")
-                        refid = elem.get("refid")
-                        info = {
-                            "kind": kind,
-                            "refid": refid,
-                        }
-                        self.compounds[name] = info
-
-                        # Build optimization indices
-                        # 1. Case-insensitive lookup (O(1))
-                        self._lower_map[name.lower()] = info
-
-                        # 2. File lookup by basename (O(1))
-                        if kind == "file":
-                            self._files.append((name, info))
-                            file_name = Path(name).name
-                            if file_name not in self._file_map:
-                                self._file_map[file_name] = []
-                            self._file_map[file_name].append(info)
-
-                    # Clear the element to free memory
-                    elem.clear()
+                    self._process_compound(elem)
+                    elem.clear()  # Only clear after processing
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("Error loading index: %s", e)
@@ -112,7 +110,6 @@ class DoxygenQueryEngine:
             return self._fetch_compound_details(self._lower_map[lower_name]["refid"])
 
         # Partial match (fallback to O(N) scan)
-        # Optimized: Iterate over _lower_map to avoid repeated .lower() calls on keys
         for name_lower, info in self._lower_map.items():
             if lower_name in name_lower:
                 return self._fetch_compound_details(info["refid"])
@@ -121,7 +118,6 @@ class DoxygenQueryEngine:
 
     def get_symbol_connections(self, symbol_name: str) -> Optional[Dict[str, Any]]:
         """Retrieve the call graph (references/referencedby) for a symbol."""
-        # Find the symbol's compound refid
         refid = None
         if symbol_name in self.compounds:
             refid = self.compounds[symbol_name]["refid"]
@@ -157,8 +153,14 @@ class DoxygenQueryEngine:
             xml_root = tree.getroot()
             compounddef = xml_root.find("compounddef")
 
+            if compounddef is None:
+                return {"error": "No compounddef found"}
+
+            name_elem = compounddef.find("compoundname")
+            name_text = name_elem.text if name_elem is not None else ""
+
             connections = {
-                "name": compounddef.find("compoundname").text,
+                "name": name_text,
                 "kind": compounddef.get("kind"),
                 "base_classes": [p.text for p in compounddef.findall("basecompoundref")],
                 "derived_classes": [p.text for p in compounddef.findall("derivedcompoundref")],
@@ -167,36 +169,35 @@ class DoxygenQueryEngine:
 
             for section in compounddef.findall("sectiondef"):
                 for member in section.findall("memberdef"):
-                    mem_info = {
-                        "name": member.find("name").text,
-                        "kind": member.get("kind"),
-                        "references": [ref.text for ref in member.findall("references") if ref.text],
-                        "referencedby": [ref.text for ref in member.findall("referencedby") if ref.text]
-                    }
-                    
-                    if mem_info["references"] or mem_info["referencedby"]:
-                        connections["members"].append(mem_info)
+                    self._process_member_connections(member, connections)
 
             return connections
         except Exception as e:
             return {"error": f"Error parsing {xml_file}: {e}"}
 
+    def _process_member_connections(self, member, connections):
+        """Helper to process member connections."""
+        mem_name_elem = member.find("name")
+        mem_name = mem_name_elem.text if mem_name_elem is not None else ""
+        mem_info = {
+            "name": mem_name,
+            "kind": member.get("kind"),
+            "references": [ref.text for ref in member.findall("references") if ref.text],
+            "referencedby": [ref.text for ref in member.findall("referencedby") if ref.text]
+        }
+
+        if mem_info["references"] or mem_info["referencedby"]:
+            connections["members"].append(mem_info)
+
     def get_file_structure(self, file_path: str) -> List[Dict[str, Any]]:
         """Identify all symbols defined in a specific file"""
-        # In Doxygen XML, files are also compounds
         file_name = Path(file_path).name
 
-        # 1. Optimization: Use pre-built file map for exact basename match (O(1))
-        # This covers the common case where the user provides the correct
-        # filename (e.g. "test_file.h")
         candidates = self._file_map.get(file_name)
         if candidates:
-            # Return the first match
             details = self._fetch_compound_details(candidates[0]["refid"])
             return details.get("members", [])
 
-        # 2. Fallback: Linear scan for suffix matching (O(N))
-        # This covers partial suffix matching (e.g. "file.h" matching "test_file.h")
         for name, info in self._files:
             if name.endswith(file_name):
                 details = self._fetch_compound_details(info["refid"])
@@ -208,10 +209,7 @@ class DoxygenQueryEngine:
     def _fetch_compound_details(self, refid: str) -> Dict[str, Any]:
         """Fetch and parse detailed information for a specific compound ID."""
         try:
-            # self.xml_dir is already resolved in __init__
             xml_file = (self.xml_dir / f"{refid}.xml").resolve()
-
-            # Security check: Ensure the file is within the XML directory
             xml_file.relative_to(self.xml_dir)
         except (ValueError, RuntimeError):
             return {"error": f"Security Error: Access denied to path '{refid}'"}
@@ -224,8 +222,14 @@ class DoxygenQueryEngine:
             xml_root = tree.getroot()
             compounddef = xml_root.find("compounddef")
 
+            if compounddef is None:
+                return {"error": "No compounddef found"}
+
+            name_elem = compounddef.find("compoundname")
+            name_text = name_elem.text if name_elem is not None else ""
+
             details = {
-                "name": compounddef.find("compoundname").text,
+                "name": name_text,
                 "kind": compounddef.get("kind"),
                 "location": self._get_location(compounddef),
                 "brief": self._get_text_recursive(compounddef.find("briefdescription")),
@@ -237,22 +241,28 @@ class DoxygenQueryEngine:
 
             for section in compounddef.findall("sectiondef"):
                 for member in section.findall("memberdef"):
-                    details["members"].append(
-                        {
-                            "name": member.find("name").text,
-                            "kind": member.get("kind"),
-                            "type": self._get_text_recursive(member.find("type")),
-                            "args": self._get_text_recursive(member.find("argsstring")),
-                            "location": self._get_location(member),
-                            "brief": self._get_text_recursive(
-                                member.find("briefdescription")
-                            ),
-                        }
-                    )
+                    self._process_member_details(member, details)
 
             return details
         except Exception as e:  # pylint: disable=broad-exception-caught
             return {"error": f"Error parsing {xml_file}: {e}"}
+
+    def _process_member_details(self, member, details):
+        """Helper to process member details."""
+        m_name_elem = member.find("name")
+        m_name = m_name_elem.text if m_name_elem is not None else ""
+        details["members"].append(
+            {
+                "name": m_name,
+                "kind": member.get("kind"),
+                "type": self._get_text_recursive(member.find("type")),
+                "args": self._get_text_recursive(member.find("argsstring")),
+                "location": self._get_location(member),
+                "brief": self._get_text_recursive(
+                    member.find("briefdescription")
+                ),
+            }
+        )
 
     def _get_location(self, element) -> Dict[str, Any]:
         """Extract location information from an XML element."""
@@ -269,8 +279,6 @@ class DoxygenQueryEngine:
         """Recursively extract text from an XML element and its children."""
         if element is None:
             return ""
-        # Optimization: use itertext() which is implemented in C and much faster
-        # than recursive Python calls (~12x speedup)
         return "".join(element.itertext()).strip()
 
     def list_all_symbols(self, kind_filter: Optional[str] = None) -> List[str]:
