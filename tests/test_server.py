@@ -84,7 +84,7 @@ async def test_create_project_success():
             extract_private=False
         )
 
-        assert "[SUCCESS] Doxygen project 'Test Project' created successfully" in result
+        assert "✅ Doxygen project 'Test Project' created successfully" in result
 
         # Check if Doxyfile was created
         doxyfile_path = Path(temp_dir) / "Doxyfile"
@@ -106,7 +106,7 @@ async def test_create_project_invalid_path():
         language="cpp"
     )
 
-    assert "[ERROR] Failed to create project:" in result
+    assert "❌ Failed to create project:" in result
 
 @pytest.mark.asyncio
 async def test_scan_project_nonexistent():
@@ -139,7 +139,7 @@ async def test_scan_project_success():
             project_path=temp_dir
         )
 
-        assert "[INFO] Project Scan Results" in result
+        assert "📁 Project Scan Results" in result
         assert "Total Files Found: 5" in result
         assert ".cpp: 1 files" in result
         assert ".h: 1 files" in result
@@ -159,7 +159,7 @@ async def test_check_doxygen_install_success(mock_exec):
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
         result = await check_doxygen_install()
 
-    assert "[SUCCESS] Doxygen 1.9.4 is installed and working" in result
+    assert "✅ Doxygen 1.9.4 is installed and working" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -181,7 +181,7 @@ async def test_generate_documentation_no_doxyfile():
             output_format="html"
         )
 
-        assert "[ERROR] No Doxyfile found" in result
+        assert "❌ No Doxyfile found" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -204,7 +204,7 @@ async def test_generate_documentation_success(mock_exec):
                 output_format="html"
             )
 
-        assert "[SUCCESS] Documentation generated successfully" in result
+        assert "✅ Documentation generated successfully" in result
 
 @pytest.mark.asyncio
 async def test_path_traversal_protection():
