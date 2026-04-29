@@ -61,7 +61,7 @@ class TestEnvConfig:
                 language="python"
             )
 
-            assert "✅ Doxygen project 'Env Project' created successfully" in result
+            assert "[SUCCESS] Doxygen project 'Env Project' created successfully" in result
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
     @pytest.mark.asyncio
@@ -78,11 +78,12 @@ class TestEnvConfig:
                 process.returncode = 0
                 mock_exec.return_value = process
                 
-                result = await generate_documentation(
-                    # project_path is None
-                )
+                with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+                    result = await generate_documentation(
+                        # project_path is None
+                    )
                 
-                assert "✅ Documentation generated successfully" in result
+                assert "[SUCCESS] Documentation generated successfully" in result
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):

@@ -84,7 +84,7 @@ async def test_create_project_success():
             extract_private=False
         )
 
-        assert "✅ Doxygen project 'Test Project' created successfully" in result
+        assert "[SUCCESS] Doxygen project 'Test Project' created successfully" in result
 
         # Check if Doxyfile was created
         doxyfile_path = Path(temp_dir) / "Doxyfile"
@@ -106,7 +106,7 @@ async def test_create_project_invalid_path():
         language="cpp"
     )
 
-    assert "❌ Failed to create project:" in result
+    assert "[ERROR] Failed to create project:" in result
 
 @pytest.mark.asyncio
 async def test_scan_project_nonexistent():
@@ -139,7 +139,7 @@ async def test_scan_project_success():
             project_path=temp_dir
         )
 
-        assert "📁 Project Scan Results" in result
+        assert "[INFO] Project Scan Results" in result
         assert "Total Files Found: 5" in result
         assert ".cpp: 1 files" in result
         assert ".h: 1 files" in result
@@ -156,9 +156,10 @@ async def test_check_doxygen_install_success(mock_exec):
 
     mock_exec.return_value = process
 
-    result = await check_doxygen_install()
+    with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+        result = await check_doxygen_install()
 
-    assert "✅ Doxygen 1.9.4 is installed and working" in result
+    assert "[SUCCESS] Doxygen 1.9.4 is installed and working" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -166,9 +167,10 @@ async def test_check_doxygen_install_not_found(mock_exec):
     """Test Doxygen not found"""
     mock_exec.side_effect = FileNotFoundError()
 
-    result = await check_doxygen_install()
+    with patch('doxygen_mcp.server.get_doxygen_executable', side_effect=ValueError("Doxygen is not installed")):
+        result = await check_doxygen_install()
 
-    assert "❌ Doxygen is not installed" in result
+    assert "Doxygen is not installed" in result
 
 @pytest.mark.asyncio
 async def test_generate_documentation_no_doxyfile():
@@ -179,7 +181,7 @@ async def test_generate_documentation_no_doxyfile():
             output_format="html"
         )
 
-        assert "❌ No Doxyfile found" in result
+        assert "[ERROR] No Doxyfile found" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -196,12 +198,13 @@ async def test_generate_documentation_success(mock_exec):
         process.returncode = 0
         mock_exec.return_value = process
 
-        result = await generate_documentation(
-            project_path=temp_dir,
-            output_format="html"
-        )
+        with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+            result = await generate_documentation(
+                project_path=temp_dir,
+                output_format="html"
+            )
 
-        assert "✅ Documentation generated successfully" in result
+        assert "[SUCCESS] Documentation generated successfully" in result
 
 @pytest.mark.asyncio
 async def test_path_traversal_protection():
