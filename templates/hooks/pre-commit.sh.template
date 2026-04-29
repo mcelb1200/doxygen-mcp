@@ -1,0 +1,12 @@
+#!/bin/bash
+# doxygen-mcp: Fast background update for header changes
+HEADERS_CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.h$|\.hpp$' | head -1)
+if [ -n "$HEADERS_CHANGED" ]; then
+    if command -v doxygen &> /dev/null; then
+        if [ -f "Doxyfile.fast" ]; then
+            (doxygen Doxyfile.fast > /dev/null 2>&1 &)
+        else
+            (doxygen Doxyfile > /dev/null 2>&1 &)
+        fi
+    fi
+fi

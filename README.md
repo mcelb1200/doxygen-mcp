@@ -42,13 +42,77 @@ The Doxygen MCP Server bridges the gap between source code and AI understanding.
 
 ## 📦 Installation
 
+### Linux / macOS / WSL (Recommended)
+
+The easiest way to set up the server is using the provided setup script:
+
 ```bash
 # Clone the repository
-git clone (https://github.com/mcelb1200/doxygen-mcp)
+git clone https://github.com/mcelb1200/doxygen-mcp
 cd doxygen-mcp
 
+# Run the setup wizard
+./scripts/setup.sh
+```
+
+### Windows (PowerShell)
+
+```powershell
+.\scripts\setup.ps1
+```
+
+### Manual Installation
+
+```bash
 # Install dependencies
 uv sync
+```
+
+## 🚀 Running the Server
+
+### Using the Run Script (Bash)
+
+```bash
+./scripts/run.sh
+```
+
+### Using uv directly
+
+```bash
+uv run doxygen-mcp
+```
+
+## 📂 Targeting Different Projects
+
+The Doxygen MCP server can be used to document any project on your system.
+
+### 1. Generate Configuration
+
+Use the `config` command with the `--path` flag to generate a configuration for a specific project:
+
+```bash
+uv run doxygen-mcp config --path /path/to/your/project
+```
+
+### 2. Manual Configuration
+
+In your MCP client settings (e.g., Claude Desktop or VS Code), set the following environment variables:
+
+```json
+{
+  "env": {
+    "DOXYGEN_PROJECT_ROOT": "/absolute/path/to/project",
+    "DOXYGEN_ALLOWED_PATHS": "/absolute/path/to/parent,/absolute/path/to/project"
+  }
+}
+```
+
+### 3. Local Runner
+
+You can also use the helper script to run against a different directory:
+
+```bash
+./scripts/run.sh /path/to/your/project
 ```
 
 ## 🔧 Configuration

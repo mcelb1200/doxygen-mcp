@@ -3,8 +3,11 @@ Utility functions for Doxygen MCP context discovery and environment integration.
 """
 
 import os
+import re
 import json
 import asyncio
+import shutil
+import itertools
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -20,9 +23,10 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
         ]
 
     current = start_path.resolve()
-    for parent in [current] + list(current.parents):
+    for parent in itertools.chain([current], current.parents):
+        parent_str = str(parent)
         for marker in markers:
-            if (parent / marker).exists():
+            if os.path.exists(os.path.join(parent_str, marker)):
                 return parent
 
     return current
@@ -91,14 +95,17 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
             is_safe = True
 
     if not is_safe:
-        raise ValueError(f"Security Error: Access denied to path '{requested_path}'. It is outside of allowed project roots.")
+        raise ValueError(
+            f"Security Error: Access denied to path '{requested_path}'. "
+            "It is outside of allowed project roots."
+        )
 
     return requested_path
 
 
-def _detect_primary_language_sync(project_path: Path) -> str:
+def detect_primary_language(project_path: Path) -> str:
     """
-    Synchronous helper to identify the dominant programming language.
+    Identify the dominant programming language in the project to optimize Doxygen settings.
     """
     ext_map = {
         ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp", ".hh": "cpp", ".cxx": "cpp",
@@ -112,31 +119,24 @@ def _detect_primary_language_sync(project_path: Path) -> str:
         ".rs": "rust"
     }
 
-    counts = {}
+    counts: Dict[str, int] = {}
     try:
         # Scan root and one level deep for performance
-        files = list(project_path.glob("*")) + list(project_path.glob("*/*"))
+        # Use itertools.chain to avoid creating a large intermediate list in memory
+        files = itertools.chain(project_path.glob("*"), project_path.glob("*/*"))
         for f in files:
             if f.is_file():
                 ext = f.suffix.lower()
                 if ext in ext_map:
                     lang = ext_map[ext]
                     counts[lang] = counts.get(lang, 0) + 1
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         pass
 
     if not counts:
         return "mixed"
 
-    return max(counts, key=counts.get)
-
-
-async def detect_primary_language(project_path: Path) -> str:
-    """
-    Identify the dominant programming language in the project to optimize Doxygen settings.
-    Offloaded to a thread pool to avoid blocking the event loop.
-    """
-    return await asyncio.to_thread(_detect_primary_language_sync, project_path)
+    return max(counts, key=lambda x: counts.get(x, 0))
 
 def get_project_name(resolved_path: Path) -> str:
     """
@@ -178,16 +178,17 @@ def get_ide_environment() -> Dict[str, Any]:
 
     if is_vscode:
         context["ide"] = "vscode"
-        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or "cursor" in os.environ.get("APP_PATH", "").lower():
+        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or \
+           "cursor" in os.environ.get("APP_PATH", "").lower():
             context["ide"] = "cursor"
 
         # Try to find VS Code settings
         vscode_settings = project_root / ".vscode" / "settings.json"
         if vscode_settings.exists():
             try:
-                with open(vscode_settings, "r") as f:
+                with open(vscode_settings, "r", encoding="utf-8") as f:
                     context["vscode_settings"] = json.load(f)
-            except:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
     # JetBrains detection
@@ -212,37 +213,56 @@ def get_active_context() -> Dict[str, Any]:
 def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
     Synchronous helper for updating .gitignore.
+    Optimized for memory by iterating over lines and reducing return statements.
     """
-    ignore_file = project_root / ".gitignore"
-    new_entry = f"{path_to_ignore}\n"
+    # Validate input to prevent arbitrary file write/traversal in .gitignore
+    if not path_to_ignore or "\n" in path_to_ignore or "\r" in path_to_ignore or ".." in path_to_ignore or not re.match(r"^[a-zA-Z0-9._\-/]+$", path_to_ignore):
+        return False
 
+    # Prevent traversal or absolute paths
+    try:
+        path_obj = Path(path_to_ignore)
+        if path_obj.is_absolute() or ".." in path_obj.parts:
+            return False
+    except Exception:  # pylint: disable=broad-exception-caught
+        return False
+
+    ignore_file = project_root / ".gitignore"
     if ignore_file.is_symlink():
         return False
 
-    # Create file if it doesn't exist
-    if not ignore_file.exists():
-        try:
+    result = False
+    try:
+        if not ignore_file.exists():
             with open(ignore_file, "w", encoding="utf-8") as f:
                 f.write("# Doxygen Generated Documentation Folders\n")
-                f.write(new_entry)
-            return True
-        except Exception:
-            return False
+                f.write(f"{path_to_ignore}\n")
+            result = True
+        else:
+            # Open for reading and appending (r+) to avoid loading everything at once
+            with open(ignore_file, "r+", encoding="utf-8") as f:
+                found = False
+                last_line = ""
+                # Iterate line-by-line to minimize memory footprint
+                for line in f:
+                    if line.strip() == path_to_ignore.strip():
+                        found = True
+                        break
+                    last_line = line
 
-    # Check if already ignored and append if not
-    try:
-        with open(ignore_file, "r+", encoding="utf-8") as f:
-            lines = f.readlines()
-            if any(line.strip() == path_to_ignore.strip() for line in lines):
-                return False
+                if not found:
+                    # Explicitly seek to end of file before writing to ensure correct appending
+                    # across all platforms and Python versions.
+                    f.seek(0, os.SEEK_END)
+                    # Ensure the last line ends with a newline before appending
+                    if last_line and not last_line.endswith("\n"):
+                        f.write("\n")
+                    f.write(f"{path_to_ignore}\n")
+                    result = True
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
 
-            # Ensure the last line ends with a newline before appending
-            if lines and not lines[-1].endswith("\n"):
-                f.write("\n")
-            f.write(new_entry)
-        return True
-    except Exception:
-        return False
+    return result
 
 
 async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
@@ -251,4 +271,30 @@ async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     Offloaded to a thread pool to avoid blocking the event loop.
     Returns True if an entry was added, False otherwise.
     """
+    # pylint: disable=no-member
     return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
+
+def get_doxygen_executable() -> str:
+    """
+    Get and validate the path to the Doxygen executable.
+    Prioritizes DOXYGEN_PATH environment variable, otherwise defaults to 'doxygen' in PATH.
+    @raises ValueError if the executable is not found or is invalid (security check).
+    """
+    doxygen_path = os.environ.get("DOXYGEN_PATH", "doxygen")
+
+    # Resolve the absolute path of the executable
+    resolved_path = shutil.which(doxygen_path)
+    if not resolved_path:
+        raise ValueError(f"Doxygen executable not found: {doxygen_path}")
+
+    # Security check: Ensure we are actually running doxygen
+    # This prevents DOXYGEN_PATH from being used for arbitrary command execution
+    # (e.g., DOXYGEN_PATH=bash)
+    exe_name = Path(resolved_path).name.lower()
+    if exe_name not in ("doxygen", "doxygen.exe"):
+        raise ValueError(
+            f"Security Error: Invalid Doxygen executable name '{exe_name}' "
+            f"at '{resolved_path}'. Only 'doxygen' is allowed."
+        )
+
+    return resolved_path

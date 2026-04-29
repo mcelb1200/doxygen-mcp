@@ -1,14 +1,19 @@
+"""
+Analyze Dependency Injection compliance using Doxygen XML data.
+"""
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
 
 # Add src to path to import DoxygenQueryEngine
 sys.path.append(str(Path("src").resolve()))
+# pylint: disable=import-error
 from doxygen_mcp.query_engine import DoxygenQueryEngine
+# pylint: enable=import-error
 
 # Force UTF-8 output for Windows console redirection
-sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 def is_logic_class(name: str) -> bool:
     """Check if class name suggests it contains business logic."""
@@ -19,6 +24,7 @@ def is_logic_class(name: str) -> bool:
     return any(name.endswith(s) for s in suffixes)
 
 def analyze_di_compliance(xml_dir: str):
+    """Analyze the project for DI compliance and print a report."""
     print("# Dependency Injection Compliance Report")
     print(f"\n**Analysis Target:** `{xml_dir}`")
     engine = DoxygenQueryEngine(xml_dir)
@@ -46,10 +52,11 @@ def analyze_di_compliance(xml_dir: str):
         constructor_args = ""
 
         if constructors:
-            for c in constructors:
-                args = c["args"]
+            for constructor in constructors:
+                args = constructor["args"]
                 constructor_args = args
-                # Heuristic: Check for references (&) or pointers (*) which usually restrict dependencies
+                # Heuristic: Check for references (&) or pointers (*) which
+                # usually restrict dependencies.
                 # And check if it's not just "void" or empty
                 if "&" in args or "*" in args:
                     has_dependencies = True
@@ -61,7 +68,8 @@ def analyze_di_compliance(xml_dir: str):
         if not has_dependencies:
             reason = "No dependencies in constructor"
             if not constructors:
-                 # Check if it has a singleton getInstance, which confirms it's a singleton violating DI
+                # Check if it has a singleton getInstance, which confirms it's
+                # a singleton violating DI
                 if has_get_instance:
                     reason = "Singleton (getInstance found, no public injection)"
                 else:
@@ -84,17 +92,20 @@ def analyze_di_compliance(xml_dir: str):
     print("| :--- | :--- | :---: |")
 
     suspicious_count = 0
-    for c in sorted(flagged_classes, key=lambda x: x['name']):
+    for flagged in sorted(flagged_classes, key=lambda x: x['name']):
         # Filter out some likely false positives or trivial classes if needed
         # For now, print all logic classes without clear dependencies
-        if c["reason"] == "Static Utility Class (likely)":
+        if flagged["reason"] == "Static Utility Class (likely)":
             continue
 
-        singleton_mark = "✅ Yes" if c['has_get_instance'] else "No"
-        print(f"| `{c['name']}` | {c['reason']} | {singleton_mark} |")
+        singleton_mark = "✅ Yes" if flagged['has_get_instance'] else "No"
+        print(f"| `{flagged['name']}` | {flagged['reason']} | {singleton_mark} |")
         suspicious_count += 1
 
-    print(f"\n**Summary:** Found **{suspicious_count}** suspicious classes out of **{len(logic_classes)}** logic classes checked.")
+    print(
+        f"\n**Summary:** Found **{suspicious_count}** suspicious classes "
+        f"out of **{len(logic_classes)}** logic classes checked."
+    )
 
 if __name__ == "__main__":
     if "DOXYGEN_XML_DIR" not in os.environ:

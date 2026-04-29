@@ -1,0 +1,11 @@
+# doxygen-mcp: Fast background update for header changes
+$HeadersChanged = git diff --cached --name-only --diff-filter=ACM | Where-Object { $_ -match '\.h$|\.hpp$' }
+if ($HeadersChanged) {
+    if (Get-Command doxygen -ErrorAction SilentlyContinue) {
+        if (Test-Path "Doxyfile.fast") {
+            Start-Process doxygen -ArgumentList "Doxyfile.fast" -WindowStyle Hidden
+        } else {
+            Start-Process doxygen -ArgumentList "Doxyfile" -WindowStyle Hidden
+        }
+    }
+}

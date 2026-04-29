@@ -1,0 +1,3 @@
+"""
+Mock lxml.etree module.
+"""
