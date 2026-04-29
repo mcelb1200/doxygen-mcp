@@ -26,7 +26,7 @@ def test_create_project_follow_symlinks():
                 follow_symlinks=True
             )
 
-            assert "[SUCCESS] Doxygen project 'Test Symlinks' created successfully" in result
+            assert "✅ Doxygen project 'Test Symlinks' created successfully" in result
 
             doxyfile_path = Path(temp_dir) / "Doxyfile"
             assert doxyfile_path.exists()
@@ -48,7 +48,7 @@ def test_create_project_default_no_symlinks():
                 language="cpp"
             )
 
-            assert "[SUCCESS] Doxygen project 'Test Secure' created successfully" in result
+            assert "✅ Doxygen project 'Test Secure' created successfully" in result
 
             doxyfile_path = Path(temp_dir) / "Doxyfile"
             assert doxyfile_path.exists()

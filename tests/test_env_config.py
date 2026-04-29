@@ -61,7 +61,7 @@ class TestEnvConfig:
                 language="python"
             )
 
-            assert "[SUCCESS] Doxygen project 'Env Project' created successfully" in result
+            assert "✅ Doxygen project 'Env Project' created successfully" in result
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
     @pytest.mark.asyncio
@@ -83,7 +83,7 @@ class TestEnvConfig:
                         # project_path is None
                     )
                 
-                assert "[SUCCESS] Documentation generated successfully" in result
+                assert "✅ Documentation generated successfully" in result
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):
