@@ -519,6 +519,11 @@ async def get_symbol_usage(
 
         output = f"[INFO] Connection Graph for {result['kind']} {result['name']}\n"
         output += "=" * len(output) + "\n\n"
+
+        if result.get("brief"):
+            output += f"Brief: {result['brief']}\n\n"
+        if result.get("detailed"):
+            output += f"Detailed:\n{result['detailed']}\n\n"
         
         if result.get("base_classes"):
             output += f"Inherits from: {', '.join(result['base_classes'])}\n"
