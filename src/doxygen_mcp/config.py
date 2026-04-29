@@ -119,11 +119,25 @@ class DoxygenConfig(BaseModel):
                 if field_type == bool:
                     config_data[field_name] = val.lower() in ("yes", "true", "1")
                 elif field_type == List[str]:
-                    config_data[field_name] = [v.strip() for v in val.split(",")]
+                    config_data[field_name] = [
+                        cls._sanitize_control_chars(v.strip()) for v in val.split(",")
+                    ]
                 else:
-                    config_data[field_name] = val
+                    config_data[field_name] = cls._sanitize_control_chars(val)
 
         return cls(**config_data)
+
+    @staticmethod
+    def _sanitize_control_chars(value: str) -> str:
+        """
+        @brief Replace control characters with spaces.
+        @details Replaces all control characters (except tab) with space to
+        prevent configuration injection and ensure safe string handling.
+        """
+        # Replace all control characters (except tab) with space
+        # This catches \n, \r, \v, \f, etc.
+        # ASCII 0-8, 10-31, 127
+        return re.sub(r'[\x00-\x08\x0a-\x1f\x7f]', ' ', value)
 
     def _sanitize_value(self, value: str) -> str:
         """
@@ -136,12 +150,7 @@ class DoxygenConfig(BaseModel):
         # Escape double quotes
         value = value.replace('"', '\\"')
 
-        # Replace all control characters (except tab) with space
-        # This catches \n, \r, \v, \f, etc.
-        # ASCII 0-8, 10-31, 127
-        value = re.sub(r'[\x00-\x08\x0a-\x1f\x7f]', ' ', value)
-
-        return value
+        return self._sanitize_control_chars(value)
 
     def _sanitize_list(self, values: List[str]) -> List[str]:
         """

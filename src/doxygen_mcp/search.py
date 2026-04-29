@@ -105,9 +105,12 @@ class DoxygenSearchIndex:
             tree = ET.parse(self.index_xml)
             root = tree.getroot()
 
-            if root is not None:
-                for compound in root.findall("compound"):
-                    self._process_compound_element(compound, cursor)
+            if root is None:
+                logger.error("Empty or invalid index.xml in %s", self.xml_dir)
+                return
+
+            for compound in root.findall("compound"):
+                self._process_compound_element(compound, cursor)
         except Exception as e:
             logger.error("Error parsing Doxygen XML for index: %s", e)
 
