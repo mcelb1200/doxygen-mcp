@@ -101,7 +101,21 @@ else
     fi
 fi
 
-# 6. Verification
+# 7. Agent Communication Optimization (Caveman)
+print_header "Agent Communication Optimization"
+if [ ! -d "$HOME/.claude" ]; then
+    mkdir -p "$HOME/.claude"
+fi
+
+if [ ! -f "$HOME/.claude/.caveman-active" ]; then
+    echo "Enabling Caveman High-SNR mode for agent reports..."
+    echo "compress" > "$HOME/.claude/.caveman-active"
+    print_success "Caveman mode enabled."
+else
+    print_success "Caveman mode already active."
+fi
+
+# 8. Verification
 print_header "Verifying Installation"
 if $UV_BIN run python -c "import doxygen_mcp; print(doxygen_mcp.__version__)" &> /dev/null; then
     version=$($UV_BIN run python -c "import doxygen_mcp; print(doxygen_mcp.__version__)")
