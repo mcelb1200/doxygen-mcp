@@ -47,7 +47,7 @@ def test_symlink_protection_doxyfile(tmp_path):
 
         # Mock dependencies
         with patch("doxygen_mcp.server.resolve_project_path", return_value=project_root):
-            with patch("doxygen_mcp.server._update_ignore_file_sync", return_value=True):
+            with patch("doxygen_mcp.server.update_ignore_file", return_value=True):
                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
                     result = await create_doxygen_project("TestProject", str(project_root))
 
@@ -69,7 +69,7 @@ def test_overwrite_protection_doxyfile(tmp_path):
 
         # Mock dependencies
         with patch("doxygen_mcp.server.resolve_project_path", return_value=project_root):
-            with patch("doxygen_mcp.server._update_ignore_file_sync", return_value=True):
+            with patch("doxygen_mcp.server.update_ignore_file", return_value=True):
                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
                     result = await create_doxygen_project("TestProject", str(project_root))
 
