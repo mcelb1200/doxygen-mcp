@@ -17,34 +17,38 @@ def minify_xml_file(filepath):
         root = tree.getroot()
 
         # Tags to completely remove (graphs and redundant lists)
-        tags_to_remove = [
+        tags_to_remove = {
             'collaborationgraph',
             'inheritancegraph',
             'listofallmembers',
             'incdepgraph',
             'invincdepgraph',
             'directorygraph'
-        ]
+        }
+        desc_tags = {'briefdescription', 'detaileddescription'}
 
-        # Remove heavy/low-signal nodes
-        for tag in tags_to_remove:
-            for parent in root.findall(f".//{tag}/.."):
-                for elem in parent.findall(tag):
-                    parent.remove(elem)
+        # Build parent map to allow efficient removal during a single pass
+        parent_map = {c: p for p in root.iter() for c in p}
 
-        # Strip empty detaileddescription or briefdescription
-        for desc_tag in ['briefdescription', 'detaileddescription']:
-            for parent in root.findall(f".//{desc_tag}/.."):
-                for elem in parent.findall(desc_tag):
-                    if len(elem) == 0 and (elem.text is None or elem.text.strip() == ""):
-                        parent.remove(elem)
-
-        # Minify text (collapse whitespace) to save tokens
-        for elem in root.iter():
+        # Single pass to handle removal and text minification
+        for elem in list(root.iter()):
+            # Minify text (collapse whitespace) to save tokens
             if elem.text and not elem.text.strip():
                 elem.text = ""
             if elem.tail and not elem.tail.strip():
                 elem.tail = ""
+
+            tag = elem.tag
+            if tag in tags_to_remove:
+                parent = parent_map.get(elem)
+                if parent is not None:
+                    parent.remove(elem)
+            elif tag in desc_tags:
+                # Strip empty descriptions
+                if len(elem) == 0 and (elem.text is None or elem.text == ""):
+                    parent = parent_map.get(elem)
+                    if parent is not None:
+                        parent.remove(elem)
 
         tree.write(filepath, encoding='utf-8', xml_declaration=True)
         return True
