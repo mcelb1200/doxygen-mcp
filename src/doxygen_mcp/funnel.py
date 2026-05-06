@@ -17,16 +17,14 @@ def minify_xml_file(filepath):
         root = tree.getroot()
 
         # Tags to completely remove (graphs and redundant lists)
-        tags_to_remove = [
+        tags_to_remove = {
             'collaborationgraph',
             'inheritancegraph',
             'listofallmembers',
             'incdepgraph',
             'invincdepgraph',
             'directorygraph'
-        ]
-
-        tags_to_remove = set(tags_to_remove)
+        }
         desc_tags = {'briefdescription', 'detaileddescription'}
 
         # Build parent map to allow efficient removal during a single pass
