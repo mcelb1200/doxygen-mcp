@@ -2,12 +2,13 @@
 High-Resolution Context Funnel for Doxygen XML.
 Standardizes minification and repository onboarding for AI context.
 """
-import os
-import sys
-import xml.etree.ElementTree as ET
-import glob
 import argparse
+import glob
+import os
 import subprocess
+import sys
+
+import defusedxml.ElementTree as ET
 from pathlib import Path
 
 def minify_xml_file(filepath):
@@ -15,40 +16,38 @@ def minify_xml_file(filepath):
     try:
         tree = ET.parse(filepath)
         root = tree.getroot()
+        if root is None:
+            return False
 
         # Tags to completely remove (graphs and redundant lists)
-        tags_to_remove = {
+        tags_to_remove = [
             'collaborationgraph',
             'inheritancegraph',
             'listofallmembers',
             'incdepgraph',
             'invincdepgraph',
             'directorygraph'
-        }
-        desc_tags = {'briefdescription', 'detaileddescription'}
+        ]
 
-        # Build parent map to allow efficient removal during a single pass
-        parent_map = {c: p for p in root.iter() for c in p}
+        # Remove heavy/low-signal nodes
+        for tag in tags_to_remove:
+            for parent in root.findall(f".//{tag}/.."):
+                for elem in parent.findall(tag):
+                    parent.remove(elem)
 
-        # Single pass to handle removal and text minification
-        for elem in list(root.iter()):
-            # Minify text (collapse whitespace) to save tokens
+        # Strip empty detaileddescription or briefdescription
+        for desc_tag in ['briefdescription', 'detaileddescription']:
+            for parent in root.findall(f".//{desc_tag}/.."):
+                for elem in parent.findall(desc_tag):
+                    if len(elem) == 0 and (elem.text is None or elem.text.strip() == ""):
+                        parent.remove(elem)
+
+        # Minify text (collapse whitespace) to save tokens
+        for elem in root.iter():
             if elem.text and not elem.text.strip():
                 elem.text = ""
             if elem.tail and not elem.tail.strip():
                 elem.tail = ""
-
-            tag = elem.tag
-            if tag in tags_to_remove:
-                parent = parent_map.get(elem)
-                if parent is not None:
-                    parent.remove(elem)
-            elif tag in desc_tags:
-                # Strip empty descriptions
-                if len(elem) == 0 and (elem.text is None or elem.text == ""):
-                    parent = parent_map.get(elem)
-                    if parent is not None:
-                        parent.remove(elem)
 
         tree.write(filepath, encoding='utf-8', xml_declaration=True)
         return True
