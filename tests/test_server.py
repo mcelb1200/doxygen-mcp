@@ -22,7 +22,8 @@ from doxygen_mcp.server import (
     create_doxygen_project,
     generate_documentation,
     scan_project,
-    check_doxygen_install
+    check_doxygen_install,
+    ProjectSettings
 )
 from doxygen_mcp.config import DoxygenConfig
 # pylint: enable=import-error
@@ -80,8 +81,10 @@ async def test_create_project_success():
             project_name="Test Project",
             project_path=temp_dir,
             language="cpp",
-            include_subdirs=True,
-            extract_private=False
+            settings=ProjectSettings(
+                include_subdirs=True,
+                extract_private=False
+            )
         )
 
         assert "✅ Doxygen project 'Test Project' created successfully" in result

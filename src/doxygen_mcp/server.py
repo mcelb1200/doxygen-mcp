@@ -23,6 +23,7 @@ except ImportError:
     except ImportError:
         get_package_version = None # type: ignore
 
+from pydantic import BaseModel
 # MCP server imports
 from mcp.server.fastmcp import FastMCP
 from .query_engine import DoxygenQueryEngine
@@ -31,9 +32,9 @@ from .utils import (
     resolve_project_path,
     detect_primary_language,
     get_ide_environment,
-    update_ignore_file,
     get_active_context,
-    get_doxygen_executable
+    get_doxygen_executable,
+    _update_ignore_file_sync
 )
 from .git_tracker import get_file_timeline
 from .funnel import setup_funnel, minify_xml_file
@@ -139,81 +140,102 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Auto-configuration failed: {str(e)}"
 
+class ProjectSettings(BaseModel):
+    """Configuration for a Doxygen project."""
+    include_subdirs: bool = True
+    extract_private: bool = False
+    follow_symlinks: bool = False
+
 def _write_doxyfile_sync(path: Path, content: str) -> None:
     """Helper to write Doxyfile synchronously."""
     with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
+
+def _initialize_project_sync(
+    project_name: str,
+    safe_project_path: Path,
+    language: str,
+    settings: ProjectSettings
+) -> str:
+    """Consolidated synchronous helper to initialize a project."""
+    if safe_project_path.exists() and not safe_project_path.is_dir():
+        return f"❌ Failed to create project: Path exists but is not a directory: {safe_project_path}"
+
+    # Create project directory if it doesn't exist
+    safe_project_path.mkdir(parents=True, exist_ok=True)
+
+    # Create configuration based on language
+    config = DoxygenConfig(
+        project_name=project_name,
+        output_directory=str(safe_project_path / "docs"),
+        input_paths=[str(safe_project_path)],
+        recursive=settings.include_subdirs,
+        extract_private=settings.extract_private,
+        exclude_symlinks=not settings.follow_symlinks
+    )
+
+    # Language-specific optimizations
+    lang_settings: Dict[str, Dict[str, Any]] = {
+        "c": {"optimize_output_for_c": True, "file_patterns": ["*.c", "*.h"]},
+        "cpp": {"file_patterns": ["*.cpp", "*.hpp", "*.cc", "*.hh", "*.cxx", "*.hxx"]},
+        "python": {"optimize_output_java": True, "file_patterns": ["*.py"]},
+        "php": {"file_patterns": ["*.php", "*.php3", "*.inc"]},
+        "java": {"optimize_output_java": True, "file_patterns": ["*.java"]},
+        "csharp": {"file_patterns": ["*.cs"]},
+        "javascript": {"file_patterns": ["*.js", "*.jsx", "*.ts", "*.tsx"]},
+    }
+
+    if language in lang_settings:
+        for key, value in lang_settings[language].items():
+            setattr(config, key, value)
+
+    # Save configuration
+    doxyfile_path = safe_project_path / "Doxyfile"
+
+    if doxyfile_path.is_symlink():
+        return f"❌ Failed to create project: Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
+    if doxyfile_path.exists():
+        return (
+            f"❌ Failed to create project: Doxyfile already exists at {doxyfile_path}. "
+            "Use 'auto_configure' or backup first."
+        )
+
+    _write_doxyfile_sync(doxyfile_path, config.to_doxyfile())
+
+    # Update .gitignore
+    _update_ignore_file_sync(safe_project_path, "docs/")
+
+    return (
+        f"✅ Doxygen project '{project_name}' created successfully "
+        f"at {safe_project_path} (Language: {language})"
+    )
 
 @mcp.tool()
 async def create_doxygen_project(
     project_name: str,
     project_path: Optional[str] = None,
     language: Optional[str] = None,
-    include_subdirs: bool = True,
-    extract_private: bool = False,
-    follow_symlinks: bool = False,
+    settings: Optional[ProjectSettings] = None,
 ) -> str:
-    # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
     """Initialize a new Doxygen documentation project with configuration"""
     try:
+        # Use default settings if not provided
+        if settings is None:
+            settings = ProjectSettings()
+
         # Resolve project path and detect language if not provided
         # pylint: disable=no-member
         safe_project_path = await asyncio.to_thread(resolve_project_path, project_path)
         if language is None:
             language = await asyncio.to_thread(detect_primary_language, safe_project_path)
 
-        if await asyncio.to_thread(safe_project_path.exists) and \
-           not await asyncio.to_thread(safe_project_path.is_dir):
-            return f"❌ Failed to create project: Path exists but is not a directory: {safe_project_path}"
-
-        # Create project directory if it doesn't exist
-        await asyncio.to_thread(safe_project_path.mkdir, parents=True, exist_ok=True)
-
-        # Create configuration based on language
-        config = DoxygenConfig(
-            project_name=project_name,
-            output_directory=str(safe_project_path / "docs"),
-            input_paths=[str(safe_project_path)],
-            recursive=include_subdirs,
-            extract_private=extract_private,
-            exclude_symlinks=not follow_symlinks
-        )
-
-        # Language-specific optimizations
-        lang_settings: Dict[str, Dict[str, Any]] = {
-            "c": {"optimize_output_for_c": True, "file_patterns": ["*.c", "*.h"]},
-            "cpp": {"file_patterns": ["*.cpp", "*.hpp", "*.cc", "*.hh", "*.cxx", "*.hxx"]},
-            "python": {"optimize_output_java": True, "file_patterns": ["*.py"]},
-            "php": {"file_patterns": ["*.php", "*.php3", "*.inc"]},
-            "java": {"optimize_output_java": True, "file_patterns": ["*.java"]},
-            "csharp": {"file_patterns": ["*.cs"]},
-            "javascript": {"file_patterns": ["*.js", "*.jsx", "*.ts", "*.tsx"]},
-        }
-
-        if language in lang_settings:
-            for key, value in lang_settings[language].items():
-                setattr(config, key, value)
-
-        # Save configuration
-        doxyfile_path = safe_project_path / "Doxyfile"
-
-        if await asyncio.to_thread(doxyfile_path.is_symlink):
-            return f"❌ Failed to create project: Security Error: {doxyfile_path} is a symlink. Cannot overwrite."
-        if await asyncio.to_thread(doxyfile_path.exists):
-            return (
-                f"❌ Failed to create project: Doxyfile already exists at {doxyfile_path}. "
-                "Use 'auto_configure' or backup first."
-            )
-
-        # pylint: disable=no-member
-        await asyncio.to_thread(_write_doxyfile_sync, doxyfile_path, config.to_doxyfile())
-
-        # Update .gitignore
-        await update_ignore_file(safe_project_path, "docs/")
-
-        return (
-            f"✅ Doxygen project '{project_name}' created successfully "
-            f"at {safe_project_path} (Language: {language})"
+        # Offload the synchronous initialization logic to a thread pool
+        return await asyncio.to_thread(
+            _initialize_project_sync,
+            project_name,
+            safe_project_path,
+            language,
+            settings
         )
 
     except Exception as e:  # pylint: disable=broad-exception-caught
