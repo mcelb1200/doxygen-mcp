@@ -19,10 +19,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 # pylint: disable=import-error
 import doxygen_mcp.server
 from doxygen_mcp.server import (
-    create_doxygen_project,
-    generate_documentation,
-    scan_project,
-    check_doxygen_install
+    doxy_create,
+    doxy_generate,
+    doxy_scan,
+    doxy_check
 )
 from doxygen_mcp.config import DoxygenConfig
 # pylint: enable=import-error
@@ -76,7 +76,7 @@ class TestDoxygenConfig:
 async def test_create_project_success():
     """Test successful project creation"""
     with tempfile.TemporaryDirectory() as temp_dir:
-        result = await create_doxygen_project(
+        result = await doxy_create(
             project_name="Test Project",
             project_path=temp_dir,
             language="cpp",
@@ -100,7 +100,7 @@ async def test_create_project_success():
 @pytest.mark.asyncio
 async def test_create_project_invalid_path():
     """Test project creation with invalid path"""
-    result = await create_doxygen_project(
+    result = await doxy_create(
         project_name="Test Project",
         project_path="/invalid/path/that/cannot/be/created",
         language="cpp"
@@ -109,9 +109,9 @@ async def test_create_project_invalid_path():
     assert "❌ Failed to create project:" in result
 
 @pytest.mark.asyncio
-async def test_scan_project_nonexistent():
+async def test_doxy_scan_nonexistent():
     """Test scanning a non-existent project"""
-    result = await scan_project(
+    result = await doxy_scan(
         project_path="/nonexistent/path"
     )
 
@@ -119,7 +119,7 @@ async def test_scan_project_nonexistent():
     assert "Security Error" in result
 
 @pytest.mark.asyncio
-async def test_scan_project_success():
+async def test_doxy_scan_success():
     """Test successful project scanning"""
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create some test files
@@ -135,7 +135,7 @@ async def test_scan_project_success():
             file_path = Path(temp_dir) / filename
             file_path.write_text(f"// Test content for {filename}", encoding='utf-8')
 
-        result = await scan_project(
+        result = await doxy_scan(
             project_path=temp_dir
         )
 
@@ -147,7 +147,7 @@ async def test_scan_project_success():
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
-async def test_check_doxygen_install_success(mock_exec):
+async def test_doxy_check_success(mock_exec):
     """Test successful Doxygen installation check"""
     # Create a mock process
     process = MagicMock()
@@ -157,26 +157,26 @@ async def test_check_doxygen_install_success(mock_exec):
     mock_exec.return_value = process
 
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
-        result = await check_doxygen_install()
+        result = await doxy_check()
 
     assert "✅ Doxygen 1.9.4 is installed and working" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
-async def test_check_doxygen_install_not_found(mock_exec):
+async def test_doxy_check_not_found(mock_exec):
     """Test Doxygen not found"""
     mock_exec.side_effect = FileNotFoundError()
 
     with patch('doxygen_mcp.server.get_doxygen_executable', side_effect=ValueError("Doxygen is not installed")):
-        result = await check_doxygen_install()
+        result = await doxy_check()
 
     assert "Doxygen is not installed" in result
 
 @pytest.mark.asyncio
-async def test_generate_documentation_no_doxyfile():
+async def test_doxy_generate_no_doxyfile():
     """Test documentation generation without Doxyfile"""
     with tempfile.TemporaryDirectory() as temp_dir:
-        result = await generate_documentation(
+        result = await doxy_generate(
             project_path=temp_dir,
             output_format="html"
         )
@@ -185,7 +185,7 @@ async def test_generate_documentation_no_doxyfile():
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
-async def test_generate_documentation_success(mock_exec):
+async def test_doxy_generate_success(mock_exec):
     """Test successful documentation generation"""
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a mock Doxyfile
@@ -199,7 +199,7 @@ async def test_generate_documentation_success(mock_exec):
         mock_exec.return_value = process
 
         with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
-            result = await generate_documentation(
+            result = await doxy_generate(
                 project_path=temp_dir,
                 output_format="html"
             )
@@ -219,7 +219,7 @@ async def test_path_traversal_protection():
 
     with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "/app/project"}):
         # This should fail as /etc is not under /app/project
-        result = await create_doxygen_project(
+        result = await doxy_create(
             project_name="Evil",
             project_path="/etc/evil"
         )

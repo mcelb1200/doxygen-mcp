@@ -71,13 +71,13 @@ uv run doxygen-mcp config --gemini
 ## 🛠️ Tools
 | Tool | Purpose |
 |------|---------|
-| `get_context_info` | IDE & root info. |
-| `auto_configure` | Detect lang & init. |
-| `scan_project` | Analyze file types. |
-| `generate_documentation` | Run Doxygen. |
-| `get_project_structure` | Class/namespace map. |
-| `query_project_reference` | Symbol documentation. |
-| `query_active_symbol` | Symbol at cursor info. |
+| `doxy_context` | IDE & root info. |
+| `doxy_config` | Detect lang & init. |
+| `doxy_scan` | Analyze file types. |
+| `doxy_generate` | Run Doxygen. |
+| `doxy_structure` | Class/namespace map. |
+| `doxy_query` | Symbol documentation. |
+| `doxy_active` | Symbol at cursor info. |
 
 ## 🛡️ Security
 - **Path Protection**: Restrict access to project root.

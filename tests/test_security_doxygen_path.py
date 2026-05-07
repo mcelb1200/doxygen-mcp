@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 # pylint: disable=import-error
 from doxygen_mcp.utils import get_doxygen_executable
-from doxygen_mcp.server import check_doxygen_install
+from doxygen_mcp.server import doxy_check
 import doxygen_mcp.server
 # pylint: enable=import-error
 
@@ -71,8 +71,8 @@ async def test_get_doxygen_executable_not_found():
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
-async def test_check_doxygen_install_invalid_version(mock_exec):
-    """Test check_doxygen_install with an unexpected version format"""
+async def test_doxy_check_invalid_version(mock_exec):
+    """Test doxy_check with an unexpected version format"""
     # Create a mock process
     process = MagicMock()
     # Malicious output that doesn't look like a version number
@@ -84,18 +84,18 @@ async def test_check_doxygen_install_invalid_version(mock_exec):
     # We need to mock get_doxygen_executable to return a "valid" path
     # so it passes the name check
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
-        result = await check_doxygen_install()
+        result = await doxy_check()
         assert "❌ Unexpected Doxygen version format" in result
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
-async def test_check_doxygen_install_valid_version(mock_exec):
-    """Test check_doxygen_install with a valid version format"""
+async def test_doxy_check_valid_version(mock_exec):
+    """Test doxy_check with a valid version format"""
     process = MagicMock()
     process.communicate = AsyncMock(return_value=(b"1.9.4\n", b""))
     process.returncode = 0
     mock_exec.return_value = process
 
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
-        result = await check_doxygen_install()
+        result = await doxy_check()
         assert "✅ Doxygen 1.9.4 is installed and working" in result
