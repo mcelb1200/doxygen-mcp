@@ -7,9 +7,9 @@ import glob
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import defusedxml.ElementTree as ET
-from pathlib import Path
 
 def minify_xml_file(filepath):
     """Minifies a Doxygen XML file while preserving AI-critical metadata."""
@@ -32,22 +32,26 @@ def minify_xml_file(filepath):
         # Remove heavy/low-signal nodes
         for tag in tags_to_remove:
             for parent in root.findall(f".//{tag}/.."):
-                for elem in parent.findall(tag):
-                    parent.remove(elem)
+                if parent is not None:
+                    for elem in parent.findall(tag):
+                        parent.remove(elem)
 
         # Strip empty detaileddescription or briefdescription
         for desc_tag in ['briefdescription', 'detaileddescription']:
             for parent in root.findall(f".//{desc_tag}/.."):
-                for elem in parent.findall(desc_tag):
-                    if len(elem) == 0 and (elem.text is None or elem.text.strip() == ""):
-                        parent.remove(elem)
+                if parent is not None:
+                    for elem in parent.findall(desc_tag):
+                        if elem is not None:
+                            if len(elem) == 0 and (elem.text is None or elem.text.strip() == ""):
+                                parent.remove(elem)
 
         # Minify text (collapse whitespace) to save tokens
         for elem in root.iter():
-            if elem.text and not elem.text.strip():
-                elem.text = ""
-            if elem.tail and not elem.tail.strip():
-                elem.tail = ""
+            if elem is not None:
+                if elem.text and not elem.text.strip():
+                    elem.text = ""
+                if elem.tail and not elem.tail.strip():
+                    elem.tail = ""
 
         tree.write(filepath, encoding='utf-8', xml_declaration=True)
         return True
