@@ -85,6 +85,21 @@ async def _get_project_path(project_path: Optional[str] = None) -> Path:
     # pylint: disable=no-member
     return await asyncio.to_thread(resolve_project_path, project_path)
 
+async def _minify_all_xml(xml_dir: str) -> None:
+    """Run SNR filter on all XML files in parallel with bounded concurrency."""
+    xml_files = glob.glob(os.path.join(xml_dir, "*.xml"))
+    if not xml_files:
+        return
+
+    # Use a semaphore to limit the number of concurrent threads to avoid pool exhaustion
+    semaphore = asyncio.Semaphore(10)
+
+    async def _sem_minify(file_path: str) -> bool:
+        async with semaphore:
+            return await asyncio.to_thread(minify_xml_file, file_path)
+
+    await asyncio.gather(*[_sem_minify(f) for f in xml_files])
+
 @mcp.tool()
 async def doxy_context() -> Dict[str, Any]:
     """Get project context, language, and IDE info."""
@@ -583,10 +598,8 @@ async def doxy_refresh(project_path: Optional[str] = None) -> str:
                 shell=False
             )
 
-            # Run SNR filter
-            xml_files = glob.glob(os.path.join(xml_dir, "*.xml"))
-            for f in xml_files:
-                await asyncio.to_thread(minify_xml_file, f)
+            # Run SNR filter in parallel with bounded concurrency
+            await _minify_all_xml(xml_dir)
 
         except Exception as build_err:
             return f"❌ Failed to rebuild Doxygen index: {build_err}"
