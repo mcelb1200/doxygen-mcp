@@ -13,9 +13,9 @@ import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.server import (
-    create_doxygen_project,
-    generate_documentation,
-    query_project_reference
+    doxy_create,
+    doxy_generate,
+    doxy_query
 )
 from doxygen_mcp.utils import resolve_project_path
 # pylint: enable=import-error
@@ -55,7 +55,7 @@ class TestEnvConfig:
     async def test_create_project_with_env(self, temp_project_dir):
         """Test creating project using environment variable for path"""
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            result = await create_doxygen_project(
+            result = await doxy_create(
                 project_name="Env Project",
                 # project_path is None by default
                 language="python"
@@ -79,7 +79,7 @@ class TestEnvConfig:
                 mock_exec.return_value = process
                 
                 with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
-                    result = await generate_documentation(
+                    result = await doxy_generate(
                         # project_path is None
                     )
                 
@@ -104,7 +104,7 @@ class TestEnvConfig:
                 future.set_result(mock_engine)
                 mock_engine_cls.create.return_value = future
 
-                result = await query_project_reference("Test")
+                result = await doxy_query("Test")
 
                 assert "Documentation for class Test" in result
                 mock_engine_cls.create.assert_called_with(str(xml_dir))
@@ -133,7 +133,7 @@ class TestEnvConfig:
                 future.set_result(mock_engine)
                 mock_engine_cls.create.return_value = future
 
-                result = await query_project_reference("Test")
+                result = await doxy_query("Test")
 
                 assert "Documentation for class Test" in result
                 mock_engine_cls.create.assert_called_with(str(xml_dir))

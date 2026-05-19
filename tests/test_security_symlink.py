@@ -9,7 +9,7 @@ import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.utils import _update_ignore_file_sync
-from doxygen_mcp.server import create_doxygen_project
+from doxygen_mcp.server import doxy_create
 # pylint: enable=import-error
 
 def test_symlink_protection_gitignore(tmp_path):
@@ -34,7 +34,7 @@ def test_symlink_protection_gitignore(tmp_path):
 
 def test_symlink_protection_doxyfile(tmp_path):
     """
-    Verify that create_doxygen_project refuses to overwrite a symlinked Doxyfile.
+    Verify that doxy_create refuses to overwrite a symlinked Doxyfile.
     """
     async def run_test():
         project_root = tmp_path
@@ -49,7 +49,7 @@ def test_symlink_protection_doxyfile(tmp_path):
         with patch("doxygen_mcp.server.resolve_project_path", return_value=project_root):
             with patch("doxygen_mcp.server.update_ignore_file", return_value=True):
                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
-                    result = await create_doxygen_project("TestProject", str(project_root))
+                    result = await doxy_create("TestProject", str(project_root))
 
         assert "Security Error" in result, f"Should return security error, got: {result}"
         assert target_file.read_text(encoding='utf-8') == "sensitive data", \
@@ -60,7 +60,7 @@ def test_symlink_protection_doxyfile(tmp_path):
 
 def test_overwrite_protection_doxyfile(tmp_path):
     """
-    Verify that create_doxygen_project refuses to overwrite an existing Doxyfile.
+    Verify that doxy_create refuses to overwrite an existing Doxyfile.
     """
     async def run_test():
         project_root = tmp_path
@@ -71,7 +71,7 @@ def test_overwrite_protection_doxyfile(tmp_path):
         with patch("doxygen_mcp.server.resolve_project_path", return_value=project_root):
             with patch("doxygen_mcp.server.update_ignore_file", return_value=True):
                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
-                    result = await create_doxygen_project("TestProject", str(project_root))
+                    result = await doxy_create("TestProject", str(project_root))
 
         assert "Doxyfile already exists" in result, f"Should return exists error, got: {result}"
         assert doxyfile.read_text(encoding='utf-8') == "existing content", \

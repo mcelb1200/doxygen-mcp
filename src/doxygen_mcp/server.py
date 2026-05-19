@@ -86,10 +86,8 @@ async def _get_project_path(project_path: Optional[str] = None) -> Path:
     return await asyncio.to_thread(resolve_project_path, project_path)
 
 @mcp.tool()
-async def get_context_info() -> Dict[str, Any]:
-    """
-    Get information about the current project context, detected language, and IDE environment.
-    """
+async def doxy_context() -> Dict[str, Any]:
+    """Get project context, language, and IDE info."""
     try:
         # pylint: disable=no-member
         project_path = await asyncio.to_thread(resolve_project_path)
@@ -113,10 +111,8 @@ async def get_context_info() -> Dict[str, Any]:
         return {"error": str(e)}
 
 @mcp.tool()
-async def auto_configure(project_name: Optional[str] = None) -> str:
-    """
-    Automatically detect project settings and create a Doxyfile if one doesn't exist.
-    """
+async def doxy_config(project_name: Optional[str] = None) -> str:
+    """Auto-detect settings and create Doxyfile."""
     try:
         # pylint: disable=no-member
         project_path = await asyncio.to_thread(resolve_project_path)
@@ -129,7 +125,7 @@ async def auto_configure(project_name: Optional[str] = None) -> str:
         if doxyfile_exists:
             return f"✅ Project already configured at {project_path}. Detected language: {language}."
 
-        result = await create_doxygen_project(
+        result = await doxy_create(
             project_name=project_name,
             project_path=str(project_path),
             language=language
@@ -145,7 +141,7 @@ def _write_doxyfile_sync(path: Path, content: str) -> None:
         f.write(content)
 
 @mcp.tool()
-async def create_doxygen_project(
+async def doxy_create(
     project_name: str,
     project_path: Optional[str] = None,
     language: Optional[str] = None,
@@ -154,7 +150,7 @@ async def create_doxygen_project(
     follow_symlinks: bool = False,
 ) -> str:
     # pylint: disable=too-many-arguments, too-many-locals, too-many-positional-arguments
-    """Initialize a new Doxygen documentation project with configuration"""
+    """Init new Doxygen project config."""
     try:
         # Resolve project path and detect language if not provided
         # pylint: disable=no-member
@@ -202,7 +198,7 @@ async def create_doxygen_project(
         if await asyncio.to_thread(doxyfile_path.exists):
             return (
                 f"❌ Failed to create project: Doxyfile already exists at {doxyfile_path}. "
-                "Use 'auto_configure' or backup first."
+                "Use 'doxy_config' or backup first."
             )
 
         # pylint: disable=no-member
@@ -220,12 +216,12 @@ async def create_doxygen_project(
         return f"❌ Failed to create project: {str(e)}"
 
 @mcp.tool()
-async def generate_documentation(
+async def doxy_generate(
     project_path: Optional[str] = None,
     output_format: str = "html",  # pylint: disable=unused-argument
     verbose: bool = False,  # pylint: disable=unused-argument
 ) -> str:
-    """Generate documentation from source code using Doxygen"""
+    """Generate docs using Doxygen."""
     try:
         safe_project_path = await _get_project_path(project_path)
     except ValueError as e:
@@ -234,7 +230,7 @@ async def generate_documentation(
     doxyfile_path = safe_project_path / "Doxyfile"
     doxyfile_exists = await asyncio.to_thread(doxyfile_path.exists)
     if not doxyfile_exists:
-        return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
+        return "❌ No Doxyfile found. Run 'doxy_config' or 'doxy_create' first."
 
     doxygen_exe = get_doxygen_executable()
 
@@ -296,10 +292,10 @@ def _perform_scan(safe_project_path: Path):
     return extensions, total_files
 
 @mcp.tool()
-async def scan_project(
+async def doxy_scan(
     project_path: Optional[str] = None,
 ) -> str:
-    """Analyze project structure and identify documentation opportunities"""
+    """Analyze project structure and files."""
     try:
         safe_project_path = await _get_project_path(project_path)
     except ValueError as e:
@@ -325,9 +321,9 @@ async def scan_project(
     return "\n".join(lines) + "\n"
 
 @mcp.tool()
-async def check_doxygen_install() -> str:
+async def doxy_check() -> str:
     # pylint: disable=too-many-return-statements
-    """Verify that Doxygen is installed and accessible"""
+    """Verify Doxygen installation."""
     try:
         doxygen_exe = get_doxygen_executable()
         if doxygen_exe in _DOXYGEN_VERSION_CACHE:
@@ -369,15 +365,12 @@ async def check_doxygen_install() -> str:
         return f"❌ Error checking Doxygen: {str(e)}"
 
 @mcp.tool()
-async def query_project_reference(
+async def doxy_query(
     symbol_name: Optional[str] = None,
     project_path: Optional[str] = None,
 ) -> str:
     # pylint: disable=too-many-locals
-    """
-    Search for documentation of a specific class, function, or namespace using XML output.
-    If symbol_name is not provided, it attempts to use selected text from the active context.
-    """
+    """Search documentation for a symbol."""
     if not symbol_name:
         context = get_active_context()
         symbol_name = context.get("selected_text")
@@ -435,15 +428,12 @@ async def query_project_reference(
         return f"❌ Error querying symbol: {str(e)}"
 
 @mcp.tool()
-async def semantic_search(
+async def doxy_search(
     query: str,
     limit: int = 5,
     project_path: Optional[str] = None,
 ) -> str:
-    """
-    Perform a semantic search across the Doxygen codebase and architecture specifications.
-    This uses an internal SQLite FTS5 index to find conceptually relevant symbols, classes, and documentation files.
-    """
+    """Semantic search across docs and symbols."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
@@ -483,13 +473,11 @@ async def semantic_search(
         return f"❌ Semantic search failed: {str(e)}"
 
 @mcp.tool()
-async def get_symbol_usage(
+async def doxy_usage(
     symbol_name: str,
     project_path: Optional[str] = None,
 ) -> str:
-    """
-    Get the connection graph for a symbol (what it calls, what calls it, and inheritance).
-    """
+    """Get call graph and inheritance for symbol."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
@@ -532,13 +520,10 @@ async def get_symbol_usage(
         return f"❌ Error querying symbol usage: {str(e)}"
 
 @mcp.tool()
-async def configure_repo_context(
+async def doxy_onboard(
     project_path: Optional[str] = None,
 ) -> str:
-    """
-    Onboard a repository to the High-SNR Context Funnel.
-    Installs Doxyfile.fast and a background post-commit hook.
-    """
+    """Onboard repo to context funnel."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
@@ -553,10 +538,8 @@ async def configure_repo_context(
         return f"❌ Error configuring repository: {str(e)}"
 
 @mcp.tool()
-async def get_project_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Provide a tree-like overview of the project's documented components.
-    """
+async def doxy_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
+    """Get tree overview of documented components."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
@@ -579,10 +562,8 @@ async def get_project_structure(project_path: Optional[str] = None) -> Dict[str,
         return {"error": str(e)}
 
 @mcp.tool()
-async def refresh_index(project_path: Optional[str] = None) -> str:
-    """
-    Trigger a re-scan/parse of Doxygen XML files.
-    """
+async def doxy_refresh(project_path: Optional[str] = None) -> str:
+    """Re-scan and parse Doxygen XML."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
@@ -620,14 +601,12 @@ async def refresh_index(project_path: Optional[str] = None) -> str:
         return f"❌ Error refreshing index: {str(e)}"
 
 @mcp.tool()
-async def get_symbol_at_location(
+async def doxy_at_loc(
     file_path: str,
     line_number: int,
     project_path: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
-    """
-    Find symbol context for the IDE's cursor.
-    """
+    """Find symbol at file/line position."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
@@ -659,11 +638,8 @@ async def get_symbol_at_location(
         return {"error": str(e)}
 
 @mcp.tool()
-async def query_active_symbol(project_path: Optional[str] = None) -> str:
-    """
-    Identify and query documentation for the symbol at the current cursor position.
-    Uses context provided by the MCP client environment (MCP_ACTIVE_FILE, MCP_CURSOR_LINE).
-    """
+async def doxy_active(project_path: Optional[str] = None) -> str:
+    """Query docs for symbol at current cursor."""
     context = get_active_context()
     file_path = context.get("active_file")
     line_str = context.get("cursor_line")
@@ -679,21 +655,19 @@ async def query_active_symbol(project_path: Optional[str] = None) -> str:
     except ValueError:
         return f"❌ Error: Invalid cursor line position: {line_str}"
 
-    symbol = await get_symbol_at_location(file_path, line_number, project_path)
+    symbol = await doxy_at_loc(file_path, line_number, project_path)
 
     if not symbol or (isinstance(symbol, dict) and "error" in symbol):
         return f"⚠️ No symbol found at {file_path}:{line_number}."
 
-    return await query_project_reference(symbol["name"], project_path)
+    return await doxy_query(symbol["name"], project_path)
 
 @mcp.tool()
-async def get_file_structure(
+async def doxy_file_struct(
     file_path: str,
     project_path: Optional[str] = None
 ) -> List[Dict[str, Any]]:
-    """
-    Retrieve all symbols defined in a specific file.
-    """
+    """Retrieve all symbols defined in a file."""
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)

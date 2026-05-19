@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
-from doxygen_mcp.server import create_doxygen_project
+from doxygen_mcp.server import doxy_create
 # pylint: enable=import-error
 
 def run_async(coro):
@@ -19,7 +19,7 @@ def test_create_project_follow_symlinks():
     """Test creating a project with follow_symlinks=True."""
     async def _test():
         with tempfile.TemporaryDirectory() as temp_dir:
-            result = await create_doxygen_project(
+            result = await doxy_create(
                 project_name="Test Symlinks",
                 project_path=temp_dir,
                 language="cpp",
@@ -42,7 +42,7 @@ def test_create_project_default_no_symlinks():
     """Test creating a project with default settings (follow_symlinks=False)."""
     async def _test():
         with tempfile.TemporaryDirectory() as temp_dir:
-            result = await create_doxygen_project(
+            result = await doxy_create(
                 project_name="Test Secure",
                 project_path=temp_dir,
                 language="cpp"

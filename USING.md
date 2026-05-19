@@ -47,8 +47,8 @@ Ask AI:
 
 ## 🛠️ Troubleshooting
 **"Doxygen not found"**: Install Doxygen. Check `doxygen --version`.
-**"No Doxyfile"**: Ask AI: *"Configure project for me"*. Runs `auto_configure`.
-**"Symbol not found"**: Ask AI: *"Refresh index"*. Runs `refresh_index`.
+**"No Doxyfile"**: Ask AI: *"Configure project for me"*. Runs `doxy_config`.
+**"Symbol not found"**: Ask AI: *"Refresh index"*. Runs `doxy_refresh`.
 
 ---
 
