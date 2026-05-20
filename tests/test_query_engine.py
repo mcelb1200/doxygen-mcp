@@ -37,6 +37,8 @@ def engine(xml_dir):  # pylint: disable=redefined-outer-name
 <doxygen>
   <compounddef id="class_test_class" kind="class">
     <compoundname>TestClass</compoundname>
+    <basecompoundref refid="class_base_class" prot="public">BaseClass</basecompoundref>
+    <derivedcompoundref refid="class_derived_class" prot="public">DerivedClass</derivedcompoundref>
     <location file="test_file.h" line="10" column="1"/>
     <briefdescription><para>Brief description.</para></briefdescription>
     <detaileddescription><para>Detailed description with <ref refid="other">link</ref>.</para></detaileddescription>
@@ -47,6 +49,8 @@ def engine(xml_dir):  # pylint: disable=redefined-outer-name
         <argsstring>(int x)</argsstring>
         <location file="test_file.h" line="15" column="5"/>
         <briefdescription><para>Method brief.</para></briefdescription>
+        <references refid="global_func">globalFunc</references>
+        <referencedby refid="other_func">otherFunc</referencedby>
       </memberdef>
     </sectiondef>
   </compounddef>
@@ -259,3 +263,69 @@ def test_list_all_symbols_filtered(engine):  # pylint: disable=redefined-outer-n
     files = engine.list_all_symbols(kind_filter="file")
     assert len(files) == 1
     assert files[0] == "test_file.h"
+
+def test_get_symbol_connections_success(engine):  # pylint: disable=redefined-outer-name
+    """Test successful retrieval of symbol connections."""
+    result = engine.get_symbol_connections("TestClass")
+    assert result is not None
+    assert result["name"] == "TestClass"
+    assert result["kind"] == "class"
+    assert "BaseClass" in result["base_classes"]
+    assert "DerivedClass" in result["derived_classes"]
+    assert len(result["members"]) == 1
+    assert result["members"][0]["name"] == "testMethod"
+    assert "globalFunc" in result["members"][0]["references"]
+    assert "otherFunc" in result["members"][0]["referencedby"]
+
+def test_get_symbol_connections_case_insensitive(engine):  # pylint: disable=redefined-outer-name
+    """Test case-insensitive symbol connection query."""
+    result = engine.get_symbol_connections("testclass")
+    assert result is not None
+    assert result["name"] == "TestClass"
+
+def test_get_symbol_connections_partial(engine):  # pylint: disable=redefined-outer-name
+    """Test partial symbol connection query."""
+    result = engine.get_symbol_connections("Namespace")
+    assert result is not None
+    assert result["name"] == "TestNamespace"
+
+def test_get_symbol_connections_not_found(engine):  # pylint: disable=redefined-outer-name
+    """Test connection query for non-existent symbol."""
+    result = engine.get_symbol_connections("NonExistent")
+    assert result is None
+
+def test_fetch_compound_connections_security_error(engine):  # pylint: disable=redefined-outer-name
+    """Test with a path that triggers the security check."""
+    # pylint: disable=protected-access
+    result = engine._fetch_compound_connections("../outside")
+    assert "error" in result
+    assert "Security Error" in result["error"]
+
+def test_fetch_compound_connections_not_found(engine):  # pylint: disable=redefined-outer-name
+    """Test with a non-existent refid."""
+    # pylint: disable=protected-access
+    result = engine._fetch_compound_connections("nonexistent_refid")
+    assert "error" in result
+    assert "not found" in result["error"]
+
+def test_fetch_compound_connections_malformed(xml_dir, engine):  # pylint: disable=redefined-outer-name
+    """Test with malformed XML."""
+    # Create a malformed compound XML
+    malformed_xml = xml_dir / "malformed_connections.xml"
+    malformed_xml.write_text("invalid xml", encoding='utf-8')
+
+    # pylint: disable=protected-access
+    result = engine._fetch_compound_connections("malformed_connections")
+    assert "error" in result
+    assert "Error parsing" in result["error"]
+
+def test_fetch_compound_connections_no_compounddef(xml_dir, engine):  # pylint: disable=redefined-outer-name
+    """Test with XML missing compounddef."""
+    # Create an XML without compounddef
+    no_compounddef_xml = xml_dir / "no_compounddef.xml"
+    no_compounddef_xml.write_text("<doxygen></doxygen>", encoding='utf-8')
+
+    # pylint: disable=protected-access
+    result = engine._fetch_compound_connections("no_compounddef")
+    assert "error" in result
+    assert "No compounddef found" in result["error"]
