@@ -42,9 +42,7 @@ Use the Doxygen MCP Server to generate documentation:
    {
      "tool": "generate_documentation",
      "arguments": {
-       "project_path": "./examples/cpp_sample",
-       "output_format": "html",
-       "verbose": true
+       "project_path": "./examples/cpp_sample"
      }
    }
    ```
