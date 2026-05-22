@@ -60,7 +60,7 @@ async def test_tools():
             language="python"
         )
 
-        if "✅" in result:
+        if result.success is True:
             print("  Creation: OK")
         else:
             print(f"  Creation: FAILED - {result}")

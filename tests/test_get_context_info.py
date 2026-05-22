@@ -38,12 +38,13 @@ async def test_get_context_info_success():
 
             result = await get_context_info()
 
-            assert result["project_root"] == str(temp_path)
-            assert result["detected_language"] == "python"
-            assert result["ide_environment"]["ide"] == "vscode"
-            assert result["active_context"]["active_file"] == "main.py"
-            assert result["doxygen_status"]["has_doxyfile"] is True
-            assert result["doxygen_status"]["config_path"] == str(doxyfile_path)
+            assert result.success is True
+            assert result.data["project_root"] == str(temp_path)
+            assert result.data["detected_language"] == "python"
+            assert result.data["ide_environment"]["ide"] == "vscode"
+            assert result.data["active_context"]["active_file"] == "main.py"
+            assert result.data["doxygen_status"]["has_doxyfile"] is True
+            assert result.data["doxygen_status"]["config_path"] == str(doxyfile_path)
 
 @pytest.mark.asyncio
 async def test_get_context_info_no_doxyfile():
@@ -60,9 +61,10 @@ async def test_get_context_info_no_doxyfile():
 
             result = await get_context_info()
 
-            assert result["project_root"] == str(temp_path)
-            assert result["doxygen_status"]["has_doxyfile"] is False
-            assert result["doxygen_status"]["config_path"] is None
+            assert result.success is True
+            assert result.data["project_root"] == str(temp_path)
+            assert result.data["doxygen_status"]["has_doxyfile"] is False
+            assert result.data["doxygen_status"]["config_path"] is None
 
 @pytest.mark.asyncio
 async def test_get_context_info_exception():
@@ -70,4 +72,5 @@ async def test_get_context_info_exception():
     with patch("doxygen_mcp.server.resolve_project_path", side_effect=Exception("Test Error")):
         result = await get_context_info()
 
-        assert result == {"error": "Test Error"}
+        assert result.success is False
+        assert result.error == "Test Error"

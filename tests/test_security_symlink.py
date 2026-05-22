@@ -51,7 +51,7 @@ def test_symlink_protection_doxyfile(tmp_path):
                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
                     result = await create_doxygen_project("TestProject", str(project_root))
 
-        assert "Security Error" in result, f"Should return security error, got: {result}"
+        assert "Security Error" in (result.message or result.error or ""), f"Should return security error, got: {result}"
         assert target_file.read_text(encoding='utf-8') == "sensitive data", \
             "Should not modify target file"
 
@@ -73,7 +73,7 @@ def test_overwrite_protection_doxyfile(tmp_path):
                 with patch("doxygen_mcp.server.detect_primary_language", return_value="python"):
                     result = await create_doxygen_project("TestProject", str(project_root))
 
-        assert "Doxyfile already exists" in result, f"Should return exists error, got: {result}"
+        assert "Doxyfile already exists" in (result.message or result.error or ""), f"Should return exists error, got: {result}"
         assert doxyfile.read_text(encoding='utf-8') == "existing content", \
             "Should not modify existing file"
 

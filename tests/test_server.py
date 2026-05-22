@@ -84,7 +84,8 @@ async def test_create_project_success():
             extract_private=False
         )
 
-        assert "✅ Doxygen project 'Test Project' created successfully" in result
+        assert result.success is True
+        assert "[SUCCESS] Doxygen project 'Test Project' created successfully" in (result.message or result.error or "")
 
         # Check if Doxyfile was created
         doxyfile_path = Path(temp_dir) / "Doxyfile"
@@ -106,7 +107,8 @@ async def test_create_project_invalid_path():
         language="cpp"
     )
 
-    assert "❌ Failed to create project:" in result
+    assert result.success is False
+    assert "[ERROR] Failed to create project:" in (result.message or result.error or "")
 
 @pytest.mark.asyncio
 async def test_scan_project_nonexistent():
@@ -116,7 +118,7 @@ async def test_scan_project_nonexistent():
     )
 
     # Path outside allowed roots raises Security Error
-    assert "Security Error" in result
+    assert "Security Error" in (result.message or result.error or "")
 
 @pytest.mark.asyncio
 async def test_scan_project_success():
@@ -139,11 +141,12 @@ async def test_scan_project_success():
             project_path=temp_dir
         )
 
-        assert "📁 Project Scan Results" in result
-        assert "Total Files Found: 5" in result
-        assert ".cpp: 1 files" in result
-        assert ".h: 1 files" in result
-        assert ".py: 1 files" in result
+        assert result.success is True
+        assert "[INFO] Project Scan Results" in result.message
+        assert "Total Files Found: 5" in result.message
+        assert ".cpp: 1 files" in result.message
+        assert ".h: 1 files" in result.message
+        assert ".py: 1 files" in result.message
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -159,7 +162,8 @@ async def test_check_doxygen_install_success(mock_exec):
     with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
         result = await check_doxygen_install()
 
-    assert "✅ Doxygen 1.9.4 is installed and working" in result
+    assert result.success is True
+    assert "[SUCCESS] Doxygen 1.9.4 is installed and working" in (result.message or result.error or "")
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -170,7 +174,7 @@ async def test_check_doxygen_install_not_found(mock_exec):
     with patch('doxygen_mcp.server.get_doxygen_executable', side_effect=ValueError("Doxygen is not installed")):
         result = await check_doxygen_install()
 
-    assert "Doxygen is not installed" in result
+    assert "Doxygen is not installed" in (result.message or result.error or "")
 
 @pytest.mark.asyncio
 async def test_generate_documentation_no_doxyfile():
@@ -181,7 +185,8 @@ async def test_generate_documentation_no_doxyfile():
             output_format="html"
         )
 
-        assert "❌ No Doxyfile found" in result
+        assert result.success is False
+        assert "[ERROR] No Doxyfile found" in (result.message or result.error or "")
 
 @pytest.mark.asyncio
 @patch('asyncio.create_subprocess_exec')
@@ -204,7 +209,8 @@ async def test_generate_documentation_success(mock_exec):
                 output_format="html"
             )
 
-        assert "✅ Documentation generated successfully" in result
+        assert result.success is True
+        assert "[SUCCESS] Documentation generated successfully" in (result.message or result.error or "")
 
 @pytest.mark.asyncio
 async def test_path_traversal_protection():
@@ -223,7 +229,7 @@ async def test_path_traversal_protection():
             project_name="Evil",
             project_path="/etc/evil"
         )
-        assert "Security Error: Access denied" in result
+        assert "Security Error: Access denied" in (result.message or result.error or "")
 
 
 class TestLanguageDetection:

@@ -61,7 +61,8 @@ class TestEnvConfig:
                 language="python"
             )
 
-            assert "✅ Doxygen project 'Env Project' created successfully" in result
+            assert result.success is True
+            assert "[SUCCESS] Doxygen project 'Env Project' created successfully" in (result.message or result.error or "")
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
     @pytest.mark.asyncio
@@ -83,7 +84,8 @@ class TestEnvConfig:
                         # project_path is None
                     )
                 
-                assert "✅ Documentation generated successfully" in result
+                assert result.success is True
+                assert "[SUCCESS] Documentation generated successfully" in (result.message or result.error or "")
 
     @pytest.mark.asyncio
     async def test_query_reference_with_env_xml(self, temp_project_dir):
@@ -106,7 +108,7 @@ class TestEnvConfig:
 
                 result = await query_project_reference("Test")
 
-                assert "Documentation for class Test" in result
+                assert "Documentation for class Test" in (result.message or result.error or "")
                 mock_engine_cls.create.assert_called_with(str(xml_dir))
 
     @pytest.mark.asyncio
@@ -135,5 +137,5 @@ class TestEnvConfig:
 
                 result = await query_project_reference("Test")
 
-                assert "Documentation for class Test" in result
+                assert "Documentation for class Test" in (result.message or result.error or "")
                 mock_engine_cls.create.assert_called_with(str(xml_dir))
