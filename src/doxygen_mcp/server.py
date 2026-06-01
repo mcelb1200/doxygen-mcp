@@ -233,8 +233,6 @@ async def doxy_create(
 @mcp.tool()
 async def doxy_generate(
     project_path: Optional[str] = None,
-    output_format: str = "html",  # pylint: disable=unused-argument
-    verbose: bool = False,  # pylint: disable=unused-argument
 ) -> str:
     """Generate docs using Doxygen."""
     try:

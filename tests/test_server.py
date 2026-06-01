@@ -177,8 +177,7 @@ async def test_doxy_generate_no_doxyfile():
     """Test documentation generation without Doxyfile"""
     with tempfile.TemporaryDirectory() as temp_dir:
         result = await doxy_generate(
-            project_path=temp_dir,
-            output_format="html"
+            project_path=temp_dir
         )
 
         assert "❌ No Doxyfile found" in result
@@ -200,8 +199,7 @@ async def test_doxy_generate_success(mock_exec):
 
         with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
             result = await doxy_generate(
-                project_path=temp_dir,
-                output_format="html"
+                project_path=temp_dir
             )
 
         assert "✅ Documentation generated successfully" in result
