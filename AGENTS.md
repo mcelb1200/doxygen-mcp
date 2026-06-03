@@ -8,11 +8,15 @@ Deep understanding architecture, dependencies, symbols. No raw file read.
 ## 🛠️ Core Tools & Workflow
 
 ### 1. Recon (Low Tokens)
-No `list_files`. Use tools for map:
+No `list_files`. Start with deep context tool:
+
+*   **`generate_context_report`**:
+    *   **Purpose**: Get repository overview, primary language, active git diff, structural stats, and index existence in a single call. Includes timestamped integrity verification hash.
+    *   **Use**: Instantly orient session. Highly compressed.
 
 *   **`doxy_context`**:
     *   **Purpose**: Identify root, language, Doxygen config.
-    *   **Use**: Orient session.
+    *   **Use**: Legacy fallback.
 
 *   **`doxy_scan`**:
     *   **Purpose**: File types and counts.
@@ -49,15 +53,21 @@ IDE (VS Code, Cursor):
 
 ## 💡 Best Practices (Token Save)
 
-1.  **`doxy_query` > `read_file`**:
+1.  **Use `generate_context_report` first**:
+    *   Retrieves project status, language, git diff, and structures in a single call, avoiding multiple tool executions.
+
+2.  **`doxy_query` > `read_file`**:
     *   Raw file = too many tokens.
     *   Query symbol = interface + docs. Enough.
 
-2.  **`doxy_structure` to navigate**:
+3.  **`doxy_structure` to navigate**:
     *   No path guess. Use map find file.
 
-3.  **Check `doxygen_status`**:
-    *   If `doxy_context` shows `has_doxyfile: false`, run `doxy_config`. Need index.
+4.  **Automatic Output Compression (Token Crusher)**:
+    *   MCP server outputs are automatically compressed in caveman style (fluff stripped, synonyms used) to save context tokens. No agent action needed.
+
+5.  **Check `doxygen_status`**:
+    *   If Doxygen index not found, run `doxy_config` and `doxy_generate` first.
 
 ## 🔄 Example Workflow
 

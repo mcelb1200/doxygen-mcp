@@ -34,6 +34,11 @@ Default: current dir. Other project:
 **Method C (Env Vars):**
 Set `DOXYGEN_PROJECT_ROOT` & `DOXYGEN_ALLOWED_PATHS`.
 
+### 🗜️ Token Compression & HTML Reviews
+* **Token Crusher Middleware**: Output text is automatically compressed by default to save token costs. To bypass and receive raw outputs, set:
+  `export DOXYGEN_COMPRESS_OUTPUT=false`
+* **Visual Architecture Reviews**: Trigger `generate_architecture_review` to generate a local HTML report. It automatically opens in your web browser. Includes class structures, coupling, and Mermaid diagrams. Each report is timestamped and cryptographically verified.
+
 ---
 
 ## 🤖 Usage (AI Questions)

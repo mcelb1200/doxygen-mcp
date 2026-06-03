@@ -78,6 +78,11 @@ uv run doxygen-mcp config --gemini
 | `doxy_structure` | Class/namespace map. |
 | `doxy_query` | Symbol documentation. |
 | `doxy_active` | Symbol at cursor info. |
+| `generate_context_report` | Multi-source LLM context report (git, diff, layout). |
+| `generate_architecture_review` | Visual HTML review. Opens browser. |
+
+## ⚙️ Configuration Options
+* **`DOXYGEN_COMPRESS_OUTPUT`**: Toggle global output token compression (Token Crusher Middleware). Defaults to `true`. Set to `false` in local env config to disable compression.
 
 ## 🛡️ Security
 - **Path Protection**: Restrict access to project root.

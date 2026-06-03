@@ -23,6 +23,13 @@ except ImportError:
     except ImportError:
         get_package_version = None # type: ignore
 
+try:
+    import watchdog.events
+    import watchdog.observers
+    HAS_WATCHDOG = True
+except ImportError:
+    HAS_WATCHDOG = False
+
 # MCP server imports
 from mcp.server.fastmcp import FastMCP
 from .query_engine import DoxygenQueryEngine
@@ -44,8 +51,73 @@ logger = logging.getLogger("doxygen-mcp")
 
 mcp = FastMCP("Doxygen")
 
+# Global Output Compression (Token Crusher Middleware)
+from functools import wraps
+from .caveman import compress_payload
+
+is_pytest = "pytest" in sys.modules
+compress_env_val = os.environ.get("DOXYGEN_COMPRESS_OUTPUT")
+if compress_env_val is not None:
+    SHOULD_COMPRESS = compress_env_val.lower() not in ("false", "0", "no", "off")
+else:
+    SHOULD_COMPRESS = not is_pytest
+
+original_tool = mcp.tool
+
+def token_crusher_tool(*args, **kwargs):
+    def decorator(func):
+        if not SHOULD_COMPRESS:
+            return original_tool(*args, **kwargs)(func)
+
+        if asyncio.iscoroutinefunction(func):
+            @wraps(func)
+            async def async_wrapper(*f_args, **f_kwargs):
+                res = await func(*f_args, **f_kwargs)
+                return compress_payload(res)
+            return original_tool(*args, **kwargs)(async_wrapper)
+        else:
+            @wraps(func)
+            def sync_wrapper(*f_args, **f_kwargs):
+                res = func(*f_args, **f_kwargs)
+                return compress_payload(res)
+            return original_tool(*args, **kwargs)(sync_wrapper)
+    return decorator
+
+mcp.tool = token_crusher_tool
+
 # Cache for Doxygen version check
 _DOXYGEN_VERSION_CACHE: Dict[str, str] = {}
+
+if HAS_WATCHDOG:
+    class DoxygenConfigWatcher(watchdog.events.FileSystemEventHandler):
+        def on_modified(self, event):
+            global _DOXYGEN_VERSION_CACHE
+            if not event.is_directory:
+                src_name = os.path.basename(event.src_path)
+                if src_name == 'Doxyfile' or 'doxygen' in src_name.lower():
+                    _DOXYGEN_VERSION_CACHE.clear()
+else:
+    class DoxygenConfigWatcher:  # type: ignore
+        pass
+
+_watcher_started = False
+def start_watchdog():
+    global _watcher_started
+    if _watcher_started or not HAS_WATCHDOG:
+        return
+    _watcher_started = True
+    try:
+        # Use daemon=True observer to not block main thread exit
+        observer = watchdog.observers.Observer()
+        observer.daemon = True
+        event_handler = DoxygenConfigWatcher()
+        # Watch only current directory non-recursively for Doxyfile updates
+        observer.schedule(event_handler, path='.', recursive=False)
+        observer.start()
+    except Exception as e:
+        logger.warning("Failed to start Doxyfile watchdog: %s", e)
+
+start_watchdog()
 
 # Common directories to skip for performance during filesystem scans
 SCAN_SKIP_DIRS = {
@@ -101,7 +173,7 @@ async def _minify_all_xml(xml_dir: str) -> None:
     await asyncio.gather(*[_sem_minify(f) for f in xml_files])
 
 @mcp.tool()
-async def doxy_context() -> Dict[str, Any]:
+async def get_context_info() -> Dict[str, Any]:
     """Get project context, language, and IDE info."""
     try:
         # pylint: disable=no-member
@@ -125,8 +197,13 @@ async def doxy_context() -> Dict[str, Any]:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return {"error": str(e)}
 
+@mcp.tool(name="doxy_context")
+async def doxy_context() -> Dict[str, Any]:
+    """Legacy wrapper for get_context_info."""
+    return await get_context_info()
+
 @mcp.tool()
-async def doxy_config(project_name: Optional[str] = None) -> str:
+async def auto_configure(project_name: Optional[str] = None) -> str:
     """Auto-detect settings and create Doxyfile."""
     try:
         # pylint: disable=no-member
@@ -140,7 +217,7 @@ async def doxy_config(project_name: Optional[str] = None) -> str:
         if doxyfile_exists:
             return f"✅ Project already configured at {project_path}. Detected language: {language}."
 
-        result = await doxy_create(
+        result = await create_doxygen_project(
             project_name=project_name,
             project_path=str(project_path),
             language=language
@@ -150,13 +227,18 @@ async def doxy_config(project_name: Optional[str] = None) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Auto-configuration failed: {str(e)}"
 
+@mcp.tool(name="doxy_config")
+async def doxy_config(project_name: Optional[str] = None) -> str:
+    """Legacy wrapper for auto_configure."""
+    return await auto_configure(project_name)
+
 def _write_doxyfile_sync(path: Path, content: str) -> None:
     """Helper to write Doxyfile synchronously."""
     with open(path, 'w', encoding='utf-8') as f:
         f.write(content)
 
 @mcp.tool()
-async def doxy_create(
+async def create_doxygen_project(
     project_name: str,
     project_path: Optional[str] = None,
     language: Optional[str] = None,
@@ -230,8 +312,27 @@ async def doxy_create(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Failed to create project: {str(e)}"
 
+@mcp.tool(name="doxy_create")
+async def doxy_create(
+    project_name: str,
+    project_path: Optional[str] = None,
+    language: Optional[str] = None,
+    include_subdirs: bool = True,
+    extract_private: bool = False,
+    follow_symlinks: bool = False,
+) -> str:
+    """Legacy wrapper for create_doxygen_project."""
+    return await create_doxygen_project(
+        project_name=project_name,
+        project_path=project_path,
+        language=language,
+        include_subdirs=include_subdirs,
+        extract_private=extract_private,
+        follow_symlinks=follow_symlinks
+    )
+
 @mcp.tool()
-async def doxy_generate(
+async def generate_documentation(
     project_path: Optional[str] = None,
 ) -> str:
     """Generate docs using Doxygen."""
@@ -243,7 +344,7 @@ async def doxy_generate(
     doxyfile_path = safe_project_path / "Doxyfile"
     doxyfile_exists = await asyncio.to_thread(doxyfile_path.exists)
     if not doxyfile_exists:
-        return "❌ No Doxyfile found. Run 'doxy_config' or 'doxy_create' first."
+        return "❌ No Doxyfile found. Run 'auto_configure' or 'create_doxygen_project' first."
 
     doxygen_exe = get_doxygen_executable()
 
@@ -284,6 +385,13 @@ async def doxy_generate(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Error generating documentation: {str(e)}"
 
+@mcp.tool(name="doxy_generate")
+async def doxy_generate(
+    project_path: Optional[str] = None,
+) -> str:
+    """Legacy wrapper for generate_documentation."""
+    return await generate_documentation(project_path)
+
 def _perform_scan(safe_project_path: Path):
     """Sync helper to scan the filesystem without blocking the event loop"""
     extensions: Dict[str, int] = {}
@@ -305,7 +413,7 @@ def _perform_scan(safe_project_path: Path):
     return extensions, total_files
 
 @mcp.tool()
-async def doxy_scan(
+async def scan_project(
     project_path: Optional[str] = None,
 ) -> str:
     """Analyze project structure and files."""
@@ -333,8 +441,15 @@ async def doxy_scan(
 
     return "\n".join(lines) + "\n"
 
+@mcp.tool(name="doxy_scan")
+async def doxy_scan(
+    project_path: Optional[str] = None,
+) -> str:
+    """Legacy wrapper for scan_project."""
+    return await scan_project(project_path)
+
 @mcp.tool()
-async def doxy_check() -> str:
+async def check_doxygen_install() -> str:
     # pylint: disable=too-many-return-statements
     """Verify Doxygen installation."""
     try:
@@ -377,8 +492,13 @@ async def doxy_check() -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Error checking Doxygen: {str(e)}"
 
+@mcp.tool(name="doxy_check")
+async def doxy_check() -> str:
+    """Legacy wrapper for check_doxygen_install."""
+    return await check_doxygen_install()
+
 @mcp.tool()
-async def doxy_query(
+async def query_project_reference(
     symbol_name: Optional[str] = None,
     project_path: Optional[str] = None,
 ) -> str:
@@ -440,8 +560,16 @@ async def doxy_query(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Error querying symbol: {str(e)}"
 
+@mcp.tool(name="doxy_query")
+async def doxy_query(
+    symbol_name: Optional[str] = None,
+    project_path: Optional[str] = None,
+) -> str:
+    """Legacy wrapper for query_project_reference."""
+    return await query_project_reference(symbol_name, project_path)
+
 @mcp.tool()
-async def doxy_search(
+async def semantic_search(
     query: str,
     limit: int = 5,
     project_path: Optional[str] = None,
@@ -485,8 +613,17 @@ async def doxy_search(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Semantic search failed: {str(e)}"
 
+@mcp.tool(name="doxy_search")
+async def doxy_search(
+    query: str,
+    limit: int = 5,
+    project_path: Optional[str] = None,
+) -> str:
+    """Legacy wrapper for semantic_search."""
+    return await semantic_search(query, limit, project_path)
+
 @mcp.tool()
-async def doxy_usage(
+async def get_symbol_usage(
     symbol_name: str,
     project_path: Optional[str] = None,
 ) -> str:
@@ -533,7 +670,7 @@ async def doxy_usage(
         return f"❌ Error querying symbol usage: {str(e)}"
 
 @mcp.tool()
-async def doxy_onboard(
+async def configure_repo_context(
     project_path: Optional[str] = None,
 ) -> str:
     """Onboard repo to context funnel."""
@@ -550,8 +687,15 @@ async def doxy_onboard(
     except Exception as e:
         return f"❌ Error configuring repository: {str(e)}"
 
+@mcp.tool(name="doxy_onboard")
+async def doxy_onboard(
+    project_path: Optional[str] = None,
+) -> str:
+    """Legacy wrapper for configure_repo_context."""
+    return await configure_repo_context(project_path)
+
 @mcp.tool()
-async def doxy_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
+async def get_project_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
     """Get tree overview of documented components."""
     try:
         # pylint: disable=no-member
@@ -574,8 +718,13 @@ async def doxy_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return {"error": str(e)}
 
+@mcp.tool(name="doxy_structure")
+async def doxy_structure(project_path: Optional[str] = None) -> Dict[str, Any]:
+    """Legacy wrapper for get_project_structure."""
+    return await get_project_structure(project_path)
+
 @mcp.tool()
-async def doxy_refresh(project_path: Optional[str] = None) -> str:
+async def refresh_index(project_path: Optional[str] = None) -> str:
     """Re-scan and parse Doxygen XML."""
     try:
         # pylint: disable=no-member
@@ -611,8 +760,13 @@ async def doxy_refresh(project_path: Optional[str] = None) -> str:
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Error refreshing index: {str(e)}"
 
+@mcp.tool(name="doxy_refresh")
+async def doxy_refresh(project_path: Optional[str] = None) -> str:
+    """Legacy wrapper for refresh_index."""
+    return await refresh_index(project_path)
+
 @mcp.tool()
-async def doxy_at_loc(
+async def get_symbol_at_location(
     file_path: str,
     line_number: int,
     project_path: Optional[str] = None
@@ -648,8 +802,17 @@ async def doxy_at_loc(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return {"error": str(e)}
 
+@mcp.tool(name="doxy_at_loc")
+async def doxy_at_loc(
+    file_path: str,
+    line_number: int,
+    project_path: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """Legacy wrapper for get_symbol_at_location."""
+    return await get_symbol_at_location(file_path, line_number, project_path)
+
 @mcp.tool()
-async def doxy_active(project_path: Optional[str] = None) -> str:
+async def query_active_symbol(project_path: Optional[str] = None) -> str:
     """Query docs for symbol at current cursor."""
     context = get_active_context()
     file_path = context.get("active_file")
@@ -666,15 +829,20 @@ async def doxy_active(project_path: Optional[str] = None) -> str:
     except ValueError:
         return f"❌ Error: Invalid cursor line position: {line_str}"
 
-    symbol = await doxy_at_loc(file_path, line_number, project_path)
+    symbol = await get_symbol_at_location(file_path, line_number, project_path)
 
     if not symbol or (isinstance(symbol, dict) and "error" in symbol):
         return f"⚠️ No symbol found at {file_path}:{line_number}."
 
-    return await doxy_query(symbol["name"], project_path)
+    return await query_project_reference(symbol["name"], project_path)
+
+@mcp.tool(name="doxy_active")
+async def doxy_active(project_path: Optional[str] = None) -> str:
+    """Legacy wrapper for query_active_symbol."""
+    return await query_active_symbol(project_path)
 
 @mcp.tool()
-async def doxy_file_struct(
+async def get_file_structure(
     file_path: str,
     project_path: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -692,6 +860,150 @@ async def doxy_file_struct(
         return await asyncio.to_thread(engine.get_file_structure, file_path)
     except Exception as e:  # pylint: disable=broad-exception-caught
         return [{"error": str(e)}]
+
+@mcp.tool(name="doxy_file_struct")
+async def doxy_file_struct(
+    file_path: str,
+    project_path: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Legacy wrapper for get_file_structure."""
+    return await get_file_structure(file_path, project_path)
+
+async def _get_git_diff(cwd: Path) -> str:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "git", "diff", "HEAD",
+            cwd=str(cwd),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        return stdout.decode(errors="replace")
+    except Exception:
+        return ""
+
+@mcp.tool()
+async def generate_architecture_review(project_path: Optional[str] = None) -> str:
+    """Generate visual HTML review of codebase architecture."""
+    import tempfile
+    import time
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        if not xml_dir:
+            return "❌ Error: Doxygen XML not found. Generate documentation first using 'doxy_generate'."
+
+        from .reporter import generate_report_html
+        
+        # Run report generator in a thread
+        html_content = await asyncio.to_thread(generate_report_html, resolved_path, xml_dir)
+        
+        # Write to temp file
+        temp_dir = tempfile.gettempdir()
+        filename = f"architecture-review-{int(time.time())}.html"
+        file_path = os.path.join(temp_dir, filename)
+        
+        await asyncio.to_thread(lambda: Path(file_path).write_text(html_content, encoding="utf-8"))
+        
+        # Open in browser asynchronously
+        def _open():
+            try:
+                import sys
+                if sys.platform.startswith('linux'):
+                    subprocess.Popen(['xdg-open', file_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                elif sys.platform == 'darwin':
+                    subprocess.Popen(['open', file_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                elif sys.platform == 'win32':
+                    os.startfile(file_path)
+            except Exception as err:
+                logger.warning("Could not open browser: %s", err)
+                
+        await asyncio.to_thread(_open)
+        
+        return f"✅ Architecture review generated at {file_path} and opened in browser."
+    except Exception as e:
+        return f"❌ Failed to generate architecture review: {str(e)}"
+
+@mcp.tool()
+async def generate_context_report(project_path: Optional[str] = None) -> str:
+    """Generate deep token-efficient context report for LLM ingestion."""
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        # Get primary language
+        language = await asyncio.to_thread(detect_primary_language, resolved_path)
+        
+        # Get active git diff
+        diff_text = await _get_git_diff(resolved_path)
+        if diff_text:
+            diff_text = diff_text[:5000] # Limit size to avoid blowup
+        else:
+            diff_text = "No active changes."
+            
+        # Get project structure summary
+        class_list, ns_list, file_list = [], [], []
+        if xml_dir:
+            engine = await DoxygenQueryEngine.create(xml_dir)
+            class_list = engine.list_all_symbols(kind_filter="class")
+            ns_list = engine.list_all_symbols(kind_filter="namespace")
+            file_list = engine.list_all_symbols(kind_filter="file")
+            
+        # Build timeline summary of recent active files
+        recent_changes = []
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "git", "status", "--porcelain",
+                cwd=str(resolved_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await proc.communicate()
+            status_lines = stdout.decode().splitlines()
+            for line in status_lines[:10]:
+                recent_changes.append(line.strip())
+        except Exception:
+            pass
+            
+        from .reporter import get_git_version
+        import hashlib
+        import datetime
+        
+        version = await asyncio.to_thread(get_git_version, resolved_path)
+        date_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        
+        hasher = hashlib.sha256()
+        hasher.update(f"{date_str}:{version}".encode("utf-8"))
+        verification_hash = hasher.hexdigest()[:16]
+            
+        lines = [
+            f"# Context Report: {resolved_path.name}",
+            f"Project Path: {resolved_path}",
+            f"Primary Language: {language}",
+            f"Doxygen Index: {'Found' if xml_dir else 'Not found'}",
+            f"Generated: {date_str}",
+            f"Version: {version[:12]}",
+            f"Verification Hash: {verification_hash}",
+            "",
+            "## Git Status",
+            "\n".join(recent_changes) if recent_changes else "No untracked or modified files.",
+            "",
+            "## Structural Summary",
+            f"Classes ({len(class_list)}): {', '.join(class_list[:15])}{'...' if len(class_list) > 15 else ''}",
+            f"Namespaces ({len(ns_list)}): {', '.join(ns_list[:15])}{'...' if len(ns_list) > 15 else ''}",
+            f"Files ({len(file_list)}): {', '.join(file_list[:15])}{'...' if len(file_list) > 15 else ''}",
+            "",
+            "## Git Diff (HEAD)",
+            "```diff",
+            diff_text,
+            "```"
+        ]
+        
+        return "\n".join(lines)
+    except Exception as e:
+        return f"❌ Failed to generate context report: {str(e)}"
 
 def generate_config(args):
     """Generate MCP configuration for various clients."""
