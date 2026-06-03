@@ -137,6 +137,7 @@ class DoxygenSearchIndex:
     def _ingest_broader_context(self, cursor):
         """Scan repository for documentation files and ingest them."""
         ignore_dirs = {".git", "build", "node_modules", "html", "latex", ".venv", "__pycache__"}
+        batch = []
 
         for root, dirs, files in os.walk(self.repo_root):
             dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith('.')]
@@ -144,24 +145,29 @@ class DoxygenSearchIndex:
             for file in files:
                 ext = Path(file).suffix.lower()
                 if ext in {'.md', '.yaml', '.yml', '.txt'}:
-                    self._ingest_file(cursor, root, file)
+                    result = self._ingest_file(root, file)
+                    if result:
+                        batch.append(result)
 
-    def _ingest_file(self, cursor, root, file):
-        """Ingest a single documentation file into the index."""
+        if batch:
+            cursor.executemany(
+                "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                batch
+            )
+
+    def _ingest_file(self, root, file):
+        """Process a single documentation file for the index."""
         filepath = Path(root) / file
         try:
             rel_path = filepath.relative_to(self.repo_root)
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            cursor.execute(
-                "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (file, "documentation", "file_context", "Repository Specification/Documentation",
-                 content, str(rel_path))
-            )
+            return (file, "documentation", "file_context", "Repository Specification/Documentation",
+                    content, str(rel_path))
         except Exception:
-            pass
+            return None
 
     def search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
         """Perform a semantic search using SQLite FTS5."""
