@@ -1,3 +1,6 @@
+# Inspired by and adapted from the "caveman" productivity skill by Matt Pocock (MIT License)
+# Copyright (c) 2026 Matt Pocock
+
 import re
 from functools import wraps
 from typing import Any

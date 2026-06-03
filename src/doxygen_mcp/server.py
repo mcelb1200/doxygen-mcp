@@ -1005,6 +1005,68 @@ async def generate_context_report(project_path: Optional[str] = None) -> str:
     except Exception as e:
         return f"❌ Failed to generate context report: {str(e)}"
 
+@mcp.tool()
+async def find_doc_gaps(project_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Scan codebase for undocumented symbols."""
+    try:
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        language = await asyncio.to_thread(detect_primary_language, resolved_path)
+        
+        if language == "python":
+            from .auditor import audit_python_files
+            return await asyncio.to_thread(audit_python_files, resolved_path)
+            
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        if not xml_dir:
+            return [{"error": "Doxygen XML not found. Generate documentation first."}]
+            
+        from .auditor import audit_doxygen_gaps
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        return await asyncio.to_thread(audit_doxygen_gaps, engine, resolved_path)
+    except Exception as e:
+        return [{"error": str(e)}]
+        
+@mcp.tool(name="doxy_doc_gaps")
+async def doxy_doc_gaps(project_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Legacy wrapper for find_doc_gaps."""
+    return await find_doc_gaps(project_path)
+
+@mcp.tool()
+async def find_binary_gaps(project_path: Optional[str] = None) -> Dict[str, Any]:
+    """Scan build objects for compiled symbol gaps."""
+    try:
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        
+        from .auditor import find_nm_tool, find_build_dir, scan_binary_gaps
+        
+        nm_tool = find_nm_tool()
+        if not nm_tool:
+            return {
+                "error": "Binary dependency 'nm' or 'llvm-nm' not found in PATH.",
+                "remediation": "Install binutils/llvm or configure DOXYGEN_NM_PATH environment variable."
+            }
+            
+        build_dir = find_build_dir(resolved_path)
+        if not build_dir:
+            return {
+                "error": "Build directory not found.",
+                "remediation": "Configure DOXYGEN_BUILD_DIR environment variable pointing to compiled object files."
+            }
+            
+        gaps = await asyncio.to_thread(scan_binary_gaps, nm_tool, build_dir)
+        return {
+            "nm_tool": nm_tool,
+            "build_directory": str(build_dir),
+            "gaps": gaps
+        }
+    except Exception as e:
+        return {"error": str(e)}
+        
+@mcp.tool(name="doxy_binary_gaps")
+async def doxy_binary_gaps(project_path: Optional[str] = None) -> Dict[str, Any]:
+    """Legacy wrapper for find_binary_gaps."""
+    return await find_binary_gaps(project_path)
+
 def generate_config(args):
     """Generate MCP configuration for various clients."""
     script_path = Path(__file__).resolve()

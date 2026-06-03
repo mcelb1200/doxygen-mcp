@@ -51,6 +51,17 @@ IDE (VS Code, Cursor):
     *   **Purpose**: Document symbol at cursor.
     *   **Use**: "What this do?" or "Explain code".
 
+### 5. Gap Audits
+Auditing codebase state and stubs:
+
+*   **`doxy_doc_gaps`**:
+    *   **Purpose**: Identify undocumented public classes and functions (uses native Python AST parser for Python codebases).
+    *   **Use**: Quickly find missing docs.
+
+*   **`doxy_binary_gaps`**:
+    *   **Purpose**: Identify compiled symbol stubs by matching compiler undefined references with headers.
+    *   **Use**: Check for missing implementation parts.
+
 ## 💡 Best Practices (Token Save)
 
 1.  **Use `generate_context_report` first**:

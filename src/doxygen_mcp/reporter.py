@@ -1,3 +1,6 @@
+# Inspired by and adapted from the "improve-codebase-architecture" engineering skill by Matt Pocock (MIT License)
+# Copyright (c) 2026 Matt Pocock
+
 import datetime
 import html
 import os

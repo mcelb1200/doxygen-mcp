@@ -80,9 +80,13 @@ uv run doxygen-mcp config --gemini
 | `doxy_active` | Symbol at cursor info. |
 | `generate_context_report` | Multi-source LLM context report (git, diff, layout). |
 | `generate_architecture_review` | Visual HTML review. Opens browser. |
+| `doxy_doc_gaps` | Scan codebase for undocumented symbols (uses AST for Python). |
+| `doxy_binary_gaps` | Scan build objects for compiled symbol gaps. |
 
 ## ⚙️ Configuration Options
 * **`DOXYGEN_COMPRESS_OUTPUT`**: Toggle global output token compression (Token Crusher Middleware). Defaults to `true`. Set to `false` in local env config to disable compression.
+* **`DOXYGEN_NM_PATH`**: Explicit path to `nm`/`llvm-nm` executable for linkage audits.
+* **`DOXYGEN_BUILD_DIR`**: Path containing compiled object files (`.o`, `.obj`) to scan.
 
 ## 🛡️ Security
 - **Path Protection**: Restrict access to project root.
