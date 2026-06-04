@@ -87,20 +87,35 @@ Auditing codebase state and stubs:
 
 ## 💡 Best Practices (Token Save)
 
+### 📊 Refactoring & Debugging Tool Selection Matrix
+
+| Scenario / Goal | Recommended Tool | Rationale & Token Saving |
+| :--- | :--- | :--- |
+| **Mechanical Refactoring** (e.g. Renaming variables/methods) | `doxy_references` | Returns a flat list of precise file + line matches instead of parsing full file contents. |
+| **Rename Impact Assessment** (e.g. Renaming APIs or classes) | `doxy_rename_impact` | Traces callers, definition sites, and subclass hierarchy to pinpoint contract breakages. |
+| **Verification of Active Edits** (Working tree vs Index) | `doxy_virtual_diff` | Instantly lists signature changes (added/removed/modified) without re-running full indexing. |
+| **Structural File Inspection** (Class/methods overview) | `doxy_skeleton` | Returns class/function signatures with method bodies replaced with `pass` / `/* stub */`, saving massive token context. |
+| **Debugging Stack Traces / Flows** (Chronological tracing) | `doxy_trace_path` | Recursively walks the call graph from an entry point and chains relevant code snippets sequentially. |
+| **State Out of Date Mid-Refactor** (Update index for file) | `doxy_refresh_delta` | Incrementally refreshes the XML index for a single file or directory in under a second. |
+| **Code Review / Compliance** (Parameter tags alignment) | `doxy_parity_check` | Audits `@param` documentation against the actual function arguments to find mismatches. |
+
 1.  **Use `generate_context_report` first**:
     *   Retrieves project status, language, git diff, and structures in a single call, avoiding multiple tool executions.
+ 
+2.  **`doxy_skeleton` > `read_file`**:
+    *   Reading the full file wastes tokens on method bodies. Use `doxy_skeleton` to read only signatures first.
 
-2.  **`doxy_query` > `read_file`**:
+3.  **`doxy_query` > `read_file`**:
     *   Raw file = too many tokens.
     *   Query symbol = interface + docs. Enough.
-
-3.  **`doxy_structure` to navigate**:
+ 
+4.  **`doxy_structure` to navigate**:
     *   No path guess. Use map find file.
-
-4.  **Automatic Output Compression (Token Crusher)**:
+ 
+5.  **Automatic Output Compression (Token Crusher)**:
     *   MCP server outputs are automatically compressed in caveman style (fluff stripped, synonyms used) to save context tokens. No agent action needed.
-
-5.  **Check `doxygen_status`**:
+ 
+6.  **Check `doxygen_status`**:
     *   If Doxygen index not found, run `doxy_config` and `doxy_generate` first.
 
 ## 🔄 Example Workflow

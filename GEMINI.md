@@ -17,7 +17,19 @@ This extension provides deep structural understanding and management of Doxygen-
 - Treat documentation as a live structural map of the codebase.
 - Use `doxy_at_loc` when helping with code to understand the context of the current file/line.
 - Use `doxy_query` to get detailed documentation for specific symbols.
-- Use `doxy_references` and `doxy_rename_impact` during refactoring/renaming tasks to safely locate call sites and identify breaking changes.
+
+### 📊 Refactoring & Debugging Tool Selection Matrix
+
+| Scenario / Goal | Recommended Tool | Rationale & Token Saving |
+| :--- | :--- | :--- |
+| **Mechanical Refactoring** (e.g. Renaming variables/methods) | `doxy_references` | Returns a flat list of precise file + line matches instead of parsing full file contents. |
+| **Rename Impact Assessment** (e.g. Renaming APIs or classes) | `doxy_rename_impact` | Traces callers, definition sites, and subclass hierarchy to pinpoint contract breakages. |
+| **Verification of Active Edits** (Working tree vs Index) | `doxy_virtual_diff` | Instantly lists signature changes (added/removed/modified) without re-running full indexing. |
+| **Structural File Inspection** (Class/methods overview) | `doxy_skeleton` | Returns class/function signatures with method bodies replaced with `pass` / `/* stub */`, saving massive token context. |
+| **Debugging Stack Traces / Flows** (Chronological tracing) | `doxy_trace_path` | Recursively walks the call graph from an entry point and chains relevant code snippets sequentially. |
+| **State Out of Date Mid-Refactor** (Update index for file) | `doxy_refresh_delta` | Incrementally refreshes the XML index for a single file or directory in under a second. |
+| **Code Review / Compliance** (Parameter tags alignment) | `doxy_parity_check` | Audits `@param` documentation against the actual function arguments to find mismatches. |
+
 - Use `doxy_skeleton` to retrieve structural signatures of a file without implementation noise.
 - Use `doxy_virtual_diff` to monitor working tree signature changes and detect contract breakages.
 - Use `doxy_trace_path` to build chronological call-path timeline blocks for targeted debugging.
