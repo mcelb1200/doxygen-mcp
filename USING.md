@@ -41,6 +41,9 @@ Set `DOXYGEN_PROJECT_ROOT` & `DOXYGEN_ALLOWED_PATHS`.
 * **Surgical Refactoring Tools**:
   * Run `doxy_references` to get a flat list of all call sites and occurrences (file, line, content) of any symbol across the codebase.
   * Run `doxy_rename_impact` to analyze the impact of renaming a symbol. Lists definitions, caller sites, and subclass/inheritance breakages.
+  * Run `doxy_skeleton` to retrieve structural signatures of a file with all method/function bodies stripped.
+  * Run `doxy_virtual_diff` to detect working tree signature modifications and contract breakages.
+  * Run `doxy_trace_path` to trace call graphs sequentially starting from an entry symbol.
 * **Incremental Delta Refresh**:
   * Run `doxy_refresh_delta` on a specific file or subdirectory to update its XML index incrementally in under a second, avoiding full index build latency.
 * **Codebase & Documentation Audits**:

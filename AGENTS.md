@@ -58,6 +58,15 @@ IDE (VS Code, Cursor):
 *   **`doxy_rename_impact`**:
     *   **Purpose**: Predict renaming impact on codebase.
     *   **Use**: Pre-refactor analysis to list definition sites, callers, and subclass hierarchy changes.
+*   **`doxy_skeleton`**:
+    *   **Purpose**: Strip function/method bodies, returning a pure structural skeleton to save tokens.
+    *   **Use**: Get high-level file signature structure without reading full implementations.
+*   **`doxy_virtual_diff`**:
+    *   **Purpose**: Predict contract breakage by diffing working tree signatures against the Doxygen index.
+    *   **Use**: Identify active refactoring deltas and potential API breakages.
+*   **`doxy_trace_path`**:
+    *   **Purpose**: Chain call path code snippets sequentially to target execution path debugging.
+    *   **Use**: Compile direct call pipeline contexts without full file overhead.
 *   **`doxy_refresh_delta`**:
     *   **Purpose**: Lightweight incremental scan of modified file or subdir.
     *   **Use**: Instantly update semantic graph for edited file without full index build latency.

@@ -912,6 +912,63 @@ XML_OUTPUT             = xml
     except Exception as e:
         return f"❌ Delta refresh failed: {str(e)}"
 
+@mcp.tool(name="doxy_skeleton")
+async def doxy_skeleton(
+    file_path: str,
+    project_path: Optional[str] = None
+) -> str:
+    """Generate a skeletal version of the source file (signatures only, bodies stripped)."""
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return "❌ Doxygen XML not found. Generate documentation first."
+            
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        return await asyncio.to_thread(engine.get_file_skeleton, file_path)
+    except Exception as e:
+        return f"❌ Error generating skeleton: {str(e)}"
+
+@mcp.tool(name="doxy_virtual_diff")
+async def doxy_virtual_diff(
+    project_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """Track active working-tree edits and provide exact signature differences."""
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return {"error": "❌ Doxygen XML not found. Generate documentation first."}
+            
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        return await asyncio.to_thread(engine.get_virtual_diff, str(resolved_path))
+    except Exception as e:
+        return {"error": f"❌ Error in doxy_virtual_diff: {str(e)}"}
+
+@mcp.tool(name="doxy_trace_path")
+async def doxy_trace_path(
+    entry_symbol: str,
+    max_depth: int = 3,
+    project_path: Optional[str] = None
+) -> str:
+    """ Crawl call graphs sequentially along a call path starting from entry_symbol. """
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return "❌ Doxygen XML not found. Generate documentation first."
+            
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        return await asyncio.to_thread(engine.trace_call_path, entry_symbol, max_depth)
+    except Exception as e:
+        return f"❌ Error in doxy_trace_path: {str(e)}"
+
 @mcp.tool()
 async def configure_repo_context(
     project_path: Optional[str] = None,
