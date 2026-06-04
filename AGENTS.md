@@ -51,7 +51,21 @@ IDE (VS Code, Cursor):
     *   **Purpose**: Document symbol at cursor.
     *   **Use**: "What this do?" or "Explain code".
 
-### 5. Gap Audits
+### 5. Surgical Refactoring Tools
+*   **`doxy_references`**:
+    *   **Purpose**: Find all call sites / occurrences of a symbol with precise file and line number.
+    *   **Use**: Before renaming or modifying, find all dependencies to change.
+*   **`doxy_rename_impact`**:
+    *   **Purpose**: Predict renaming impact on codebase.
+    *   **Use**: Pre-refactor analysis to list definition sites, callers, and subclass hierarchy changes.
+*   **`doxy_refresh_delta`**:
+    *   **Purpose**: Lightweight incremental scan of modified file or subdir.
+    *   **Use**: Instantly update semantic graph for edited file without full index build latency.
+*   **`doxy_parity_check`**:
+    *   **Purpose**: Scan codebase for parameter comment vs function signature mismatches.
+    *   **Use**: Validate `@param` tags (mismatched, redundant, or missing).
+
+### 6. Gap Audits
 Auditing codebase state and stubs:
 
 *   **`doxy_doc_gaps`**:

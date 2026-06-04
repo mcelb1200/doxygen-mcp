@@ -34,13 +34,19 @@ Default: current dir. Other project:
 **Method C (Env Vars):**
 Set `DOXYGEN_PROJECT_ROOT` & `DOXYGEN_ALLOWED_PATHS`.
 
-### 🗜️ Token Compression, HTML Reviews & Code Audits
+### 🗜️ Token Compression, HTML Reviews, Surgical Refactoring & Audits
 * **Token Crusher Middleware**: Output text is automatically compressed by default to save token costs. To bypass and receive raw outputs, set:
   `export DOXYGEN_COMPRESS_OUTPUT=false`
 * **Visual Architecture Reviews**: Trigger `generate_architecture_review` to generate a local HTML report. It automatically opens in your web browser. Includes class structures, coupling, and Mermaid diagrams. Each report is timestamped and cryptographically verified.
-* **Codebase Gap Audits**:
+* **Surgical Refactoring Tools**:
+  * Run `doxy_references` to get a flat list of all call sites and occurrences (file, line, content) of any symbol across the codebase.
+  * Run `doxy_rename_impact` to analyze the impact of renaming a symbol. Lists definitions, caller sites, and subclass/inheritance breakages.
+* **Incremental Delta Refresh**:
+  * Run `doxy_refresh_delta` on a specific file or subdirectory to update its XML index incrementally in under a second, avoiding full index build latency.
+* **Codebase & Documentation Audits**:
   * Run `doxy_doc_gaps` to identify public classes or functions lacking documentation (uses native Python AST parser for Python codebases).
   * Run `doxy_binary_gaps` to cross-reference build outputs (`.o` files via `nm`) with Doxygen headers to find stubs or compilation discrepancies. Configurable via `DOXYGEN_NM_PATH` and `DOXYGEN_BUILD_DIR`.
+  * Run `doxy_parity_check` to detect documentation/signature parity mismatches (mismatched, redundant, or missing `@param` tags).
 
 ---
 

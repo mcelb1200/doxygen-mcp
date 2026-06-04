@@ -4,6 +4,7 @@ import shutil
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional, Any
+import defusedxml.ElementTree as ET
 from .query_engine import DoxygenQueryEngine
 
 class PythonDocVisitor(ast.NodeVisitor):
@@ -170,3 +171,111 @@ def scan_binary_gaps(nm_tool: str, build_dir: Path) -> Dict[str, List[str]]:
         except Exception:
             pass
     return gaps
+
+def check_doxygen_parity(engine: DoxygenQueryEngine) -> List[Dict[str, Any]]:
+    """Scan Doxygen XML files for documentation-to-code parity mismatches."""
+    mismatches = []
+    
+    for name, info in engine.compounds.items():
+        refid = info["refid"]
+        xml_file = engine.xml_dir / f"{refid}.xml"
+        if not xml_file.exists():
+            continue
+            
+        try:
+            tree = ET.parse(xml_file)
+            xml_root = tree.getroot()
+            compounddef = xml_root.find("compounddef")
+            if compounddef is None:
+                continue
+                
+            for section in compounddef.findall("sectiondef"):
+                for member in section.findall("memberdef"):
+                    if member.get("kind") != "function":
+                        continue
+                        
+                    mem_name_elem = member.find("name")
+                    mem_name = mem_name_elem.text if mem_name_elem is not None else "unknown"
+                    
+                    loc_elem = member.find("location")
+                    loc_file = loc_elem.get("file") if loc_elem is not None else "unknown"
+                    loc_line = int(loc_elem.get("line") or 1) if loc_elem is not None else 1
+                    
+                    # 1. Extract actual parameters
+                    actual_params = []
+                    for param in member.findall("param"):
+                        declname = param.find("declname")
+                        defname = param.find("defname")
+                        p_name = None
+                        if declname is not None and declname.text:
+                            p_name = declname.text
+                        elif defname is not None and defname.text:
+                            p_name = defname.text
+                        if p_name and p_name not in ("self", "cls"):
+                            actual_params.append(p_name)
+                            
+                    # 2. Extract documented parameters
+                    comment_params = []
+                    detaileddesc = member.find("detaileddescription")
+                    if detaileddesc is not None:
+                        for paramlist in detaileddesc.findall(".//parameterlist"):
+                            if paramlist.get("kind") == "param":
+                                for paramitem in paramlist.findall("parameteritem"):
+                                    namelist = paramitem.find("parameternamelist")
+                                    if namelist is not None:
+                                        for name_node in namelist.findall("parametername"):
+                                            if name_node.text:
+                                                comment_params.append(name_node.text.strip())
+                                                
+                    if not comment_params and not actual_params:
+                        continue
+                        
+                    # Check for mismatches and redundant
+                    for cp in comment_params:
+                        if cp not in actual_params:
+                            normalized_cp = cp.lower().replace("_", "").replace("-", "")
+                            matched_actual = None
+                            for ap in actual_params:
+                                normalized_ap = ap.lower().replace("_", "").replace("-", "")
+                                if normalized_cp == normalized_ap:
+                                    matched_actual = ap
+                                    break
+                                    
+                            if matched_actual:
+                                mismatches.append({
+                                    "file": loc_file,
+                                    "line": loc_line,
+                                    "symbol": f"{name}::{mem_name}",
+                                    "kind": "parameter_mismatch",
+                                    "message": f"Parameter name mismatch: documented as '@param {cp}' but signature is '{matched_actual}'"
+                                })
+                            else:
+                                mismatches.append({
+                                    "file": loc_file,
+                                    "line": loc_line,
+                                    "symbol": f"{name}::{mem_name}",
+                                    "kind": "parameter_redundant",
+                                    "message": f"Redundant parameter documentation: '@param {cp}' does not exist in function signature"
+                                })
+                                
+                    # Check for missing param documentation
+                    if comment_params:
+                        for ap in actual_params:
+                            is_documented = False
+                            for cp in comment_params:
+                                if cp == ap or cp.lower().replace("_", "").replace("-", "") == ap.lower().replace("_", "").replace("-", ""):
+                                    is_documented = True
+                                    break
+                            if not is_documented:
+                                mismatches.append({
+                                    "file": loc_file,
+                                    "line": loc_line,
+                                    "symbol": f"{name}::{mem_name}",
+                                    "kind": "parameter_missing",
+                                    "message": f"Missing parameter documentation: parameter '{ap}' is in signature but not documented"
+                                })
+        except Exception:
+            pass
+            
+    return mismatches
+

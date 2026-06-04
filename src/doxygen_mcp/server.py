@@ -669,6 +669,249 @@ async def get_symbol_usage(
     except Exception as e:  # pylint: disable=broad-exception-caught
         return f"❌ Error querying symbol usage: {str(e)}"
 
+@mcp.tool(name="doxy_references")
+async def doxy_references(
+    symbol_name: str,
+    project_path: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Find all call sites / occurrences of a symbol (file and line) across workspace."""
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return [{"error": "Doxygen XML not found. Generate documentation first."}]
+            
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        return await asyncio.to_thread(engine.find_references, symbol_name)
+    except Exception as e:
+        return [{"error": str(e)}]
+
+@mcp.tool(name="doxy_rename_impact")
+async def doxy_rename_impact(
+    symbol_name: str,
+    project_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """Analyze impact of renaming a symbol. Lists definition sites, call sites, and subclasses that will break."""
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return {"error": "Doxygen XML not found. Generate documentation first."}
+            
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        
+        definitions = await asyncio.to_thread(engine.find_symbol_definitions, symbol_name)
+        references = await asyncio.to_thread(engine.find_references, symbol_name)
+        
+        if not definitions:
+            return {
+                "symbol": symbol_name,
+                "found": False,
+                "message": f"Symbol '{symbol_name}' not found in Doxygen index."
+            }
+            
+        defs_list = []
+        for d in definitions:
+            loc = d.get("location") or {}
+            defs_list.append({
+                "name": d["name"],
+                "kind": d["kind"],
+                "file": loc.get("file", "unknown"),
+                "line": int(loc.get("line") or 1)
+            })
+            
+        calls_list = []
+        inheritance_list = []
+        
+        for r in references:
+            if "inherits from" in r.get("content", ""):
+                inheritance_list.append({
+                    "subclass": r["caller"],
+                    "file": r["file"],
+                    "line": r["line"]
+                })
+            else:
+                calls_list.append({
+                    "caller": r["caller"],
+                    "file": r["file"],
+                    "line": r["line"],
+                    "line_content": r["content"]
+                })
+                
+        return {
+            "symbol": symbol_name,
+            "found": True,
+            "definitions": defs_list,
+            "references": calls_list,
+            "inheritance_impact": inheritance_list,
+            "total_impacted_files": len(set(
+                [d["file"] for d in defs_list if d["file"] != "unknown"] +
+                [c["file"] for c in calls_list] +
+                [i["file"] for i in inheritance_list]
+            ))
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@mcp.tool(name="doxy_parity_check")
+async def doxy_parity_check(
+    project_path: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Scan codebase for Doxygen-to-code parity mismatches (mismatched, redundant, or missing @param tags)."""
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return [{"error": "Doxygen XML not found. Generate documentation first."}]
+            
+        from .auditor import check_doxygen_parity
+        engine = await DoxygenQueryEngine.create(xml_dir)
+        return await asyncio.to_thread(check_doxygen_parity, engine)
+    except Exception as e:
+        return [{"error": str(e)}]
+
+@mcp.tool(name="doxy_refresh_delta")
+async def doxy_refresh_delta(
+    file_or_dir_path: str,
+    project_path: Optional[str] = None
+) -> str:
+    """Incrementally update Doxygen documentation for a single file or subdirectory."""
+    import shutil
+    try:
+        # pylint: disable=no-member
+        resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
+        
+        if not xml_dir:
+            return "❌ Error: Doxygen XML directory not found. Generate documentation first using 'doxy_generate'."
+            
+        target_path = Path(file_or_dir_path)
+        if not target_path.is_absolute():
+            target_path = (resolved_path / target_path).resolve()
+            
+        try:
+            target_path.relative_to(resolved_path)
+        except ValueError:
+            return f"❌ Security Error: Path '{file_or_dir_path}' is outside the project root."
+            
+        if not target_path.exists():
+            return f"❌ Error: Target path '{file_or_dir_path}' does not exist."
+            
+        delta_temp = resolved_path / ".doxy_delta_temp"
+        if delta_temp.exists():
+            await asyncio.to_thread(shutil.rmtree, delta_temp, ignore_errors=True)
+        await asyncio.to_thread(delta_temp.mkdir, exist_ok=True)
+        
+        temp_xml_out = delta_temp / "xml"
+        await asyncio.to_thread(temp_xml_out.mkdir, exist_ok=True)
+        
+        base_doxyfile = "Doxyfile"
+        if (resolved_path / "Doxyfile.fast").exists():
+            base_doxyfile = "Doxyfile.fast"
+        elif not (resolved_path / "Doxyfile").exists():
+            doxyfile_path = resolved_path / "Doxyfile"
+            doxygen_exe = get_doxygen_executable()
+            await asyncio.create_subprocess_exec(
+                doxygen_exe, "-g", str(doxyfile_path),
+                cwd=str(resolved_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL
+            )
+            
+        temp_doxyfile_content = f"""# Temporary Doxyfile for Delta Refresh
+@INCLUDE               = {base_doxyfile}
+INPUT                  = "{target_path}"
+OUTPUT_DIRECTORY       = "{delta_temp}"
+GENERATE_XML           = YES
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+XML_OUTPUT             = xml
+"""
+        temp_doxyfile_path = delta_temp / "Doxyfile.temp"
+        await asyncio.to_thread(temp_doxyfile_path.write_text, temp_doxyfile_content, encoding="utf-8")
+        
+        doxygen_exe = get_doxygen_executable()
+        process = await asyncio.create_subprocess_exec(
+            doxygen_exe,
+            str(temp_doxyfile_path),
+            cwd=str(resolved_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+        except asyncio.TimeoutError:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            await process.wait()
+            return "❌ Error: Doxygen delta generation timed out."
+            
+        if process.returncode != 0:
+            stderr_text = stderr.decode(errors='replace') if stderr else ""
+            return f"❌ Error: Doxygen delta generation failed:\n{stderr_text}"
+            
+        from .funnel import minify_xml_file
+        
+        temp_xml_files = list(temp_xml_out.glob("*.xml"))
+        xml_dest_dir = Path(xml_dir)
+        
+        copied_count = 0
+        for temp_file in temp_xml_files:
+            if temp_file.name in ("index.xml", "index.xsd", "compound.xsd", "xml.xsd"):
+                continue
+                
+            await asyncio.to_thread(minify_xml_file, str(temp_file))
+            dest_file = xml_dest_dir / temp_file.name
+            await asyncio.to_thread(shutil.copy2, temp_file, dest_file)
+            copied_count += 1
+            
+        temp_index_path = temp_xml_out / "index.xml"
+        main_index_path = xml_dest_dir / "index.xml"
+        
+        if temp_index_path.exists():
+            if not main_index_path.exists():
+                await asyncio.to_thread(shutil.copy2, temp_index_path, main_index_path)
+            else:
+                def merge_indexes():
+                    import defusedxml.ElementTree as ET
+                    try:
+                        main_tree = ET.parse(main_index_path)
+                        main_root = main_tree.getroot()
+                        
+                        temp_tree = ET.parse(temp_index_path)
+                        temp_root = temp_tree.getroot()
+                        
+                        for temp_compound in temp_root.findall("compound"):
+                            refid = temp_compound.get("refid")
+                            if refid:
+                                for existing in main_root.findall(f"./compound[@refid='{refid}']"):
+                                    main_root.remove(existing)
+                                main_root.append(temp_compound)
+                                
+                        main_tree.write(main_index_path, encoding='utf-8', xml_declaration=True)
+                    except Exception as err:
+                        logger.error("Failed to merge index.xml: %s", err)
+                        
+                await asyncio.to_thread(merge_indexes)
+                
+        await asyncio.to_thread(shutil.rmtree, delta_temp, ignore_errors=True)
+        
+        DoxygenQueryEngine.clear_cache(xml_dir)
+        await DoxygenQueryEngine.create(xml_dir)
+        
+        return f"✅ Delta refresh completed successfully. Updated {copied_count} files."
+    except Exception as e:
+        return f"❌ Delta refresh failed: {str(e)}"
+
 @mcp.tool()
 async def configure_repo_context(
     project_path: Optional[str] = None,
