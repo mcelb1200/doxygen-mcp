@@ -415,6 +415,7 @@ full = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "pylint" },
     { name = "pytest-cov" },
 ]
 
@@ -441,7 +442,10 @@ requires-dist = [
 provides-extras = ["dev", "full"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest-cov", specifier = ">=7.0.0" }]
+dev = [
+    { name = "pylint", specifier = ">=4.0.5" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+]
 
 [[package]]
 name = "h11"
