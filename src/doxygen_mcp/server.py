@@ -83,7 +83,7 @@ def token_crusher_tool(*args, **kwargs):
             return original_tool(*args, **kwargs)(sync_wrapper)
     return decorator
 
-mcp.tool = token_crusher_tool
+mcp.tool = token_crusher_tool  # type: ignore
 
 # Cache for Doxygen version check
 _DOXYGEN_VERSION_CACHE: Dict[str, str] = {}
@@ -890,12 +890,19 @@ XML_OUTPUT             = xml
                         temp_tree = ET.parse(temp_index_path)
                         temp_root = temp_tree.getroot()
                         
-                        for temp_compound in temp_root.findall("compound"):
-                            refid = temp_compound.get("refid")
-                            if refid:
-                                for existing in main_root.findall(f"./compound[@refid='{refid}']"):
-                                    main_root.remove(existing)
-                                main_root.append(temp_compound)
+                        if main_root is None or temp_root is None:
+                            return
+
+                        temp_compounds = temp_root.findall("compound")
+                        if temp_compounds:
+                            for temp_compound in temp_compounds:
+                                refid = temp_compound.get("refid")
+                                if refid:
+                                    existing_nodes = main_root.findall(f"./compound[@refid='{refid}']")
+                                    if existing_nodes:
+                                        for existing in existing_nodes:
+                                            main_root.remove(existing)
+                                    main_root.append(temp_compound)
                                 
                         main_tree.write(main_index_path, encoding='utf-8', xml_declaration=True)
                     except Exception as err:

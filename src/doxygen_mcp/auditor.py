@@ -11,8 +11,8 @@ class PythonDocVisitor(ast.NodeVisitor):
     """AST Visitor to scan Python code for missing docstrings."""
     def __init__(self, filepath: str):
         self.filepath = filepath
-        self.gaps = []
-        self._current_class = None
+        self.gaps: List[Dict[str, Any]] = []
+        self._current_class: Optional[str] = None
 
     def visit_ClassDef(self, node: ast.ClassDef):
         # Skip private classes
@@ -185,6 +185,8 @@ def check_doxygen_parity(engine: DoxygenQueryEngine) -> List[Dict[str, Any]]:
         try:
             tree = ET.parse(xml_file)
             xml_root = tree.getroot()
+            if xml_root is None:
+                continue
             compounddef = xml_root.find("compounddef")
             if compounddef is None:
                 continue
