@@ -117,6 +117,7 @@ def discover_candidates(engine: DoxygenQueryEngine, project_path: Path) -> List[
 
 def get_git_version(project_path: Path) -> str:
     try:
+        import subprocess
         res = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=project_path,
