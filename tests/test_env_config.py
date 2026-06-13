@@ -170,3 +170,14 @@ class TestEnvConfig:
 
                 assert "Documentation for class Test" in result
                 mock_engine_cls.create.assert_called_with(str(xml_dir.resolve()))
+
+    def test_resolve_project_path_expansion(self):
+        """Test resolving path with home-relative ~ and environment variables"""
+        home_path = Path.home().resolve()
+        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "~/test_project_dir", "TEST_VAR": "foo"}):
+            resolved = resolve_project_path(None)
+            assert resolved == (home_path / "test_project_dir").resolve()
+
+        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "~/test_$TEST_VAR", "TEST_VAR": "foo"}):
+            resolved = resolve_project_path(None)
+            assert resolved == (home_path / "test_foo").resolve()

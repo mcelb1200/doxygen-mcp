@@ -45,7 +45,8 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
     # Priority 2: Standard override
     env_root = os.environ.get("DOXYGEN_PROJECT_ROOT")
     if env_root:
-        safe_roots.append(Path(os.path.abspath(os.path.realpath(env_root))))
+        expanded = os.path.expandvars(os.path.expanduser(env_root))
+        safe_roots.append(Path(os.path.abspath(os.path.realpath(expanded))))
 
     # Priority 3: IDE Workspace variables
     ide_roots = [
@@ -69,7 +70,8 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
     if allowed_env:
         for p in allowed_env.split(","):
             if p.strip():
-                safe_roots.append(Path(os.path.abspath(os.path.realpath(p.strip()))))
+                expanded = os.path.expandvars(os.path.expanduser(p.strip()))
+                safe_roots.append(Path(os.path.abspath(os.path.realpath(expanded))))
 
     # Load project-specific allowed paths from doxygen_mcp.json in base root
     base_root = safe_roots[0] if safe_roots else discovery_root
@@ -83,7 +85,8 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
                     if isinstance(extra_paths, list):
                         for p in extra_paths:
                             if isinstance(p, str) and p.strip():
-                                p_path = Path(p.strip())
+                                p_str = os.path.expandvars(os.path.expanduser(p.strip()))
+                                p_path = Path(p_str)
                                 if not p_path.is_absolute():
                                     p_path = (base_root / p_path).resolve()
                                 else:

@@ -74,7 +74,20 @@ def install_standalone_tool():
             print(f"uv tool install failed: {e}. Falling back to repository path execution.")
     return False
 
-def configure_client(client_name: str, config_path: Path, target_project: Optional[Path], repo_root: Path, interactive: bool):
+def sanitize_path(path_str: str) -> str:
+    """Replace user home directory path with ~ to keep configurations portable."""
+    try:
+        home_dir = str(Path.home())
+        # Standardize slashes for comparison
+        h_dir = os.path.abspath(home_dir)
+        p_str = os.path.abspath(path_str)
+        if p_str.startswith(h_dir):
+            return p_str.replace(h_dir, "~", 1)
+    except Exception:
+        pass
+    return path_str
+
+def configure_client(client_name: str, config_path: Path, target_project: Optional[Path], repo_root: Path, interactive: bool, sanitize: bool = False):
     print(f"\nFound configuration directory for {client_name} at: {config_path.parent}")
     
     if interactive:
@@ -117,14 +130,17 @@ def configure_client(client_name: str, config_path: Path, target_project: Option
     else:
         # Fallback to local uv execution from repo root
         cmd = "uv"
-        args = ["--directory", str(repo_root), "run", "doxygen-mcp"]
+        repo_path_str = sanitize_path(str(repo_root)) if sanitize else str(repo_root)
+        args = ["--directory", repo_path_str, "run", "doxygen-mcp"]
         
     env = {
         "DOXYGEN_XML_DIR": "./docs/xml"
     }
     if target_project:
-        env["DOXYGEN_PROJECT_ROOT"] = str(target_project)
-        env["DOXYGEN_ALLOWED_PATHS"] = f"{target_project.parent},{target_project}"
+        project_path_str = sanitize_path(str(target_project)) if sanitize else str(target_project)
+        parent_path_str = sanitize_path(str(target_project.parent)) if sanitize else str(target_project.parent)
+        env["DOXYGEN_PROJECT_ROOT"] = project_path_str
+        env["DOXYGEN_ALLOWED_PATHS"] = f"{parent_path_str},{project_path_str}"
         
     config_data["mcpServers"]["doxygen-mcp"] = {
         "command": cmd,
@@ -144,6 +160,7 @@ def main():
     parser = argparse.ArgumentParser(description="Configure doxygen-mcp clients")
     parser.add_argument("path", nargs="?", default=None, help="Target project root directory (default: CWD-aware dynamic mode)")
     parser.add_argument("--non-interactive", action="store_true", help="Run automatically without prompting")
+    parser.add_argument("--sanitize", action="store_true", help="Sanitize absolute paths to home-relative (~) in client configurations")
     args = parser.parse_args()
     
     target_project = Path(args.path).resolve() if args.path else None
@@ -178,7 +195,7 @@ def main():
         config_path = resolve_path(path_template)
         # We configure if either the config file already exists, or the parent directory exists
         if config_path.exists() or config_path.parent.exists():
-            configure_client(client_name, config_path, target_project, repo_root, not args.non_interactive)
+            configure_client(client_name, config_path, target_project, repo_root, not args.non_interactive, args.sanitize)
             configured_any = True
             
     # 3. Create target doxygen_mcp.json if it doesn't exist
@@ -208,14 +225,17 @@ def main():
             cmd_args = []
         else:
             cmd = "uv"
-            cmd_args = ["--directory", str(repo_root), "run", "doxygen-mcp"]
+            repo_path_str = sanitize_path(str(repo_root)) if args.sanitize else str(repo_root)
+            cmd_args = ["--directory", repo_path_str, "run", "doxygen-mcp"]
             
         manual_env = {
             "DOXYGEN_XML_DIR": "./docs/xml"
         }
         if target_project:
-            manual_env["DOXYGEN_PROJECT_ROOT"] = str(target_project)
-            manual_env["DOXYGEN_ALLOWED_PATHS"] = f"{target_project.parent},{target_project}"
+            project_path_str = sanitize_path(str(target_project)) if args.sanitize else str(target_project)
+            parent_path_str = sanitize_path(str(target_project.parent)) if args.sanitize else str(target_project.parent)
+            manual_env["DOXYGEN_PROJECT_ROOT"] = project_path_str
+            manual_env["DOXYGEN_ALLOWED_PATHS"] = f"{parent_path_str},{project_path_str}"
             
         manual_config = {
             "doxygen-mcp": {
