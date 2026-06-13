@@ -12,30 +12,29 @@ Need `uv` and `doxygen`.
 **Windows:** Doxygen [doxygen.nl](https://www.doxygen.nl/download.html), `uv` via astral.sh.
 
 ### 2. Run Setup Script (Recommended)
-Run `./scripts/setup.sh [/optional/target/project/path]` to automatically configure dependencies and generate the client configuration JSON.
+Run the setup script, passing the absolute path of the target project you want to document:
+```bash
+./scripts/setup.sh /path/to/target/project
+```
+This automatically:
+- Installs Python dependencies (including `tree-sitter`).
+- Installs `doxygen-mcp` globally via `uv tool install`.
+- Locates active client configurations (Claude Desktop, Cursor, VS Code, Google Antigravity), prompts you, backs them up, and updates them.
 
-### 3. Config AI Client
-If setup script wasn't used with path, run in `doxygen-mcp` folder:
-
-**Claude:** `uv run doxygen-mcp config` (copy JSON to config).
-**Gemini:** `uv run doxygen-mcp config --gemini`
-
-### 4. Restart
-Restart client. Tools available.
+### 3. Restart
+Restart your AI client. The tools will now be active.
 
 ---
 
-## 📁 Other Projects
-Default: current dir. Other project:
+## 📁 Other Projects & Cross-Repo Context
+By default, the server is configured to serve the project specified during setup. To reference other projects or allow cross-repo refactoring context:
 
-**Method A (Config Flag):**
-`uv run doxygen-mcp config --path "/path/to/project"`
+**Method A (Project Config file):**
+Create a `doxygen_mcp.json` in your project root (see below).
 
-**Method B (Run Script):**
-`./scripts/run.sh "/path/to/project"`
-
-**Method C (Env Vars):**
-Set `DOXYGEN_PROJECT_ROOT` & `DOXYGEN_ALLOWED_PATHS`.
+**Method B (Manual Config):**
+Generate client config JSON manually for other project paths:
+`doxygen-mcp config --path "/path/to/other/project"`
 
 ### 📁 Project-level Allowed Paths (doxygen_mcp.json)
 To allow a single global server instance to safely access other projects or dependencies, create a `doxygen_mcp.json` file in your project's root folder:

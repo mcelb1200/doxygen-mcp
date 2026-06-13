@@ -31,41 +31,31 @@ Bridges source code and AI. Enables:
 - **uv** (Recommended)
 - **Graphviz** (Optional)
 
-## 📦 Installation
-### Linux / macOS / WSL
+## 📦 Installation & Setup
+Automatically configures Python dependencies (including `tree-sitter`), installs `doxygen-mcp` globally, and registers it into active AI clients (**Claude Desktop**, **Cursor**, **VS Code**, and **Google Antigravity**).
+
+### 1. Run Setup Wizard
+Clone the repository and run the setup script, optionally passing the absolute path of the target project you want to document:
 ```bash
+# Linux / macOS / WSL
 git clone https://github.com/mcelb1200/doxygen-mcp
 cd doxygen-mcp
 ./scripts/setup.sh [/optional/target/project/path]
-```
 
-### Windows
-```powershell
+# Windows
 .\scripts\setup.ps1
 ```
 
-## 🚀 Run
-```bash
-./scripts/run.sh
-# OR
-uv run doxygen-mcp
-```
+The script will locate active client configurations on your system, back them up, and insert the `doxygen-mcp` settings automatically.
 
-## 📂 Target Other Projects
-### 1. Config
+### 2. Manual Config (Optional)
+If no clients are auto-detected, or you want to generate manual configuration blocks for other projects:
 ```bash
-uv run doxygen-mcp config --path /project/path
-```
+# Output Claude configuration JSON
+doxygen-mcp config --path /path/to/project
 
-### 2. Manual
-Set `DOXYGEN_PROJECT_ROOT` env var.
-
-## 🔧 Config
-### Auto (Recommended)
-```bash
-uv run doxygen-mcp config
-# For Gemini
-uv run doxygen-mcp config --gemini
+# Output Gemini/Antigravity config JSON
+doxygen-mcp config --gemini --path /path/to/project
 ```
 
 ## 🛠️ Tools
