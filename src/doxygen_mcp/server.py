@@ -12,11 +12,10 @@ import os
 import re
 import subprocess
 import sys
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as get_package_version
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 try:
     import watchdog.events
