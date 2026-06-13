@@ -1005,17 +1005,13 @@ def _merge_index_xml_sync(main_index_path: Path, temp_index_path: Path) -> None:
             for temp_compound in temp_compounds:
                 refid = temp_compound.get("refid")
                 if refid:
-                    existing_nodes = main_root.findall(
-                        f"./compound[@refid='{refid}']"
-                    )
+                    existing_nodes = main_root.findall(f"./compound[@refid='{refid}']")
                     if existing_nodes:
                         for existing in existing_nodes:
                             main_root.remove(existing)
                     main_root.append(temp_compound)
 
-        main_tree.write(
-            main_index_path, encoding="utf-8", xml_declaration=True
-        )
+        main_tree.write(main_index_path, encoding="utf-8", xml_declaration=True)
     except Exception as err:
         logger.error("Failed to merge index.xml: %s", err)
 
@@ -1146,7 +1142,9 @@ async def doxy_refresh_delta(
             if not main_index_path.exists():
                 await asyncio.to_thread(shutil.copy2, temp_index_path, main_index_path)
             else:
-                await asyncio.to_thread(_merge_index_xml_sync, main_index_path, temp_index_path)
+                await asyncio.to_thread(
+                    _merge_index_xml_sync, main_index_path, temp_index_path
+                )
 
         await asyncio.to_thread(shutil.rmtree, delta_temp, ignore_errors=True)
 
