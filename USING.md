@@ -100,6 +100,30 @@ Ask AI:
 
 ---
 
+## 🔄 Releases & Updates
+
+### How to Update
+If a new version is available, the server returns an update warning on tool initialization (`get_context_info`).
+To update the global command tool:
+```bash
+uv tool upgrade doxygen-mcp
+```
+
+### How to Release
+1. Update package version in [pyproject.toml](file:///home/pa-system/github/doxygen-mcp/pyproject.toml) and [__init__.py](file:///home/pa-system/github/doxygen-mcp/src/doxygen_mcp/__init__.py).
+2. Commit and tag release:
+   ```bash
+   git tag -a v1.0.2 -m "Release v1.0.2"
+   git push origin --tags
+   ```
+3. Build and publish:
+   ```bash
+   uv build
+   uv publish
+   ```
+
+---
+
 ## 🔄 Auto-Sync (Git Hooks)
 Background Doxygen updates on commit/push. Fully compatible with Git worktrees.
 
