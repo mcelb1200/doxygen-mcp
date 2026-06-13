@@ -15,14 +15,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-try:
-    from importlib.metadata import version as get_package_version
-except ImportError:
-    # Fallback for Python < 3.8
-    try:
-        from importlib_metadata import version as get_package_version  # type: ignore
-    except ImportError:
-        get_package_version = None  # type: ignore
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as get_package_version
 
 try:
     import watchdog.events
@@ -1678,11 +1672,10 @@ def main():
 
     if args.version:
         pkg_v = "unknown"
-        if get_package_version is not None:
-            try:
-                pkg_v = get_package_version("doxygen-mcp")
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
+        try:
+            pkg_v = get_package_version("doxygen-mcp")
+        except PackageNotFoundError:
+            pass
         print(f"doxygen-mcp {pkg_v}")
         sys.exit(0)
 
