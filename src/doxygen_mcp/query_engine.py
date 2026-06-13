@@ -5,9 +5,11 @@ This module parses Doxygen XML output and provides an API for querying
 symbols, structures, and documentation.
 """
 
+import ast
 import asyncio
 import logging
 import re
+import subprocess
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
@@ -482,124 +484,150 @@ class DoxygenQueryEngine:
 
     def find_references(self, symbol_name: str) -> List[Dict[str, Any]]:
         """Find all call sites / occurrences of a symbol in the workspace."""
-        results = []
+        results: List[Dict[str, Any]] = []
 
-        # Resolve target symbol to member(s) or compound(s)
         definitions = self.find_symbol_definitions(symbol_name)
         if not definitions:
             return []
 
         for def_info in definitions:
-            referenced_by_list = []
-
-            if def_info["is_member"]:
-                # Fetch details of parent compound to get all members
-                parent_details = self._fetch_compound_details(def_info["parent_refid"])
-                if parent_details and "members" in parent_details:
-                    for member in parent_details["members"]:
-                        if member["name"] == def_info["name"] and member.get(
-                            "referencedby"
-                        ):
-                            referenced_by_list = member["referencedby"]
-                            break
+            if def_info.get("is_member"):
+                referenced_by_list = self._get_member_referenced_by(def_info)
+                for ref in referenced_by_list:
+                    results.extend(self._process_reference_call_site(ref, def_info))
             else:
-                # If it's a compound class, check for derived classes
-                connections = self.get_symbol_connections(def_info["name"])
-                if connections and connections.get("derived_classes"):
-                    for derived in connections["derived_classes"]:
-                        derived_details = self.query_symbol(derived)
-                        if derived_details and derived_details.get("location"):
-                            loc = derived_details["location"]
-                            file_path_str = loc.get("file")
-                            if file_path_str:
-                                abs_path = (
-                                    self.search_index.repo_root / file_path_str
-                                ).resolve()
-                                results.append(
-                                    {
-                                        "file": str(abs_path),
-                                        "line": int(loc.get("line") or 1),
-                                        "content": f"class {derived} inherits from {def_info['name']}",
-                                        "caller": derived,
-                                    }
-                                )
+                results.extend(self._get_compound_derived_classes(def_info))
 
-            # Process referenced_by_list
-            for ref in referenced_by_list:
-                ref_refid = ref.get("refid")
-                file_path_str = None
+        return results
 
-                # 1. Look up parent compound of caller
-                if ref_refid and ref_refid in self._member_parent_map:
-                    caller_parent_refid = self._member_parent_map[ref_refid]
-                    caller_parent_details = self._fetch_compound_details(
-                        caller_parent_refid
-                    )
-                    if caller_parent_details and caller_parent_details.get("location"):
-                        file_path_str = caller_parent_details["location"].get("file")
+    def _get_member_referenced_by(
+        self, def_info: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Extract the referencedby list for a member definition."""
+        parent_details = self._fetch_compound_details(def_info.get("parent_refid", ""))
+        if not parent_details or "members" not in parent_details:
+            return []
 
-                # 2. Fall back to compoundref
-                if not file_path_str:
-                    file_path_str = ref.get("compoundref")
+        for member in parent_details["members"]:
+            if member["name"] == def_info["name"] and member.get("referencedby"):
+                return member["referencedby"]
 
-                if not file_path_str:
-                    continue
+        return []
 
-                # Resolve to absolute path in repository
-                abs_path = (self.search_index.repo_root / file_path_str).resolve()
-                if not abs_path.exists():
-                    abs_path = (self.xml_dir.parent / file_path_str).resolve()
-                    if not abs_path.exists():
-                        found_files = list(
-                            self.search_index.repo_root.rglob(Path(file_path_str).name)
-                        )
-                        if found_files:
-                            abs_path = found_files[0]
-                        else:
-                            continue
+    def _get_compound_derived_classes(
+        self, def_info: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Find derived classes for compound definitions and construct results."""
+        results = []
+        connections = self.get_symbol_connections(def_info["name"])
 
-                start_line = int(ref.get("startline") or 1)
-                end_line = int(ref.get("endline") or start_line)
+        if not connections or not connections.get("derived_classes"):
+            return results
 
-                # Scan lines for exact call site
-                short_name = def_info["name"].split("::")[-1].split(".")[-1]
-                word_pattern = re.compile(r"\b" + re.escape(short_name) + r"\b")
+        for derived in connections["derived_classes"]:
+            derived_details = self.query_symbol(derived)
+            if not derived_details or not derived_details.get("location"):
+                continue
 
-                found_lines = []
-                try:
-                    with open(abs_path, "r", encoding="utf-8") as f:
-                        lines = f.readlines()
+            loc = derived_details["location"]
+            file_path_str = loc.get("file")
+            if not file_path_str:
+                continue
 
-                    scan_start = max(0, start_line - 1)
-                    scan_end = min(len(lines), end_line)
+            abs_path = (self.search_index.repo_root / file_path_str).resolve()
+            results.append(
+                {
+                    "file": str(abs_path),
+                    "line": int(loc.get("line") or 1),
+                    "content": f"class {derived} inherits from {def_info['name']}",
+                    "caller": derived,
+                }
+            )
 
-                    for idx in range(scan_start, scan_end):
-                        line_content = lines[idx]
-                        if word_pattern.search(line_content):
-                            found_lines.append(
-                                {
-                                    "file": str(abs_path),
-                                    "line": idx + 1,
-                                    "content": line_content.strip(),
-                                    "caller": ref.get("name"),
-                                }
-                            )
-                except Exception:
-                    pass
+        return results
 
-                if found_lines:
-                    results.extend(found_lines)
-                else:
-                    results.append(
+    def _resolve_reference_file_path(self, ref: Dict[str, Any]) -> Optional[Path]:
+        """Resolve the absolute file path for a reference."""
+        file_path_str = None
+        ref_refid = ref.get("refid")
+
+        # 1. Look up parent compound of caller
+        if ref_refid and ref_refid in self._member_parent_map:
+            caller_parent_refid = self._member_parent_map[ref_refid]
+            caller_parent_details = self._fetch_compound_details(caller_parent_refid)
+            if caller_parent_details and caller_parent_details.get("location"):
+                file_path_str = caller_parent_details["location"].get("file")
+
+        # 2. Fall back to compoundref
+        if not file_path_str:
+            file_path_str = ref.get("compoundref")
+
+        if not file_path_str:
+            return None
+
+        # Resolve to absolute path in repository
+        abs_path = (self.search_index.repo_root / file_path_str).resolve()
+        if abs_path.exists():
+            return abs_path
+
+        abs_path = (self.xml_dir.parent / file_path_str).resolve()
+        if abs_path.exists():
+            return abs_path
+
+        found_files = list(self.search_index.repo_root.rglob(Path(file_path_str).name))
+        if found_files:
+            return found_files[0]
+
+        return None
+
+    def _process_reference_call_site(
+        self, ref: Dict[str, Any], def_info: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Parse the exact call site from the resolved file path."""
+        abs_path = self._resolve_reference_file_path(ref)
+        if not abs_path:
+            return []
+
+        start_line = int(ref.get("startline") or 1)
+        end_line = int(ref.get("endline") or start_line)
+
+        # Scan lines for exact call site
+        short_name = def_info["name"].split("::")[-1].split(".")[-1]
+        word_pattern = re.compile(r"\b" + re.escape(short_name) + r"\b")
+
+        found_lines = []
+        try:
+            with open(abs_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            scan_start = max(0, start_line - 1)
+            scan_end = min(len(lines), end_line)
+
+            for idx in range(scan_start, scan_end):
+                line_content = lines[idx]
+                if word_pattern.search(line_content):
+                    found_lines.append(
                         {
                             "file": str(abs_path),
-                            "line": start_line,
-                            "content": f"[Caller block start] {ref.get('name')}",
+                            "line": idx + 1,
+                            "content": line_content.strip(),
                             "caller": ref.get("name"),
                         }
                     )
+        except Exception:
+            pass
 
-        return results
+        if found_lines:
+            return found_lines
+
+        return [
+            {
+                "file": str(abs_path),
+                "line": start_line,
+                "content": f"[Caller block start] {ref.get('name')}",
+                "caller": ref.get("name"),
+            }
+        ]
 
     def get_file_skeleton(self, file_path: str) -> str:
         """Generate a skeletal version of the source file (signatures only, bodies stripped)."""
@@ -823,8 +851,6 @@ class DoxygenQueryEngine:
         if project_path:
             repo_root = Path(project_path).resolve()
 
-        import subprocess
-
         try:
             res = subprocess.run(
                 ["git", "status", "--porcelain"],
@@ -908,8 +934,6 @@ class DoxygenQueryEngine:
 
 
 # Helper functions for virtual diff and parsing
-import ast
-import subprocess
 
 
 def normalize_symbol_name(name: str) -> str:
@@ -929,9 +953,9 @@ def extract_param_names(args_str: str) -> List[str]:
     level = 0
     current = []
     for char in s:
-        if char in "([":
+        if char in "([<":
             level += 1
-        elif char in ")]":
+        elif char in ")]>":
             level -= 1
         elif char == "," and level == 0:
             parts.append("".join(current).strip())
@@ -945,15 +969,59 @@ def extract_param_names(args_str: str) -> List[str]:
     for part in parts:
         if not part:
             continue
+        # Strip default values
         part = part.split("=")[0].strip()
-        if ":" in part:
+        if ":" in part and "::" not in part:
+            # Python style annotations: a: int
             name = part.split(":")[0].strip()
         else:
-            words = part.split()
-            if words:
-                name = words[-1].strip()
+            # Strip trailing array brackets before splitting by space
+            # e.g., "int array[10]" -> "int array"
+            while part.endswith("]"):
+                idx = part.rfind("[")
+                if idx != -1:
+                    part = part[:idx].strip()
+                else:
+                    break
+
+            # Strip generic/template type args <...> so they don't mess up split
+            # Note: handle nested generic scopes by counting levels
+            clean_part = ""
+            generic_level = 0
+            for char in part:
+                if char == "<":
+                    generic_level += 1
+                elif char == ">":
+                    generic_level -= 1
+                elif generic_level == 0:
+                    clean_part += char
+
+            part = clean_part.strip()
+
+            # For function pointer "void (*func)(int)", we need special handling
+            # because splitting by space gives "(*func)(int)".
+            if "(*" in part and ")" in part:
+                # Extract 'func' from '(*func)'
+                # Find the innermost (*...) block
+                start_idx = part.find("(*")
+                if start_idx != -1:
+                    end_idx = part.find(")", start_idx)
+                    if end_idx != -1:
+                        # Extract the inner name, strip the '*' and space
+                        name = part[start_idx + 2 : end_idx].strip()
+                    else:
+                        words = part.split()
+                        name = words[-1].strip() if words else ""
+                else:
+                    words = part.split()
+                    name = words[-1].strip() if words else ""
             else:
-                name = ""
+                words = part.split()
+                if words:
+                    name = words[-1].strip()
+                else:
+                    name = ""
+
         if name:
             param_names.append(name.strip("*&"))
     return param_names
@@ -1041,8 +1109,6 @@ def parse_python_signatures_from_source(content: str) -> Dict[str, Dict[str, Any
 
 
 def parse_cpp_signatures_from_source(content: str) -> Dict[str, Dict[str, Any]]:
-    import re
-
     signatures = {}
 
     content_clean = re.sub(r"/\*.*?\*/", "", content, flags=re.DOTALL)
