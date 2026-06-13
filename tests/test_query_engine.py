@@ -10,7 +10,11 @@ from unittest.mock import Mock
 import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
-from doxygen_mcp.query_engine import DoxygenQueryEngine, normalize_symbol_name
+from doxygen_mcp.query_engine import (
+    DoxygenQueryEngine,
+    normalize_symbol_name,
+    extract_param_names,
+)
 
 # pylint: enable=import-error
 
@@ -390,6 +394,7 @@ def test_fetch_compound_connections_no_compounddef(
     assert "error" in result
     assert "No compounddef found" in result["error"]
 
+
 @pytest.mark.parametrize(
     "input_name, expected_name",
     [
@@ -405,3 +410,23 @@ def test_fetch_compound_connections_no_compounddef(
 def test_normalize_symbol_name(input_name, expected_name):
     """Test that normalize_symbol_name correctly handles whitespace, case, and namespace operators."""
     assert normalize_symbol_name(input_name) == expected_name
+
+
+@pytest.mark.parametrize(
+    "args_str, expected_names",
+    [
+        ("", []),
+        ("()", []),
+        ("( )", []),
+        ("int a, int b", ["a", "b"]),
+        ("(int a, float b)", ["a", "b"]),
+        ("int* a, float &b", ["a", "b"]),
+        ("int a = 5, char c = 'a'", ["a", "c"]),
+        ("a: int, b: str = 'hello'", ["a", "b"]),
+        ("int array[10], void (*func)(int, float)", ["array", "func"]),
+        ("std::pair<int, float> p, std::vector<int> v", ["p", "v"]),
+    ],
+)
+def test_extract_param_names(args_str, expected_names):
+    """Test extract_param_names with various signature formats."""
+    assert extract_param_names(args_str) == expected_names

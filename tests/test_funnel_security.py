@@ -22,7 +22,8 @@ class TestFunnel(unittest.TestCase):
         with tempfile.NamedTemporaryFile(
             suffix=".xml", mode="w", delete=False, encoding="utf-8"
         ) as f:
-            f.write("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+            f.write(
+                """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygen>
   <compounddef id="class1" kind="class">
     <compoundname>Class1</compoundname>
@@ -31,7 +32,8 @@ class TestFunnel(unittest.TestCase):
     <detaileddescription></detaileddescription>
   </compounddef>
 </doxygen>
-""")
+"""
+            )
             temp_path = f.name
 
         try:
@@ -59,12 +61,14 @@ class TestFunnel(unittest.TestCase):
         with tempfile.NamedTemporaryFile(
             suffix=".xml", mode="w", delete=False, encoding="utf-8"
         ) as f:
-            f.write("""<?xml version="1.0"?>
+            f.write(
+                """<?xml version="1.0"?>
 <!DOCTYPE root [
   <!ENTITY xxe SYSTEM "file:///etc/passwd">
 ]>
 <root>&xxe;</root>
-""")
+"""
+            )
             temp_path = f.name
 
         try:
