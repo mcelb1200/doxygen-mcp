@@ -148,3 +148,8 @@ cython_debug/
 
 # JCLAW Local Metadata
 .jules/
+# Doxygen MCP Server
+doxygen_mcp.json
+search_index.db
+.caveman-active
+Doxyfile.fast

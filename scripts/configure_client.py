@@ -156,6 +156,48 @@ def configure_client(client_name: str, config_path: Path, target_project: Option
     except OSError as e:
         print(f"  Error writing config: {e}")
 
+def update_project_gitignore(target_project: Path):
+    """Ensure Doxygen MCP configuration and temporary files are ignored in .gitignore (Option 2)."""
+    gitignore_path = target_project / ".gitignore"
+    header = "# Doxygen MCP Server"
+    entries = [
+        "doxygen_mcp.json",
+        "search_index.db",
+        ".caveman-active",
+        "Doxyfile.fast"
+    ]
+    
+    existing_content = ""
+    if gitignore_path.exists():
+        try:
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                existing_content = f.read()
+        except OSError as e:
+            print(f"Warning: Failed to read .gitignore: {e}")
+            return
+
+    # Check if header or entries already exist
+    lines_to_add = []
+    if header not in existing_content:
+        lines_to_add.append(header)
+    
+    for entry in entries:
+        if entry not in existing_content:
+            lines_to_add.append(entry)
+            
+    if not lines_to_add or (len(lines_to_add) == 1 and lines_to_add[0] == header):
+        return
+        
+    try:
+        with open(gitignore_path, "a", encoding="utf-8") as f:
+            if existing_content and not existing_content.endswith("\n"):
+                f.write("\n")
+            for line in lines_to_add:
+                f.write(f"{line}\n")
+        print(f"  Option 2: Added Doxygen MCP server patterns to .gitignore")
+    except OSError as e:
+        print(f"Warning: Failed to write to .gitignore: {e}")
+
 def main():
     parser = argparse.ArgumentParser(description="Configure doxygen-mcp clients")
     parser.add_argument("path", nargs="?", default=None, help="Target project root directory (default: CWD-aware dynamic mode)")
@@ -200,6 +242,7 @@ def main():
             
     # 3. Create target doxygen_mcp.json if it doesn't exist
     if target_project:
+        update_project_gitignore(target_project)
         target_config = target_project / "doxygen_mcp.json"
         if not target_config.exists():
             try:

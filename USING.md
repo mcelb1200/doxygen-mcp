@@ -48,6 +48,9 @@ To allow a single global server instance to safely access other projects, depend
 }
 ```
 
+> [!NOTE]
+> The setup script automatically configures the project to ignore `doxygen_mcp.json` and other doxygen-mcp patterns in `.gitignore` (Option 2) under a dedicated section header (`# Doxygen MCP Server`) to avoid committing absolute local paths.
+
 ## ⚙️ Advanced Features
 
 ### 🗜️ Token Crusher Middleware
