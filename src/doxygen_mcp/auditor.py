@@ -11,7 +11,7 @@ class PythonDocVisitor(ast.NodeVisitor):
     """AST Visitor to scan Python code for missing docstrings."""
     def __init__(self, filepath: str):
         self.filepath = filepath
-        self.gaps: List[Dict[str, str]] = []
+        self.gaps: List[Dict[str, Any]] = []
         self._current_class: Optional[str] = None
 
     def visit_ClassDef(self, node: ast.ClassDef):
