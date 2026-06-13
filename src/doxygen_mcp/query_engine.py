@@ -5,9 +5,11 @@ This module parses Doxygen XML output and provides an API for querying
 symbols, structures, and documentation.
 """
 
+import ast
 import asyncio
 import logging
 import re
+import subprocess
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
@@ -823,8 +825,6 @@ class DoxygenQueryEngine:
         if project_path:
             repo_root = Path(project_path).resolve()
 
-        import subprocess
-
         try:
             res = subprocess.run(
                 ["git", "status", "--porcelain"],
@@ -908,8 +908,6 @@ class DoxygenQueryEngine:
 
 
 # Helper functions for virtual diff and parsing
-import ast
-import subprocess
 
 
 def normalize_symbol_name(name: str) -> str:
@@ -1041,8 +1039,6 @@ def parse_python_signatures_from_source(content: str) -> Dict[str, Dict[str, Any
 
 
 def parse_cpp_signatures_from_source(content: str) -> Dict[str, Dict[str, Any]]:
-    import re
-
     signatures = {}
 
     content_clean = re.sub(r"/\*.*?\*/", "", content, flags=re.DOTALL)
