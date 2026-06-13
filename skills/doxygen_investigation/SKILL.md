@@ -44,3 +44,4 @@ Use the matrix below to select the most efficient tool for your task:
 
 - **doxygen_mcp.json**: Create in project root to configure neighbor project accesses (`allowed_paths`) and custom XML folders (`xml_dir`). Supports `~` and env variable expansion (e.g. `~/github/dependency`).
 - **Dynamic CWD Resolution**: The global MCP server dynamically discovers project context using workspace CWD when env variables are omitted.
+- **Git Worktree Support**: The server and setup scripts are fully worktree-aware. Git hook installations resolve to the repository's `.git/common/hooks` folder, and repository tracking resolves roots correctly.

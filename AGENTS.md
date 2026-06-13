@@ -125,6 +125,9 @@ Auditing codebase state and stubs:
 2. **Project Configuration (`doxygen_mcp.json`)**:
    - Create `doxygen_mcp.json` in project root to authorize extra paths (`allowed_paths`) and set custom Doxygen XML folders (`xml_dir`).
    - Configuration paths support `~` and env variable expansion (e.g. `~/github/dependency-repo`).
+3. **Git Worktree Support**:
+   - Fully aware of Git worktrees. Resolves git hook installation paths using `git rev-parse --git-path hooks` (resolves to `.git/common/hooks` inside worktrees).
+   - Resolves repository root path using `git rev-parse --show-toplevel` or fallback checks.
 
 ## 🔄 Example Workflow
 

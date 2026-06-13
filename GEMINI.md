@@ -35,3 +35,4 @@ This extension provides deep structural understanding and management of Doxygen-
 - Use `doxy_trace_path` to build chronological call-path timeline blocks for targeted debugging.
 - Use `doxy_parity_check` to verify `@param` documentation correctness.
 - If editing files and index gets stale, run `doxy_refresh_delta` on the changed file/directory. If documentation is completely missing or outdated, suggest running `doxy_config` or `doxy_generate`.
+- Fully aware of Git worktrees. Resolves git hook installation paths using `git rev-parse --git-path hooks` (resolves to `.git/common/hooks` inside worktrees) and repository root paths cleanly.

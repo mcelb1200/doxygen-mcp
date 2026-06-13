@@ -98,11 +98,13 @@ Ask AI:
 ---
 
 ## 🔄 Auto-Sync (Git Hooks)
-Background Doxygen updates on commit/push.
+Background Doxygen updates on commit/push. Fully compatible with Git worktrees.
 
 ### 1. Install
 Run in project root:
 `python path/to/scripts/install_hooks.py`
+
+Hooks are installed under the resolved git hooks directory (supporting worktree paths using `git rev-parse --git-path hooks` to locate `.git/common/hooks` automatically).
 
 ### 2. Result
 - **Commit**: Fast incremental update on header change.
