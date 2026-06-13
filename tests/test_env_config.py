@@ -137,3 +137,36 @@ class TestEnvConfig:
 
                 assert "Documentation for class Test" in result
                 mock_engine_cls.create.assert_called_with(str(xml_dir))
+
+    @pytest.mark.asyncio
+    async def test_query_reference_with_project_json_xml(self, temp_project_dir):
+        """Test querying with xml_dir in doxygen_mcp.json"""
+        import json
+        xml_dir = Path(temp_project_dir) / "custom_xml_dir"
+        xml_dir.mkdir(parents=True)
+        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>", encoding="utf-8")
+
+        config_file = Path(temp_project_dir) / "doxygen_mcp.json"
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump({"xml_dir": "custom_xml_dir"}, f)
+
+        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
+            # Clear DOXYGEN_XML_DIR to force using doxygen_mcp.json
+            if "DOXYGEN_XML_DIR" in os.environ:
+                del os.environ["DOXYGEN_XML_DIR"]
+
+            with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
+                mock_engine = MagicMock()
+                mock_engine.query_symbol.return_value = {
+                    "kind": "class", "name": "Test", "brief": "Brief",
+                    "detailed": "", "members": []
+                }
+
+                future = asyncio.Future()
+                future.set_result(mock_engine)
+                mock_engine_cls.create.return_value = future
+
+                result = await doxy_query("Test")
+
+                assert "Documentation for class Test" in result
+                mock_engine_cls.create.assert_called_with(str(xml_dir.resolve()))

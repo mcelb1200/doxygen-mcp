@@ -9,6 +9,7 @@ import shutil
 import argparse
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 CLIENTS = {
     "Claude Desktop": {
@@ -73,7 +74,7 @@ def install_standalone_tool():
             print(f"uv tool install failed: {e}. Falling back to repository path execution.")
     return False
 
-def configure_client(client_name: str, config_path: Path, target_project: Path, repo_root: Path, interactive: bool):
+def configure_client(client_name: str, config_path: Path, target_project: Optional[Path], repo_root: Path, interactive: bool):
     print(f"\nFound configuration directory for {client_name} at: {config_path.parent}")
     
     if interactive:
@@ -118,14 +119,17 @@ def configure_client(client_name: str, config_path: Path, target_project: Path, 
         cmd = "uv"
         args = ["--directory", str(repo_root), "run", "doxygen-mcp"]
         
+    env = {
+        "DOXYGEN_XML_DIR": "./docs/xml"
+    }
+    if target_project:
+        env["DOXYGEN_PROJECT_ROOT"] = str(target_project)
+        env["DOXYGEN_ALLOWED_PATHS"] = f"{target_project.parent},{target_project}"
+        
     config_data["mcpServers"]["doxygen-mcp"] = {
         "command": cmd,
         "args": args,
-        "env": {
-            "DOXYGEN_PROJECT_ROOT": str(target_project),
-            "DOXYGEN_ALLOWED_PATHS": f"{target_project.parent},{target_project}",
-            "DOXYGEN_XML_DIR": "./docs/xml"
-        },
+        "env": env,
         "disabled": False
     }
     
@@ -138,15 +142,29 @@ def configure_client(client_name: str, config_path: Path, target_project: Path, 
 
 def main():
     parser = argparse.ArgumentParser(description="Configure doxygen-mcp clients")
-    parser.add_argument("path", nargs="?", default=".", help="Target project root directory (default: current)")
+    parser.add_argument("path", nargs="?", default=None, help="Target project root directory (default: CWD-aware dynamic mode)")
     parser.add_argument("--non-interactive", action="store_true", help="Run automatically without prompting")
     args = parser.parse_args()
     
-    target_project = Path(args.path).resolve()
+    target_project = Path(args.path).resolve() if args.path else None
     repo_root = Path(__file__).resolve().parent.parent
     
     # 1. Install tool globally
     install_standalone_tool()
+    
+    # 1.5 Install skill globally for Antigravity if global skills folder exists
+    global_skills_dir = Path("~/.gemini/skills").expanduser()
+    if global_skills_dir.exists():
+        src_skill = repo_root / "skills" / "doxygen_investigation"
+        dst_skill = global_skills_dir / "doxygen_investigation"
+        if src_skill.exists():
+            try:
+                if dst_skill.exists():
+                    shutil.rmtree(dst_skill)
+                shutil.copytree(src_skill, dst_skill)
+                print(f"Successfully installed doxygen-investigation skill to: {dst_skill}")
+            except Exception as e:
+                print(f"Failed to install skill to ~/.gemini/skills: {e}")
     
     # 2. Iterate clients and update configs
     platform = sys.platform
@@ -164,19 +182,20 @@ def main():
             configured_any = True
             
     # 3. Create target doxygen_mcp.json if it doesn't exist
-    target_config = target_project / "doxygen_mcp.json"
-    if not target_config.exists():
-        try:
-            default_config = {
-                "allowed_paths": [
-                    ".."
-                ]
-            }
-            with open(target_config, "w", encoding="utf-8") as f:
-                json.dump(default_config, f, indent=2)
-            print(f"\nCreated default project configuration at: {target_config}")
-        except OSError:
-            pass
+    if target_project:
+        target_config = target_project / "doxygen_mcp.json"
+        if not target_config.exists():
+            try:
+                default_config = {
+                    "allowed_paths": [
+                        ".."
+                    ]
+                }
+                with open(target_config, "w", encoding="utf-8") as f:
+                    json.dump(default_config, f, indent=2)
+                print(f"\nCreated default project configuration at: {target_config}")
+            except OSError:
+                pass
             
     if not configured_any:
         print("\nNo active MCP clients (Claude Desktop, Cursor, VS Code, Antigravity) detected in standard locations.")
@@ -191,15 +210,18 @@ def main():
             cmd = "uv"
             cmd_args = ["--directory", str(repo_root), "run", "doxygen-mcp"]
             
+        manual_env = {
+            "DOXYGEN_XML_DIR": "./docs/xml"
+        }
+        if target_project:
+            manual_env["DOXYGEN_PROJECT_ROOT"] = str(target_project)
+            manual_env["DOXYGEN_ALLOWED_PATHS"] = f"{target_project.parent},{target_project}"
+            
         manual_config = {
             "doxygen-mcp": {
                 "command": cmd,
                 "args": cmd_args,
-                "env": {
-                    "DOXYGEN_PROJECT_ROOT": str(target_project),
-                    "DOXYGEN_ALLOWED_PATHS": f"{target_project.parent},{target_project}",
-                    "DOXYGEN_XML_DIR": "./docs/xml"
-                }
+                "env": manual_env
             }
         }
         print(json.dumps(manual_config, indent=2))

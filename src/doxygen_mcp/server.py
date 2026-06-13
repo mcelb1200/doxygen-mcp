@@ -178,7 +178,8 @@ def _find_xml_dir(resolved_path: Path) -> Optional[str]:
     """
     Find the Doxygen XML directory with preference for:
     1. DOXYGEN_XML_DIR env var (absolute or relative)
-    2. Standard locations within project root
+    2. doxygen_mcp.json config in project root
+    3. Standard locations within project root
     """
     xml_dir_env = os.environ.get("DOXYGEN_XML_DIR")
     if xml_dir_env:
@@ -188,6 +189,23 @@ def _find_xml_dir(resolved_path: Path) -> Optional[str]:
 
         if path.exists() and (path / "index.xml").exists():
             return str(path.absolute())
+
+    # Check doxygen_mcp.json
+    config_file = resolved_path / "doxygen_mcp.json"
+    if config_file.exists() and not config_file.is_symlink():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+                if isinstance(config_data, dict):
+                    xml_dir_val = config_data.get("xml_dir")
+                    if isinstance(xml_dir_val, str) and xml_dir_val.strip():
+                        path = Path(xml_dir_val.strip())
+                        if not path.is_absolute():
+                            path = resolved_path / path
+                        if path.exists() and (path / "index.xml").exists():
+                            return str(path.absolute())
+        except Exception:
+            pass
 
     # Discovery in standard locations
     potential_paths = [
@@ -566,15 +584,7 @@ async def query_project_reference(
     try:
         # pylint: disable=no-member
         resolved_path = await asyncio.to_thread(resolve_project_path, project_path)
-        xml_dir = os.environ.get("DOXYGEN_XML_DIR")
-
-        if not xml_dir:
-            potential_paths = [resolved_path / "docs" / "xml", resolved_path / "xml"]
-            for p in potential_paths:
-                if await asyncio.to_thread(p.exists) and \
-                   await asyncio.to_thread((p / "index.xml").exists):
-                    xml_dir = str(p)
-                    break
+        xml_dir = await asyncio.to_thread(_find_xml_dir, resolved_path)
 
         if not xml_dir:
             return (

@@ -165,26 +165,9 @@ try {
     Write-Host "Setup Complete!" -ForegroundColor Green
     Write-Host ""
     
-    $uvPath = (Get-Command uv).Source
-    $projectDir = $PWD.Path
-    
-    # Check if we need to warn about PATH
-    $pathModified = $false
-    if ($env:PATH -like "*$HOME\.local\bin*") { $pathModified = $true }
-    if ($env:PATH -like "*doxygen*") { $pathModified = $true }
-    
-    Write-Host "To configure this server in your IDE:"
-    Write-Host "-----------------------------------"
-    Write-Host "Command: $uvPath" -ForegroundColor Magenta
-    Write-Host "Args:    --directory `"$projectDir`" run doxygen-mcp" -ForegroundColor Magenta
-    
-    Write-Host ""
-    Write-Host "IMPORTANT:" -ForegroundColor Yellow
-    Write-Host "If you just installed tools, you may need to restart your shell/IDE" -ForegroundColor Yellow
-    Write-Host "or add the following to your system PATH:" -ForegroundColor Yellow
-    Write-Host " - C:\Program Files\doxygen\bin"
-    Write-Host " - C:\Program Files\Graphviz\bin"
-    Write-Host " - $HOME\.local\bin"
+    # Run the automated client configurator
+    Write-Host "Running automated client configuration..." -ForegroundColor Gray
+    uv run python scripts/configure_client.py $args
 }
 catch {
     Print-Error "Server failed to start."
