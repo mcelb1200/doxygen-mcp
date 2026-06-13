@@ -78,10 +78,36 @@ def filter_main():
 
     print(f"Minified {processed}/{len(xml_files)} XML files in {args.xml_dir}")
 
+def get_git_hooks_dir(repo: Path) -> Path:
+    """Resolve the correct git hooks directory path (worktree-aware)."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-path", "hooks"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        p = Path(result.stdout.strip())
+        if not p.is_absolute():
+            p = (repo / p).resolve()
+        return p
+    except Exception:
+        # Fallback to standard .git/hooks directory
+        return repo / ".git" / "hooks"
+
 def setup_funnel(repo_path: str):
     """Installs Doxyfile.fast and post-commit hook into a repository."""
     repo = Path(repo_path).resolve()
-    if not (repo / ".git").exists():
+    # Check if git repository in a worktree-aware way
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=repo,
+            capture_output=True,
+            check=True
+        )
+    except Exception:
         return False, f"Not a git repository: {repo}"
 
     # 1. Ensure a base Doxyfile exists
@@ -117,7 +143,7 @@ INCLUDED_BY_GRAPH      = NO
         f.write(doxyfile_content)
 
     # 2. Install post-commit hook
-    hook_dir = repo / ".git" / "hooks"
+    hook_dir = get_git_hooks_dir(repo)
     hook_dir.mkdir(parents=True, exist_ok=True)
     hook_path = hook_dir / "post-commit"
 

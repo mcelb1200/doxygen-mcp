@@ -1,7 +1,25 @@
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
+
+def get_git_hooks_dir(target_dir: Path) -> Path:
+    """Resolve the correct git hooks directory path (worktree-aware)."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-path", "hooks"],
+            cwd=target_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        p = Path(result.stdout.strip())
+        if not p.is_absolute():
+            p = (target_dir / p).resolve()
+        return p
+    except Exception:
+        return target_dir / '.git' / 'hooks'
 
 def install_hooks(target_dir=None):
     if not target_dir:
@@ -9,12 +27,19 @@ def install_hooks(target_dir=None):
     else:
         target_dir = Path(target_dir)
 
-    git_dir = target_dir / '.git'
-    if not git_dir.exists():
+    # Check if git repository in a worktree-aware way
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=target_dir,
+            capture_output=True,
+            check=True
+        )
+    except Exception:
         print(f'Error: {target_dir} is not a git repository.')
         return
 
-    hooks_dir = git_dir / 'hooks'
+    hooks_dir = get_git_hooks_dir(target_dir)
     hooks_dir.mkdir(exist_ok=True)
 
     script_dir = Path(__file__).parent.parent

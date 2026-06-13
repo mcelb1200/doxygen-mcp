@@ -3,7 +3,7 @@ import os
 import tempfile
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # The environment might have defusedxml mocked in conftest.py,
 # but for this standalone-ish test we want to be careful.
@@ -72,6 +72,25 @@ class TestFunnel(unittest.TestCase):
             pass
         finally:
             os.remove(temp_path)
+
+    def test_get_git_hooks_dir_fallback(self):
+        from doxygen_mcp.funnel import get_git_hooks_dir
+        repo = Path("/mock/repo")
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = Exception("error")
+            hooks_dir = get_git_hooks_dir(repo)
+            self.assertEqual(hooks_dir, repo / ".git" / "hooks")
+
+    def test_get_git_hooks_dir_worktree(self):
+        from doxygen_mcp.funnel import get_git_hooks_dir
+        repo = Path("/mock/repo")
+        with patch("subprocess.run") as mock_run:
+            mock_result = MagicMock()
+            mock_result.stdout = "/main/repo/.git/worktrees/wt1/hooks\n"
+            mock_run.return_value = mock_result
+            
+            hooks_dir = get_git_hooks_dir(repo)
+            self.assertEqual(hooks_dir, Path("/main/repo/.git/worktrees/wt1/hooks"))
 
 if __name__ == "__main__":
     unittest.main()
