@@ -13,6 +13,8 @@ sys.path.insert(
 
 from doxygen_mcp.caveman import compress_payload, compress_text
 from doxygen_mcp.reporter import discover_candidates, generate_report_html
+from pydantic import BaseModel
+
 from doxygen_mcp.server import (
     generate_architecture_review,
     generate_context_report,
@@ -28,7 +30,7 @@ def test_caveman_text_compression():
     assert compress_text("some   excessive    spaces .") == "some excessive spaces."
 
 
-def test_caveman_payload_compression():
+def test_caveman_payload_compression_dict_list():
     # Test list/dict traversal
     payload = {
         "title": "A standard configuration module",
@@ -36,6 +38,63 @@ def test_caveman_payload_compression():
     }
     expected = {"title": "standard config module", "values": ["impl", 42, True]}
     assert compress_payload(payload) == expected
+
+def test_caveman_payload_compression_tuple():
+    # Test tuple traversal
+    payload = ("the configuration", "a documentation file", 100)
+    expected = ("config", "docs file", 100)
+    assert compress_payload(payload) == expected
+
+class DummyModel(BaseModel):
+    name: str
+    description: str
+    count: int
+
+def test_caveman_payload_compression_pydantic():
+    # Test Pydantic BaseModel traversal
+    model = DummyModel(
+        name="the authentication service",
+        description="really basically an implementation for databases",
+        count=5
+    )
+    expected_model = DummyModel(
+        name="auth service",
+        description="impl for DBs",
+        count=5
+    )
+    assert compress_payload(model) == expected_model
+
+def test_caveman_payload_compression_nested():
+    # Test deeply nested payloads
+    payload = {
+        "level1": [
+            {
+                "level2_tuple": ("just a request", "the response"),
+                "level2_str": "certainly a repository",
+                "level2_int": 404
+            }
+        ]
+    }
+    expected = {
+        "level1": [
+            {
+                "level2_tuple": ("req", "res"),
+                "level2_str": "repo",
+                "level2_int": 404
+            }
+        ]
+    }
+    assert compress_payload(payload) == expected
+
+def test_caveman_payload_compression_edge_cases():
+    # Test edge cases: None, empty collections, empty strings
+    assert compress_payload(None) is None
+    assert compress_payload("") == ""
+    assert compress_payload([]) == []
+    assert compress_payload({}) == {}
+    assert compress_payload(()) == ()
+    assert compress_payload(123) == 123
+    assert compress_payload(True) is True
 
 
 @pytest.mark.asyncio
