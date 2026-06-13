@@ -35,15 +35,15 @@ Bridges source code and AI. Enables:
 Automatically configures Python dependencies (including `tree-sitter`), installs `doxygen-mcp` globally, and registers it into active AI clients (**Claude Desktop**, **Cursor**, **VS Code**, and **Google Antigravity**).
 
 ### 1. Run Setup Wizard
-Clone the repository and run the setup script, optionally passing the absolute path of the target project you want to document:
+Clone the repository and run the setup script. Optionally, pass a target project path, and `--sanitize` to make client configuration paths home-relative (`~`) for privacy and portability:
 ```bash
 # Linux / macOS / WSL
 git clone https://github.com/mcelb1200/doxygen-mcp
 cd doxygen-mcp
-./scripts/setup.sh [/optional/target/project/path]
+./scripts/setup.sh [/optional/target/project/path] [--sanitize]
 
 # Windows
-.\scripts\setup.ps1
+.\scripts\setup.ps1 [-path \optional\target\path] [-sanitize]
 ```
 
 The script will locate active client configurations on your system, back them up, and insert the `doxygen-mcp` settings automatically.
@@ -81,19 +81,22 @@ doxygen-mcp config --gemini --path /path/to/project
 | `doxy_trace_path` | Trace call path chains sequentially to debug execution. |
 
 ## ⚙️ Configuration Options
+* **`DOXYGEN_PROJECT_ROOT`**: Root path of target project to document (supports `~` and env variable expansion).
+* **`DOXYGEN_ALLOWED_PATHS`**: Comma-separated directories that the MCP server is authorized to read.
 * **`DOXYGEN_USE_MCP_RESULT`**: Wrap tool responses in structured Pydantic `MCPResult` schema (`success`, `data`, `error`, `message`). Defaults to `true` (except in pytest).
 * **`DOXYGEN_COMPRESS_OUTPUT`**: Toggle global output token compression (Token Crusher Middleware). Defaults to `true`. Set to `false` in local env config to disable compression.
 * **`DOXYGEN_NM_PATH`**: Explicit path to `nm`/`llvm-nm` executable for linkage audits.
 * **`DOXYGEN_BUILD_DIR`**: Path containing compiled object files (`.o`, `.obj`) to scan.
 
 ## 📁 Multi-Project Context Safety (doxygen_mcp.json)
-To allow a single global server instance to safely reference neighbor projects or dependencies, create a `doxygen_mcp.json` file in your project root:
+To allow a single global server instance to safely reference neighbor projects or specify Doxygen output settings, create a `doxygen_mcp.json` file in your project root. Path values support `~` and env variable expansion:
 ```json
 {
   "allowed_paths": [
-    "/absolute/path/to/dependency",
-    "../relative-neighbor-project"
-  ]
+    "~/github/other-project",
+    "../dependency-folder"
+  ],
+  "xml_dir": "docs/xml"
 }
 ```
 

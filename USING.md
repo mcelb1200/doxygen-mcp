@@ -12,9 +12,9 @@ Need `uv` and `doxygen`.
 **Windows:** Doxygen [doxygen.nl](https://www.doxygen.nl/download.html), `uv` via astral.sh.
 
 ### 2. Run Setup Script (Recommended)
-Run the setup script, passing the absolute path of the target project you want to document:
+Run the setup script, passing the target project path. Optionally use `--sanitize` to make configuration paths home-relative (`~`) for privacy:
 ```bash
-./scripts/setup.sh /path/to/target/project
+./scripts/setup.sh /path/to/target/project [--sanitize]
 ```
 This automatically:
 - Installs Python dependencies (including `tree-sitter`).
@@ -36,14 +36,15 @@ Create a `doxygen_mcp.json` in your project root (see below).
 Generate client config JSON manually for other project paths:
 `doxygen-mcp config --path "/path/to/other/project"`
 
-### 📁 Project-level Allowed Paths (doxygen_mcp.json)
-To allow a single global server instance to safely access other projects or dependencies, create a `doxygen_mcp.json` file in your project's root folder:
+### 📁 Project-level Allowed Paths & Doxygen Settings (doxygen_mcp.json)
+To allow a single global server instance to safely access other projects, dependencies, or to hardcode Doxygen output folders, create a `doxygen_mcp.json` file in your project's root folder. Path values support `~` and env variable expansion:
 ```json
 {
   "allowed_paths": [
-    "/absolute/path/to/other/project",
+    "~/github/other-project",
     "../relative-neighbor-project"
-  ]
+  ],
+  "xml_dir": "docs/xml"
 }
 ```
 

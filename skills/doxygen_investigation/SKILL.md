@@ -39,3 +39,8 @@ Use the matrix below to select the most efficient tool for your task:
 | **Check refactor impact** | `doxy_rename_impact` | Traces subclass trees and callers to identify where contract breakages will occur. |
 | **Verify active edits** | `doxy_virtual_diff` | Instantly lists signature changes in the working tree compared to the indexed baseline. |
 | **Update stale index** | `doxy_refresh_delta` | Syncs index for the modified file in < 1 second instead of doing a full index build. |
+
+## Project Setup & Configuration
+
+- **doxygen_mcp.json**: Create in project root to configure neighbor project accesses (`allowed_paths`) and custom XML folders (`xml_dir`). Supports `~` and env variable expansion (e.g. `~/github/dependency`).
+- **Dynamic CWD Resolution**: The global MCP server dynamically discovers project context using workspace CWD when env variables are omitted.

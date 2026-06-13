@@ -118,6 +118,14 @@ Auditing codebase state and stubs:
 6.  **Check `doxygen_status`**:
     *   If Doxygen index not found, run `doxy_config` and `doxy_generate` first.
 
+## ⚙️ Project Configuration & Discovery
+
+1. **CWD Auto-Discovery**:
+   - The global `doxygen-mcp` server resolves the project root dynamically from the active client CWD (workspace directory) when no env variables are specified.
+2. **Project Configuration (`doxygen_mcp.json`)**:
+   - Create `doxygen_mcp.json` in project root to authorize extra paths (`allowed_paths`) and set custom Doxygen XML folders (`xml_dir`).
+   - Configuration paths support `~` and env variable expansion (e.g. `~/github/dependency-repo`).
+
 ## 🔄 Example Workflow
 
 **User**: "How auth work?"
