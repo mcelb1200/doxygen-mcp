@@ -390,6 +390,7 @@ def test_fetch_compound_connections_no_compounddef(
     assert "error" in result
     assert "No compounddef found" in result["error"]
 
+
 @pytest.mark.parametrize(
     "input_name, expected_name",
     [
