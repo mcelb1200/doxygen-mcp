@@ -991,7 +991,7 @@ def extract_param_names(args_str: str) -> List[str]:
                     end_idx = part.find(")", start_idx)
                     if end_idx != -1:
                         # Extract the inner name, strip the '*' and space
-                        name = part[start_idx+2:end_idx].strip()
+                        name = part[start_idx + 2 : end_idx].strip()
                     else:
                         words = part.split()
                         name = words[-1].strip() if words else ""

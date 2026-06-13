@@ -394,6 +394,7 @@ def test_fetch_compound_connections_no_compounddef(
     assert "error" in result
     assert "No compounddef found" in result["error"]
 
+
 @pytest.mark.parametrize(
     "input_name, expected_name",
     [
@@ -410,6 +411,7 @@ def test_normalize_symbol_name(input_name, expected_name):
     """Test that normalize_symbol_name correctly handles whitespace, case, and namespace operators."""
     assert normalize_symbol_name(input_name) == expected_name
 
+
 @pytest.mark.parametrize(
     "args_str, expected_names",
     [
@@ -423,7 +425,7 @@ def test_normalize_symbol_name(input_name, expected_name):
         ("a: int, b: str = 'hello'", ["a", "b"]),
         ("int array[10], void (*func)(int, float)", ["array", "func"]),
         ("std::pair<int, float> p, std::vector<int> v", ["p", "v"]),
-    ]
+    ],
 )
 def test_extract_param_names(args_str, expected_names):
     """Test extract_param_names with various signature formats."""
