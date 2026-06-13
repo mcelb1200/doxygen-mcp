@@ -80,12 +80,18 @@ def compress_text(text: str) -> str:
     text = re.sub(r'\s+([.,!?;:])', r'\1', text)
     return text.strip()
 
+from pydantic import BaseModel
+
 def compress_payload(payload: Any) -> Any:
     """
-    Recursively traverse python collections.
+    Recursively traverse python collections and Pydantic models.
     Compress string values while keeping dictionary keys and non-string types intact.
     """
-    if isinstance(payload, dict):
+    if isinstance(payload, BaseModel):
+        model_dict = payload.model_dump()
+        compressed_dict = compress_payload(model_dict)
+        return payload.__class__(**compressed_dict)
+    elif isinstance(payload, dict):
         return {key: compress_payload(val) for key, val in payload.items()}
     elif isinstance(payload, list):
         return [compress_payload(item) for item in payload]
@@ -94,3 +100,4 @@ def compress_payload(payload: Any) -> Any:
     elif isinstance(payload, str):
         return compress_text(payload)
     return payload
+

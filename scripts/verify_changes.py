@@ -60,7 +60,13 @@ async def test_tools():
             language="python"
         )
 
-        if "✅" in result:
+        is_success = False
+        if hasattr(result, "success"):
+            is_success = result.success
+        elif isinstance(result, str) and "✅" in result:
+            is_success = True
+
+        if is_success:
             print("  Creation: OK")
         else:
             print(f"  Creation: FAILED - {result}")

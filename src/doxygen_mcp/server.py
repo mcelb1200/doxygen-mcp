@@ -44,6 +44,7 @@ from .utils import (
 )
 from .git_tracker import get_file_timeline
 from .funnel import setup_funnel, minify_xml_file
+from .types import MCPResult
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,24 +63,72 @@ if compress_env_val is not None:
 else:
     SHOULD_COMPRESS = not is_pytest
 
+use_mcp_result_env = os.environ.get("DOXYGEN_USE_MCP_RESULT")
+if use_mcp_result_env is not None:
+    SHOULD_WRAP_MCP_RESULT = use_mcp_result_env.lower() not in ("false", "0", "no", "off")
+else:
+    SHOULD_WRAP_MCP_RESULT = not is_pytest
+
+def wrap_in_mcp_result(res: Any) -> Any:
+    if not SHOULD_WRAP_MCP_RESULT:
+        return res
+    if isinstance(res, MCPResult):
+        return res
+        
+    # If the tool returned a dictionary or list containing an error key
+    if isinstance(res, dict) and "error" in res:
+        return MCPResult(success=False, error=str(res["error"]))
+    if isinstance(res, list) and len(res) == 1 and isinstance(res[0], dict) and "error" in res[0]:
+        return MCPResult(success=False, error=str(res[0]["error"]))
+        
+    if isinstance(res, str):
+        res_stripped = res.strip()
+        if res_stripped.startswith("❌") or res_stripped.startswith("[ERROR]") or res_stripped.startswith("Security Error"):
+            return MCPResult(success=False, error=res)
+        elif res_stripped.startswith("⚠️") or res_stripped.startswith("[WARNING]"):
+            return MCPResult(success=False, error=res)
+        elif res_stripped.startswith("✅") or res_stripped.startswith("[SUCCESS]") or res_stripped.startswith("📁") or res_stripped.startswith("ℹ️"):
+            return MCPResult(success=True, message=res)
+        else:
+            return MCPResult(success=True, data=res)
+            
+    return MCPResult(success=True, data=res)
+
 original_tool = mcp.tool
 
 def token_crusher_tool(*args, **kwargs):
     def decorator(func):
-        if not SHOULD_COMPRESS:
-            return original_tool(*args, **kwargs)(func)
-
         if asyncio.iscoroutinefunction(func):
             @wraps(func)
             async def async_wrapper(*f_args, **f_kwargs):
-                res = await func(*f_args, **f_kwargs)
-                return compress_payload(res)
+                try:
+                    res = await func(*f_args, **f_kwargs)
+                    wrapped = wrap_in_mcp_result(res)
+                except Exception as e:
+                    if SHOULD_WRAP_MCP_RESULT:
+                        wrapped = MCPResult(success=False, error=str(e))
+                    else:
+                        raise e
+                
+                if SHOULD_COMPRESS:
+                    return compress_payload(wrapped)
+                return wrapped
             return original_tool(*args, **kwargs)(async_wrapper)
         else:
             @wraps(func)
             def sync_wrapper(*f_args, **f_kwargs):
-                res = func(*f_args, **f_kwargs)
-                return compress_payload(res)
+                try:
+                    res = func(*f_args, **f_kwargs)
+                    wrapped = wrap_in_mcp_result(res)
+                except Exception as e:
+                    if SHOULD_WRAP_MCP_RESULT:
+                        wrapped = MCPResult(success=False, error=str(e))
+                    else:
+                        raise e
+                
+                if SHOULD_COMPRESS:
+                    return compress_payload(wrapped)
+                return wrapped
             return original_tool(*args, **kwargs)(sync_wrapper)
     return decorator
 
