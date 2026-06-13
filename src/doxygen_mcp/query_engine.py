@@ -913,6 +913,13 @@ import subprocess
 
 
 def normalize_symbol_name(name: str) -> str:
+    """Normalize symbol name by removing whitespace, standardizing case, and converting namespace separators.
+
+    # Original task description (inaccurate for current implementation):
+    # Normalize symbol name by removing whitespace and const/&/* modifiers.
+    # name = name.replace(' ', '').replace('const', '')
+    # return name.replace('&', '').replace('*', '')
+    """
     return name.replace("::", ".").strip().lower()
 
 
@@ -929,9 +936,9 @@ def extract_param_names(args_str: str) -> List[str]:
     level = 0
     current = []
     for char in s:
-        if char in "([":
+        if char in "([<":
             level += 1
-        elif char in ")]":
+        elif char in ")]>":
             level -= 1
         elif char == "," and level == 0:
             parts.append("".join(current).strip())
@@ -945,15 +952,59 @@ def extract_param_names(args_str: str) -> List[str]:
     for part in parts:
         if not part:
             continue
+        # Strip default values
         part = part.split("=")[0].strip()
-        if ":" in part:
+        if ":" in part and "::" not in part:
+            # Python style annotations: a: int
             name = part.split(":")[0].strip()
         else:
-            words = part.split()
-            if words:
-                name = words[-1].strip()
+            # Strip trailing array brackets before splitting by space
+            # e.g., "int array[10]" -> "int array"
+            while part.endswith("]"):
+                idx = part.rfind("[")
+                if idx != -1:
+                    part = part[:idx].strip()
+                else:
+                    break
+
+            # Strip generic/template type args <...> so they don't mess up split
+            # Note: handle nested generic scopes by counting levels
+            clean_part = ""
+            generic_level = 0
+            for char in part:
+                if char == "<":
+                    generic_level += 1
+                elif char == ">":
+                    generic_level -= 1
+                elif generic_level == 0:
+                    clean_part += char
+
+            part = clean_part.strip()
+
+            # For function pointer "void (*func)(int)", we need special handling
+            # because splitting by space gives "(*func)(int)".
+            if "(*" in part and ")" in part:
+                # Extract 'func' from '(*func)'
+                # Find the innermost (*...) block
+                start_idx = part.find("(*")
+                if start_idx != -1:
+                    end_idx = part.find(")", start_idx)
+                    if end_idx != -1:
+                        # Extract the inner name, strip the '*' and space
+                        name = part[start_idx + 2 : end_idx].strip()
+                    else:
+                        words = part.split()
+                        name = words[-1].strip() if words else ""
+                else:
+                    words = part.split()
+                    name = words[-1].strip() if words else ""
             else:
-                name = ""
+                words = part.split()
+                if words:
+                    name = words[-1].strip()
+                else:
+                    name = ""
+
         if name:
             param_names.append(name.strip("*&"))
     return param_names
