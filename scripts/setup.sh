@@ -123,29 +123,8 @@ if $UV_BIN run python -c "import doxygen_mcp; print(doxygen_mcp.__version__)" &>
     
     echo -e "\n${GREEN}Setup Complete!${NC}\n"
     
-    PROJ_DIR=$(pwd)
-    TARGET_DIR="${1:-}"
-    
-    if [ -n "$TARGET_DIR" ]; then
-        if [ ! -d "$TARGET_DIR" ]; then
-            print_error "Target directory does not exist: $TARGET_DIR"
-            exit 1
-        fi
-        ABS_TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
-        echo -e "Generating configuration for target project: ${CYAN}$ABS_TARGET_DIR${NC}"
-        echo "-----------------------------------"
-        $UV_BIN run doxygen-mcp config --path "$ABS_TARGET_DIR"
-        echo "-----------------------------------"
-        echo "Copy the JSON above into your client settings (e.g. claude_desktop_config.json)."
-    else
-        echo "To configure this server in your IDE:"
-        echo "-----------------------------------"
-        echo -e "Command: ${CYAN}$UV_BIN${NC}"
-        echo -e "Args:    ${CYAN}--directory \"$PROJ_DIR\" run doxygen-mcp${NC}"
-        echo ""
-        echo -e "To generate a client configuration for a specific target project, run:"
-        echo -e "  ${CYAN}$UV_BIN run doxygen-mcp config --path /path/to/your/project${NC}"
-    fi
+    # Run the automated client configurator
+    $UV_BIN run python scripts/configure_client.py "$@"
 else
     print_error "Server failed to start. Try running 'uv sync' again."
     exit 1
