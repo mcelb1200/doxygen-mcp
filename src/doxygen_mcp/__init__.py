@@ -20,7 +20,7 @@ Key Features:
 - Custom theme and layout support
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __author__ = "Positronikal"
 __email__ = "hoyt.harness@gmail.com"
 

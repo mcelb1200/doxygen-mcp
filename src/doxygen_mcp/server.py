@@ -45,6 +45,7 @@ from .utils import (
 from .git_tracker import get_file_timeline
 from .funnel import setup_funnel, minify_xml_file
 from .types import MCPResult
+from . import __version__
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -239,6 +240,39 @@ async def _minify_all_xml(xml_dir: str) -> None:
 
     await asyncio.gather(*[_sem_minify(f) for f in xml_files])
 
+_UPDATE_CHECK_CACHE: Optional[str] = None
+
+def _check_for_updates_sync() -> Optional[str]:
+    """Synchronous version checker using urllib."""
+    global _UPDATE_CHECK_CACHE
+    if _UPDATE_CHECK_CACHE is not None:
+        return _UPDATE_CHECK_CACHE if _UPDATE_CHECK_CACHE != "" else None
+
+    import urllib.request
+    import json
+    try:
+        url = "https://pypi.org/pypi/doxygen-mcp/json"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": f"doxygen-mcp/{__version__}"}
+        )
+        with urllib.request.urlopen(req, timeout=1.0) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode("utf-8"))
+                latest_version = data["info"]["version"]
+                
+                def parse_ver(v):
+                    return tuple(map(int, v.split("+")[0].split("rc")[0].split("a")[0].split("b")[0].split(".")))
+                
+                if parse_ver(latest_version) > parse_ver(__version__):
+                    _UPDATE_CHECK_CACHE = latest_version
+                    return latest_version
+    except Exception:
+        pass
+    
+    _UPDATE_CHECK_CACHE = ""
+    return None
+
 @mcp.tool()
 async def get_context_info() -> Dict[str, Any]:
     """Get project context, language, and IDE info."""
@@ -251,7 +285,14 @@ async def get_context_info() -> Dict[str, Any]:
 
         has_doxyfile = await asyncio.to_thread((project_path / "Doxyfile").exists)
 
-        return {
+        # Check for updates in the background
+        update_available = None
+        try:
+            update_available = await asyncio.to_thread(_check_for_updates_sync)
+        except Exception:
+            pass
+
+        res = {
             "project_root": str(project_path),
             "detected_language": language,
             "ide_environment": ide_info,
@@ -261,6 +302,13 @@ async def get_context_info() -> Dict[str, Any]:
                 "config_path": str(project_path / "Doxyfile") if has_doxyfile else None
             }
         }
+        if update_available:
+            logger.warning(
+                "⚠️ UPDATE AVAILABLE: A newer version of doxygen-mcp (v%s) is available. Run 'uv tool upgrade doxygen-mcp' to update.",
+                update_available
+            )
+            res["update_warning"] = f"⚠️ UPDATE AVAILABLE: A newer version of doxygen-mcp (v{update_available}) is available. Run 'uv tool upgrade doxygen-mcp' to update."
+        return res
     except Exception as e:  # pylint: disable=broad-exception-caught
         return {"error": str(e)}
 
