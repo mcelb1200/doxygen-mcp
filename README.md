@@ -96,6 +96,17 @@ uv run doxygen-mcp config --gemini
 * **`DOXYGEN_NM_PATH`**: Explicit path to `nm`/`llvm-nm` executable for linkage audits.
 * **`DOXYGEN_BUILD_DIR`**: Path containing compiled object files (`.o`, `.obj`) to scan.
 
+## 📁 Multi-Project Context Safety (doxygen_mcp.json)
+To allow a single global server instance to safely reference neighbor projects or dependencies, create a `doxygen_mcp.json` file in your project root:
+```json
+{
+  "allowed_paths": [
+    "/absolute/path/to/dependency",
+    "../relative-neighbor-project"
+  ]
+}
+```
+
 ## 🛡️ Security
 - **Path Protection**: Restrict access to project root.
 - **Symlink Safety**: No symbolic link following for writes.

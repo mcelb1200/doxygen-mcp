@@ -37,6 +37,17 @@ Default: current dir. Other project:
 **Method C (Env Vars):**
 Set `DOXYGEN_PROJECT_ROOT` & `DOXYGEN_ALLOWED_PATHS`.
 
+### 📁 Project-level Allowed Paths (doxygen_mcp.json)
+To allow a single global server instance to safely access other projects or dependencies, create a `doxygen_mcp.json` file in your project's root folder:
+```json
+{
+  "allowed_paths": [
+    "/absolute/path/to/other/project",
+    "../relative-neighbor-project"
+  ]
+}
+```
+
 ## ⚙️ Advanced Features
 
 ### 🗜️ Token Crusher Middleware

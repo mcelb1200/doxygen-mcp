@@ -351,7 +351,7 @@ async def create_doxygen_project(
         await asyncio.to_thread(_write_doxyfile_sync, doxyfile_path, config.to_doxyfile())
 
         # Update .gitignore
-        await update_ignore_file(safe_project_path, "docs/")
+        await update_ignore_file(safe_project_path, "docs/xml/")
 
         return (
             f"✅ Doxygen project '{project_name}' created successfully "

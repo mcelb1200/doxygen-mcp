@@ -71,6 +71,27 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
             if p.strip():
                 safe_roots.append(Path(os.path.abspath(os.path.realpath(p.strip()))))
 
+    # Load project-specific allowed paths from doxygen_mcp.json in base root
+    base_root = safe_roots[0] if safe_roots else discovery_root
+    config_file = base_root / "doxygen_mcp.json"
+    if config_file.exists() and not config_file.is_symlink():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+                if isinstance(config_data, dict):
+                    extra_paths = config_data.get("allowed_paths", [])
+                    if isinstance(extra_paths, list):
+                        for p in extra_paths:
+                            if isinstance(p, str) and p.strip():
+                                p_path = Path(p.strip())
+                                if not p_path.is_absolute():
+                                    p_path = (base_root / p_path).resolve()
+                                else:
+                                    p_path = p_path.resolve()
+                                safe_roots.append(p_path)
+        except Exception:
+            pass
+
     if not project_path:
         return safe_roots[0] if safe_roots else discovery_root
 

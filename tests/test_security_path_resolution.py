@@ -93,3 +93,51 @@ def test_resolve_project_path_no_bypass_without_env_var():
                 with pytest.raises(ValueError) as excinfo:
                     resolve_project_path(str(tmp_path))
                 assert "Security Error: Access denied" in str(excinfo.value)
+
+def test_resolve_project_path_with_doxygen_mcp_json():
+    """
+    Test that resolve_project_path loads allowed_paths from doxygen_mcp.json.
+    """
+    import json
+    with tempfile.TemporaryDirectory() as base_dir:
+        base_path = Path(base_dir).resolve()
+        
+        # Create a neighbor directory we want to allow access to
+        with tempfile.TemporaryDirectory() as allowed_dir:
+            allowed_path = Path(allowed_dir).resolve()
+            
+            # Write doxygen_mcp.json specifying allowed_paths
+            config_file = base_path / "doxygen_mcp.json"
+            config_data = {
+                "allowed_paths": [
+                    str(allowed_path),
+                    "../relative_allowed_path"
+                ]
+            }
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(config_data, f)
+                
+            # Set DOXYGEN_PROJECT_ROOT to base_path
+            env = {
+                "DOXYGEN_PROJECT_ROOT": str(base_path)
+            }
+            with patch.dict(os.environ, env, clear=True):
+                # Ensure PYTEST_CURRENT_TEST is not set to avoid bypass
+                if "PYTEST_CURRENT_TEST" in os.environ:
+                    del os.environ["PYTEST_CURRENT_TEST"]
+                    
+                # Requesting base_path should work
+                assert resolve_project_path(str(base_path)) == base_path
+                
+                # Requesting explicitly allowed absolute path should work
+                assert resolve_project_path(str(allowed_path)) == allowed_path
+                
+                # Requesting explicitly allowed relative path should resolve and work
+                rel_path = (base_path / "../relative_allowed_path").resolve()
+                assert resolve_project_path(str(rel_path)) == rel_path
+                
+                # Requesting a random unauthorized path should fail
+                unsafe_path = Path("/usr/local/bin").resolve()
+                with pytest.raises(ValueError) as excinfo:
+                    resolve_project_path(str(unsafe_path))
+                assert "Security Error: Access denied" in str(excinfo.value)
