@@ -913,6 +913,13 @@ import subprocess
 
 
 def normalize_symbol_name(name: str) -> str:
+    """Normalize symbol name by removing whitespace, standardizing case, and converting namespace separators.
+
+    # Original task description (inaccurate for current implementation):
+    # Normalize symbol name by removing whitespace and const/&/* modifiers.
+    # name = name.replace(' ', '').replace('const', '')
+    # return name.replace('&', '').replace('*', '')
+    """
     return name.replace("::", ".").strip().lower()
 
 
