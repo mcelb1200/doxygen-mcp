@@ -389,3 +389,20 @@ def test_fetch_compound_connections_no_compounddef(
     result = engine._fetch_compound_connections("no_compounddef")
     assert "error" in result
     assert "No compounddef found" in result["error"]
+
+
+@pytest.mark.parametrize(
+    "input_name, expected_name",
+    [
+        ("my_function", "my_function"),
+        ("  my_function  ", "my_function"),
+        ("My_Function", "my_function"),
+        ("Namespace::Class::Method", "namespace.class.method"),
+        ("  NAMESPACE::Class::method  ", "namespace.class.method"),
+        ("", ""),
+        ("::", "."),
+    ],
+)
+def test_normalize_symbol_name(input_name, expected_name):
+    """Test that normalize_symbol_name correctly handles whitespace, case, and namespace operators."""
+    assert normalize_symbol_name(input_name) == expected_name

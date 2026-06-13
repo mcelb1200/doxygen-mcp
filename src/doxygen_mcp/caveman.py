@@ -80,7 +80,8 @@ def compress_text(text: str) -> str:
     # 2. Replace synonyms
     text = SYNONYMS_RE.sub(_replace_synonym, text)
     # 3. Clean up whitespace
-    text = re.sub(r"\s+", " ", text)
+    # Replace multiple spaces/tabs with single space but preserve newlines
+    text = re.sub(r"[ \t]+", " ", text)
     # 4. Clean up spaces before punctuation
     text = re.sub(r"\s+([.,!?;:])", r"\1", text)
     return text.strip()

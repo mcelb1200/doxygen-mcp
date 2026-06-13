@@ -99,11 +99,13 @@ class DoxygenSearchIndex:
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE VIRTUAL TABLE symbols USING fts5(
                 name, kind, refid, brief, detailed, filepath
             )
-        """)
+        """
+        )
 
         try:
             tree = ET.parse(self.index_xml)

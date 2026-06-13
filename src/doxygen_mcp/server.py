@@ -25,6 +25,8 @@ try:
 except ImportError:
     HAS_WATCHDOG = False
 
+import shutil
+
 # MCP server imports
 from mcp.server.fastmcp import FastMCP
 
@@ -977,6 +979,110 @@ async def doxy_parity_check(project_path: Optional[str] = None) -> List[Dict[str
         return [{"error": str(e)}]
 
 
+def _merge_index_xml_sync(main_index_path: Path, temp_index_path: Path) -> None:
+    """Helper to merge temporary index.xml into main index.xml."""
+    import defusedxml.ElementTree as ET
+
+    try:
+        main_tree = ET.parse(main_index_path)
+        main_root = main_tree.getroot()
+
+        temp_tree = ET.parse(temp_index_path)
+        temp_root = temp_tree.getroot()
+
+        if main_root is None or temp_root is None:
+            return
+
+        temp_compounds = temp_root.findall("compound")
+        if temp_compounds:
+            for temp_compound in temp_compounds:
+                refid = temp_compound.get("refid")
+                if refid:
+                    existing_nodes = main_root.findall(f"./compound[@refid='{refid}']")
+                    if existing_nodes:
+                        for existing in existing_nodes:
+                            main_root.remove(existing)
+                    main_root.append(temp_compound)
+
+        main_tree.write(main_index_path, encoding="utf-8", xml_declaration=True)
+    except Exception as err:
+        logger.error("Failed to merge index.xml: %s", err)
+
+
+async def _process_delta_xml_files(temp_xml_out: Path, xml_dest_dir: Path) -> int:
+    """Helper to minify and copy generated XML files."""
+    from .funnel import minify_xml_file
+
+    temp_xml_files = list(temp_xml_out.glob("*.xml"))
+    copied_count = 0
+    for temp_file in temp_xml_files:
+        if temp_file.name in ("index.xml", "index.xsd", "compound.xsd", "xml.xsd"):
+            continue
+
+        await asyncio.to_thread(minify_xml_file, str(temp_file))
+        dest_file = xml_dest_dir / temp_file.name
+        await asyncio.to_thread(shutil.copy2, temp_file, dest_file)
+        copied_count += 1
+    return copied_count
+
+
+async def _generate_delta_xml(
+    resolved_path: Path, target_path: Path, delta_temp: Path
+) -> None:
+    """Helper to generate delta XML for a specific path."""
+    base_doxyfile = "Doxyfile"
+    if (resolved_path / "Doxyfile.fast").exists():
+        base_doxyfile = "Doxyfile.fast"
+    elif not (resolved_path / "Doxyfile").exists():
+        doxyfile_path = resolved_path / "Doxyfile"
+        doxygen_exe = get_doxygen_executable()
+        await asyncio.create_subprocess_exec(
+            doxygen_exe,
+            "-g",
+            str(doxyfile_path),
+            cwd=str(resolved_path),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+
+    temp_doxyfile_content = f"""# Temporary Doxyfile for Delta Refresh
+@INCLUDE               = {base_doxyfile}
+INPUT                  = "{target_path}"
+OUTPUT_DIRECTORY       = "{delta_temp}"
+GENERATE_XML           = YES
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+XML_OUTPUT             = xml
+"""
+    temp_doxyfile_path = delta_temp / "Doxyfile.temp"
+    await asyncio.to_thread(
+        temp_doxyfile_path.write_text, temp_doxyfile_content, encoding="utf-8"
+    )
+
+    doxygen_exe = get_doxygen_executable()
+    process = await asyncio.create_subprocess_exec(
+        doxygen_exe,
+        str(temp_doxyfile_path),
+        cwd=str(resolved_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
+    except asyncio.TimeoutError as exc:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        await process.wait()
+        raise TimeoutError("Doxygen delta generation timed out.") from exc
+
+    if process.returncode != 0:
+        stderr_text = stderr.decode(errors="replace") if stderr else ""
+        raise RuntimeError(f"Doxygen delta generation failed:\n{stderr_text}")
+
+
 @mcp.tool(name="doxy_refresh_delta")
 async def doxy_refresh_delta(
     file_or_dir_path: str, project_path: Optional[str] = None
@@ -1012,72 +1118,15 @@ async def doxy_refresh_delta(
         temp_xml_out = delta_temp / "xml"
         await asyncio.to_thread(temp_xml_out.mkdir, exist_ok=True)
 
-        base_doxyfile = "Doxyfile"
-        if (resolved_path / "Doxyfile.fast").exists():
-            base_doxyfile = "Doxyfile.fast"
-        elif not (resolved_path / "Doxyfile").exists():
-            doxyfile_path = resolved_path / "Doxyfile"
-            doxygen_exe = get_doxygen_executable()
-            await asyncio.create_subprocess_exec(
-                doxygen_exe,
-                "-g",
-                str(doxyfile_path),
-                cwd=str(resolved_path),
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-
-        temp_doxyfile_content = f"""# Temporary Doxyfile for Delta Refresh
-@INCLUDE               = {base_doxyfile}
-INPUT                  = "{target_path}"
-OUTPUT_DIRECTORY       = "{delta_temp}"
-GENERATE_XML           = YES
-GENERATE_HTML          = NO
-GENERATE_LATEX         = NO
-XML_OUTPUT             = xml
-"""
-        temp_doxyfile_path = delta_temp / "Doxyfile.temp"
-        await asyncio.to_thread(
-            temp_doxyfile_path.write_text, temp_doxyfile_content, encoding="utf-8"
-        )
-
-        doxygen_exe = get_doxygen_executable()
-        process = await asyncio.create_subprocess_exec(
-            doxygen_exe,
-            str(temp_doxyfile_path),
-            cwd=str(resolved_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
         try:
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=60.0)
-        except asyncio.TimeoutError:
-            try:
-                process.kill()
-            except ProcessLookupError:
-                pass
-            await process.wait()
-            return "❌ Error: Doxygen delta generation timed out."
+            await _generate_delta_xml(resolved_path, target_path, delta_temp)
+        except TimeoutError as e:
+            return f"❌ Error: {str(e)}"
+        except RuntimeError as e:
+            return f"❌ Error: {str(e)}"
 
-        if process.returncode != 0:
-            stderr_text = stderr.decode(errors="replace") if stderr else ""
-            return f"❌ Error: Doxygen delta generation failed:\n{stderr_text}"
-
-        from .funnel import minify_xml_file
-
-        temp_xml_files = list(temp_xml_out.glob("*.xml"))
         xml_dest_dir = Path(xml_dir)
-
-        copied_count = 0
-        for temp_file in temp_xml_files:
-            if temp_file.name in ("index.xml", "index.xsd", "compound.xsd", "xml.xsd"):
-                continue
-
-            await asyncio.to_thread(minify_xml_file, str(temp_file))
-            dest_file = xml_dest_dir / temp_file.name
-            await asyncio.to_thread(shutil.copy2, temp_file, dest_file)
-            copied_count += 1
+        copied_count = await _process_delta_xml_files(temp_xml_out, xml_dest_dir)
 
         temp_index_path = temp_xml_out / "index.xml"
         main_index_path = xml_dest_dir / "index.xml"
@@ -1086,40 +1135,9 @@ XML_OUTPUT             = xml
             if not main_index_path.exists():
                 await asyncio.to_thread(shutil.copy2, temp_index_path, main_index_path)
             else:
-
-                def merge_indexes():
-                    import defusedxml.ElementTree as ET
-
-                    try:
-                        main_tree = ET.parse(main_index_path)
-                        main_root = main_tree.getroot()
-
-                        temp_tree = ET.parse(temp_index_path)
-                        temp_root = temp_tree.getroot()
-
-                        if main_root is None or temp_root is None:
-                            return
-
-                        temp_compounds = temp_root.findall("compound")
-                        if temp_compounds:
-                            for temp_compound in temp_compounds:
-                                refid = temp_compound.get("refid")
-                                if refid:
-                                    existing_nodes = main_root.findall(
-                                        f"./compound[@refid='{refid}']"
-                                    )
-                                    if existing_nodes:
-                                        for existing in existing_nodes:
-                                            main_root.remove(existing)
-                                    main_root.append(temp_compound)
-
-                        main_tree.write(
-                            main_index_path, encoding="utf-8", xml_declaration=True
-                        )
-                    except Exception as err:
-                        logger.error("Failed to merge index.xml: %s", err)
-
-                await asyncio.to_thread(merge_indexes)
+                await asyncio.to_thread(
+                    _merge_index_xml_sync, main_index_path, temp_index_path
+                )
 
         await asyncio.to_thread(shutil.rmtree, delta_temp, ignore_errors=True)
 
