@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
-from doxygen_mcp.query_engine import DoxygenQueryEngine, normalize_symbol_name
+from doxygen_mcp.query_engine import DoxygenQueryEngine
 
 # pylint: enable=import-error
 
