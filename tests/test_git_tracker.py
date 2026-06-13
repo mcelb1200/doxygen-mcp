@@ -38,6 +38,42 @@ def test_get_git_root_failure():
         assert root is None
 
 
+def test_get_git_root_happy_path():
+    """Test successful git root retrieval returning valid path."""
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.stdout = "/path/to/repo\n"
+        mock_run.return_value = mock_result
+
+        root = get_git_root(Path("/path/to/repo/file.py"))
+        assert root == Path("/path/to/repo")
+        mock_run.assert_called_once_with(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=Path("/path/to/repo"),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+
+def test_get_git_root_file_not_found():
+    """Test git root retrieval failure due to missing executable."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = FileNotFoundError()
+
+        root = get_git_root(Path("/path/to/repo/file.py"))
+        assert root is None
+
+
+def test_get_git_root_oserror():
+    """Test git root retrieval failure due to an OSError."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = OSError("Unexpected error")
+
+        root = get_git_root(Path("/path/to/repo/file.py"))
+        assert root is None
+
+
 def test_check_working_tree_clean():
     """Test clean working tree."""
     repo_root = Path("/path/to/repo")
@@ -219,3 +255,22 @@ def test_get_file_timeline_not_indexed(mock_resolve, mock_branch, mock_tree, moc
     timeline = get_file_timeline("/path/to/repo/file.py", is_indexed=False)
 
     assert "Documentation State: [NOT INDEXED]" in timeline
+
+
+@patch("doxygen_mcp.git_tracker.get_git_root")
+@patch("doxygen_mcp.git_tracker.check_working_tree")
+@patch("doxygen_mcp.git_tracker.check_branch_state")
+@patch("pathlib.Path.resolve")
+def test_get_file_timeline_relative_to_value_error(mock_resolve, mock_branch, mock_tree, mock_root):
+    """Test timeline generation handling ValueError when path is not relative to repo root."""
+    mock_resolve.return_value = Path("/outside/repo/file.py")
+    mock_root.return_value = Path("/path/to/repo")
+    mock_tree.return_value = "[CLEAN]"
+    mock_branch.return_value = "[SYNCED]"
+
+    timeline = get_file_timeline("/outside/repo/file.py")
+
+    assert "[SYMBOL TIMELINE: file.py]" in timeline
+    assert "Documentation State: Reflects HEAD commit ('What Was')." in timeline
+    assert "Working Tree State: [CLEAN]" in timeline
+    assert "Branch State: [SYNCED]" in timeline
