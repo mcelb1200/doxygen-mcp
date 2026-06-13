@@ -101,19 +101,6 @@ else
     fi
 fi
 
-# 7. Agent Communication Optimization (Caveman)
-print_header "Agent Communication Optimization"
-if [ ! -d "$HOME/.claude" ]; then
-    mkdir -p "$HOME/.claude"
-fi
-
-if [ ! -f "$HOME/.claude/.caveman-active" ]; then
-    echo "Enabling Caveman High-SNR mode for agent reports..."
-    echo "compress" > "$HOME/.claude/.caveman-active"
-    print_success "Caveman mode enabled."
-else
-    print_success "Caveman mode already active."
-fi
 
 # 6. Verification
 print_header "Verifying Installation"

@@ -198,15 +198,90 @@ def update_project_gitignore(target_project: Path):
     except OSError as e:
         print(f"Warning: Failed to write to .gitignore: {e}")
 
+def prompt_yes_no(question: str, default: bool) -> bool:
+    """Prompt the user with a yes/no question."""
+    suffix = " (Y/n)" if default else " (y/N)"
+    while True:
+        try:
+            ans = input(question + suffix + ": ").strip().lower()
+            if not ans:
+                return default
+            if ans in ('y', 'yes'):
+                return True
+            if ans in ('n', 'no'):
+                return False
+            print("Please enter 'y' or 'n'.")
+        except (KeyboardInterrupt, EOFError):
+            print()
+            return default
+
 def main():
     parser = argparse.ArgumentParser(description="Configure doxygen-mcp clients")
     parser.add_argument("path", nargs="?", default=None, help="Target project root directory (default: CWD-aware dynamic mode)")
     parser.add_argument("--non-interactive", action="store_true", help="Run automatically without prompting")
     parser.add_argument("--sanitize", action="store_true", help="Sanitize absolute paths to home-relative (~) in client configurations")
+    parser.add_argument("--install-hooks", action="store_true", default=None, help="Force install git hooks in target project")
+    parser.add_argument("--no-install-hooks", action="store_true", help="Force skip git hooks installation")
+    parser.add_argument("--enable-caveman", action="store_true", default=None, help="Force enable Caveman agent optimization")
+    parser.add_argument("--no-caveman", action="store_true", help="Force skip Caveman agent optimization")
     args = parser.parse_args()
     
     target_project = Path(args.path).resolve() if args.path else None
     repo_root = Path(__file__).resolve().parent.parent
+    
+    # 0. Resolve optional components
+    
+    # 0.1. Resolve Caveman preference
+    caveman_enabled = True
+    if args.no_caveman:
+        caveman_enabled = False
+    elif args.enable_caveman:
+        caveman_enabled = True
+    elif not args.non_interactive:
+        caveman_enabled = prompt_yes_no(
+            "\nEnable Caveman Agent Communication Optimization (high-SNR report compression)?",
+            default=True
+        )
+
+    if caveman_enabled:
+        claude_dir = Path.home() / ".claude"
+        claude_dir.mkdir(exist_ok=True)
+        caveman_active = claude_dir / ".caveman-active"
+        if not caveman_active.exists():
+            try:
+                with open(caveman_active, "w", encoding="utf-8") as f:
+                    f.write("compress\n")
+                print("  Successfully enabled Caveman high-SNR mode.")
+            except OSError as e:
+                print(f"  Warning: Failed to enable Caveman mode: {e}")
+        else:
+            print("  Caveman mode already active.")
+    else:
+        print("  Skipped Caveman agent optimization.")
+
+    # 0.2. Resolve Git Hooks preference
+    install_hooks_selected = False
+    if target_project:
+        if args.no_install_hooks:
+            install_hooks_selected = False
+        elif args.install_hooks:
+            install_hooks_selected = True
+        elif not args.non_interactive:
+            install_hooks_selected = prompt_yes_no(
+                f"\nInstall Git Hooks in '{target_project.name}' for auto-syncing documentation?",
+                default=False
+            )
+
+        if install_hooks_selected:
+            print(f"Installing Git Hooks to {target_project}...")
+            sys.path.append(str(Path(__file__).resolve().parent))
+            try:
+                from install_hooks import install_hooks
+                install_hooks(target_project)
+            except Exception as e:
+                print(f"  Warning: Failed to install git hooks: {e}")
+        else:
+            print("  Skipped Git Hooks installation.")
     
     # 1. Install tool globally
     install_standalone_tool()
