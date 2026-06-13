@@ -109,8 +109,18 @@ class DoxygenSearchIndex:
                 logger.error("Empty or invalid index.xml in %s", self.xml_dir)
                 return
 
+            batch = []
             for compound in root.findall("compound"):
-                self._process_compound_element(compound, cursor)
+                result = self._process_compound_element(compound)
+                if result:
+                    batch.append(result)
+
+            if batch:
+                cursor.executemany(
+                    "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    batch
+                )
         except Exception as e:
             logger.error("Error parsing Doxygen XML for index: %s", e)
 
@@ -119,8 +129,8 @@ class DoxygenSearchIndex:
         conn.close()
         logger.info("FTS5 index build complete.")
 
-    def _process_compound_element(self, compound, cursor):
-        """Helper to process a compound element and insert into DB."""
+    def _process_compound_element(self, compound):
+        """Helper to process a compound element and return data tuple for DB insert."""
         refid = compound.get("refid", "")
         kind = compound.get("kind", "")
         name_elem = compound.find("name")
@@ -128,11 +138,7 @@ class DoxygenSearchIndex:
 
         brief, detailed, filepath = self._parse_detailed_xml(refid)
 
-        cursor.execute(
-            "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (name, kind, refid, brief, detailed, filepath)
-        )
+        return (name, kind, refid, brief, detailed, filepath)
 
     def _ingest_broader_context(self, cursor):
         """Scan repository for documentation files and ingest them."""
