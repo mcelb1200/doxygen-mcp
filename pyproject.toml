@@ -6,7 +6,12 @@ readme = "README.md"
 requires-python = ">=3.11.2"
 license = { file = "COPYING.md" }
 authors = [
-    { name = "Positronikal", email = "hoyt.harness@gmail.com" }
+    { name = "Hoyt Harness", email = "hoyt.harness@gmail.com" },
+    { name = "Gemini", email = "gemini@google.com" },
+    { name = "Claude AI" },
+    { name = "mcelb1200" },
+    { name = "positronikal" },
+    { name = "Matt Pocock" }
 ]
 keywords = ["mcp", "model-context-protocol", "doxygen", "documentation", "claude"]
 classifiers = [
