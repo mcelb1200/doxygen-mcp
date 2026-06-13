@@ -261,7 +261,9 @@ def test_get_file_timeline_not_indexed(mock_resolve, mock_branch, mock_tree, moc
 @patch("doxygen_mcp.git_tracker.check_working_tree")
 @patch("doxygen_mcp.git_tracker.check_branch_state")
 @patch("pathlib.Path.resolve")
-def test_get_file_timeline_relative_to_value_error(mock_resolve, mock_branch, mock_tree, mock_root):
+def test_get_file_timeline_relative_to_value_error(
+    mock_resolve, mock_branch, mock_tree, mock_root
+):
     """Test timeline generation handling ValueError when path is not relative to repo root."""
     mock_resolve.return_value = Path("/outside/repo/file.py")
     mock_root.return_value = Path("/path/to/repo")
