@@ -3,7 +3,7 @@ name = "doxygen-mcp"
 version = "1.0.1"
 description = "A comprehensive Model Context Protocol (MCP) server that provides full access to Doxygen's documentation generation capabilities."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = { file = "COPYING.md" }
 authors = [
     { name = "Positronikal", email = "hoyt.harness@gmail.com" }
@@ -14,7 +14,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Documentation",
 ]
@@ -32,6 +31,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "black>=22.0.0",
+    "isort>=5.0.0",
     "mypy>=1.0.0",
     "pylint>=3.0.0",
     "types-defusedxml",
