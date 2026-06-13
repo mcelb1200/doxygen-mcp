@@ -36,7 +36,7 @@ Bridges source code and AI. Enables:
 ```bash
 git clone https://github.com/mcelb1200/doxygen-mcp
 cd doxygen-mcp
-./scripts/setup.sh
+./scripts/setup.sh [/optional/target/project/path]
 ```
 
 ### Windows
@@ -82,8 +82,16 @@ uv run doxygen-mcp config --gemini
 | `generate_architecture_review` | Visual HTML review. Opens browser. |
 | `doxy_doc_gaps` | Scan codebase for undocumented symbols (uses AST for Python). |
 | `doxy_binary_gaps` | Scan build objects for compiled symbol gaps. |
+| `doxy_references` | Find symbol call sites and occurrences. |
+| `doxy_rename_impact` | Predict rename breakages (callers, subclasses). |
+| `doxy_parity_check` | Find mismatched, redundant, or missing `@param` tags. |
+| `doxy_refresh_delta` | Fast incremental refresh of single file or folder index. |
+| `doxy_skeleton` | Get file structural signatures with bodies stripped. |
+| `doxy_virtual_diff` | Diff working tree signatures against index for API breakages. |
+| `doxy_trace_path` | Trace call path chains sequentially to debug execution. |
 
 ## ⚙️ Configuration Options
+* **`DOXYGEN_USE_MCP_RESULT`**: Wrap tool responses in structured Pydantic `MCPResult` schema (`success`, `data`, `error`, `message`). Defaults to `true` (except in pytest).
 * **`DOXYGEN_COMPRESS_OUTPUT`**: Toggle global output token compression (Token Crusher Middleware). Defaults to `true`. Set to `false` in local env config to disable compression.
 * **`DOXYGEN_NM_PATH`**: Explicit path to `nm`/`llvm-nm` executable for linkage audits.
 * **`DOXYGEN_BUILD_DIR`**: Path containing compiled object files (`.o`, `.obj`) to scan.
