@@ -11,10 +11,10 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
 )
 
-from doxygen_mcp.caveman import compress_payload, compress_text
-from doxygen_mcp.reporter import discover_candidates, generate_report_html
 from pydantic import BaseModel
 
+from doxygen_mcp.caveman import compress_payload, compress_text
+from doxygen_mcp.reporter import discover_candidates, generate_report_html
 from doxygen_mcp.server import (
     generate_architecture_review,
     generate_context_report,

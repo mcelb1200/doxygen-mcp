@@ -2,8 +2,10 @@
 Mock implementation of pydantic for CI and tests.
 """
 
+
 class BaseModel:
     """Mock BaseModel class."""
+
     def __init__(self, **kwargs):
         """Mock constructor."""
         for key, value in kwargs.items():
