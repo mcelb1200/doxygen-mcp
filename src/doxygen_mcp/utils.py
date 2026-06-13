@@ -56,7 +56,10 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
             if os.path.exists(os.path.join(parent_str, marker)):
                 return parent
 
-    return current
+    raise FileNotFoundError(
+        f"Could not find project root containing any of {markers} "
+        f"starting from {current}"
+    )
 
 
 def resolve_project_path(project_path: Optional[str] = None) -> Path:
@@ -90,7 +93,11 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
             safe_roots.append(Path(os.path.abspath(os.path.realpath(val))))
 
     # Priority 4: Search upwards from CWD
-    discovery_root = find_project_root(Path.cwd())
+    try:
+        discovery_root = find_project_root(Path.cwd())
+    except FileNotFoundError:
+        discovery_root = Path.cwd()
+
     safe_roots.append(discovery_root)
 
     # Add explicitly allowed paths from environment
