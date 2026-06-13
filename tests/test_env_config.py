@@ -211,3 +211,78 @@ class TestEnvConfig:
         ):
             resolved = resolve_project_path(None)
             assert resolved == (home_path / "test_foo").resolve()
+
+    def test_find_project_root_in_current_dir(self, tmp_path):
+        """Test when the marker is in the starting directory."""
+        marker_file = tmp_path / ".git"
+        marker_file.mkdir()
+
+        from doxygen_mcp.utils import find_project_root
+        result = find_project_root(tmp_path)
+        assert result == tmp_path.resolve()
+
+    def test_find_project_root_in_parent_dir(self, tmp_path):
+        """Test when the marker is in a parent directory."""
+        from doxygen_mcp.utils import find_project_root
+        marker_file = tmp_path / "pyproject.toml"
+        marker_file.touch()
+
+        sub_dir = tmp_path / "src" / "module"
+        sub_dir.mkdir(parents=True)
+
+        result = find_project_root(sub_dir)
+        assert result == tmp_path.resolve()
+
+    def test_find_project_root_in_grandparent_dir(self, tmp_path):
+        """Test when the marker is in a grandparent directory."""
+        from doxygen_mcp.utils import find_project_root
+        marker_dir = tmp_path / ".svn"
+        marker_dir.mkdir()
+
+        deep_dir = tmp_path / "a" / "b" / "c" / "d"
+        deep_dir.mkdir(parents=True)
+
+        result = find_project_root(deep_dir, markers=[".svn"])
+        assert result == tmp_path.resolve()
+
+    def test_find_project_root_not_found(self, tmp_path):
+        """Test when no marker is found in the entire hierarchy."""
+        from doxygen_mcp.utils import find_project_root
+        # Create a deep structure with no markers
+        deep_dir = tmp_path / "x" / "y" / "z"
+        deep_dir.mkdir(parents=True)
+
+        with pytest.raises(FileNotFoundError, match="Could not find project root containing any of"):
+            find_project_root(deep_dir)
+
+    def test_find_project_root_custom_markers(self, tmp_path):
+        """Test using custom markers."""
+        from doxygen_mcp.utils import find_project_root
+        default_marker = tmp_path / ".git"
+        default_marker.mkdir()
+
+        sub_dir = tmp_path / "subdir"
+        sub_dir.mkdir()
+
+        custom_marker = sub_dir / "custom_marker.txt"
+        custom_marker.touch()
+
+        deep_dir = sub_dir / "deep"
+        deep_dir.mkdir()
+
+        # With default markers, it would find .git in tmp_path
+        # But with custom markers, it should find custom_marker.txt in sub_dir
+        result = find_project_root(deep_dir, markers=["custom_marker.txt"])
+        assert result == sub_dir.resolve()
+
+    def test_find_project_root_custom_markers_not_found(self, tmp_path):
+        """Test custom markers when not found."""
+        from doxygen_mcp.utils import find_project_root
+        default_marker = tmp_path / ".git"
+        default_marker.mkdir()
+
+        deep_dir = tmp_path / "subdir" / "deep"
+        deep_dir.mkdir(parents=True)
+
+        with pytest.raises(FileNotFoundError, match="Could not find project root containing any of"):
+            find_project_root(deep_dir, markers=["non_existent_marker.txt"])
