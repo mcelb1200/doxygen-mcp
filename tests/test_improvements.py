@@ -39,30 +39,32 @@ def test_caveman_payload_compression_dict_list():
     expected = {"title": "standard config module", "values": ["impl", 42, True]}
     assert compress_payload(payload) == expected
 
+
 def test_caveman_payload_compression_tuple():
     # Test tuple traversal
     payload = ("the configuration", "a documentation file", 100)
     expected = ("config", "docs file", 100)
     assert compress_payload(payload) == expected
 
+
 class DummyModel(BaseModel):
     name: str
     description: str
     count: int
+
 
 def test_caveman_payload_compression_pydantic():
     # Test Pydantic BaseModel traversal
     model = DummyModel(
         name="the authentication service",
         description="really basically an implementation for databases",
-        count=5
+        count=5,
     )
     expected_model = DummyModel(
-        name="auth service",
-        description="impl for DBs",
-        count=5
+        name="auth service", description="impl for DBs", count=5
     )
     assert compress_payload(model) == expected_model
+
 
 def test_caveman_payload_compression_nested():
     # Test deeply nested payloads
@@ -71,20 +73,17 @@ def test_caveman_payload_compression_nested():
             {
                 "level2_tuple": ("just a request", "the response"),
                 "level2_str": "certainly a repository",
-                "level2_int": 404
+                "level2_int": 404,
             }
         ]
     }
     expected = {
         "level1": [
-            {
-                "level2_tuple": ("req", "res"),
-                "level2_str": "repo",
-                "level2_int": 404
-            }
+            {"level2_tuple": ("req", "res"), "level2_str": "repo", "level2_int": 404}
         ]
     }
     assert compress_payload(payload) == expected
+
 
 def test_caveman_payload_compression_edge_cases():
     # Test edge cases: None, empty collections, empty strings
