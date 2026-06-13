@@ -22,7 +22,7 @@ def get_git_root(filepath: Path) -> Optional[Path]:
             check=True,
         )
         return Path(result.stdout.strip())
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
         return None
 
 

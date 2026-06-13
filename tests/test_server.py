@@ -114,7 +114,7 @@ async def test_doxy_scan_nonexistent():
     """Test scanning a non-existent project"""
     result = await doxy_scan(project_path="/nonexistent/path")
 
-    # Path outside allowed roots raises Security Error or does not exist
+    # Path outside allowed roots raises Security Error or Project path does not exist
     assert "Security Error" in result or "Project path does not exist" in result
 
 
