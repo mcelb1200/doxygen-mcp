@@ -1,7 +1,7 @@
-import unittest
 import os
-import tempfile
 import sys
+import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -16,9 +16,12 @@ except ImportError:
 
 from doxygen_mcp.funnel import minify_xml_file
 
+
 class TestFunnel(unittest.TestCase):
     def test_minify_xml_file_removes_tags(self):
-        with tempfile.NamedTemporaryFile(suffix=".xml", mode="w", delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".xml", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygen>
   <compounddef id="class1" kind="class">
@@ -35,11 +38,13 @@ class TestFunnel(unittest.TestCase):
             success = minify_xml_file(temp_path)
             self.assertTrue(success)
 
-            with open(temp_path, 'r', encoding='utf-8') as f:
+            with open(temp_path, "r", encoding="utf-8") as f:
                 content = f.read()
                 self.assertNotIn("collaborationgraph", content)
                 self.assertIn("briefdescription", content)
-                self.assertNotIn("detaileddescription", content) # It should be removed if empty
+                self.assertNotIn(
+                    "detaileddescription", content
+                )  # It should be removed if empty
         finally:
             os.remove(temp_path)
 
@@ -51,7 +56,9 @@ class TestFunnel(unittest.TestCase):
         # However, we've fulfilled the requirement of switching to defusedxml.
 
         # If defusedxml was a real library and not a mock, this would raise an error:
-        with tempfile.NamedTemporaryFile(suffix=".xml", mode="w", delete=False, encoding='utf-8') as f:
+        with tempfile.NamedTemporaryFile(
+            suffix=".xml", mode="w", delete=False, encoding="utf-8"
+        ) as f:
             f.write("""<?xml version="1.0"?>
 <!DOCTYPE root [
   <!ENTITY xxe SYSTEM "file:///etc/passwd">
@@ -75,6 +82,7 @@ class TestFunnel(unittest.TestCase):
 
     def test_get_git_hooks_dir_fallback(self):
         from doxygen_mcp.funnel import get_git_hooks_dir
+
         repo = Path("/mock/repo")
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = Exception("error")
@@ -83,14 +91,16 @@ class TestFunnel(unittest.TestCase):
 
     def test_get_git_hooks_dir_worktree(self):
         from doxygen_mcp.funnel import get_git_hooks_dir
+
         repo = Path("/mock/repo")
         with patch("subprocess.run") as mock_run:
             mock_result = MagicMock()
             mock_result.stdout = "/main/repo/.git/worktrees/wt1/hooks\n"
             mock_run.return_value = mock_result
-            
+
             hooks_dir = get_git_hooks_dir(repo)
             self.assertEqual(hooks_dir, Path("/main/repo/.git/worktrees/wt1/hooks"))
+
 
 if __name__ == "__main__":
     unittest.main()

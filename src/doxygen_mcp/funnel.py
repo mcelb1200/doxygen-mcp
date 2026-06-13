@@ -2,6 +2,7 @@
 High-Resolution Context Funnel for Doxygen XML.
 Standardizes minification and repository onboarding for AI context.
 """
+
 import argparse
 import glob
 import os
@@ -10,6 +11,7 @@ import sys
 from pathlib import Path
 
 import defusedxml.ElementTree as ET
+
 
 def minify_xml_file(filepath):
     """Minifies a Doxygen XML file while preserving AI-critical metadata."""
@@ -21,12 +23,12 @@ def minify_xml_file(filepath):
 
         # Tags to completely remove (graphs and redundant lists)
         tags_to_remove = [
-            'collaborationgraph',
-            'inheritancegraph',
-            'listofallmembers',
-            'incdepgraph',
-            'invincdepgraph',
-            'directorygraph'
+            "collaborationgraph",
+            "inheritancegraph",
+            "listofallmembers",
+            "incdepgraph",
+            "invincdepgraph",
+            "directorygraph",
         ]
 
         # Remove heavy/low-signal nodes
@@ -37,12 +39,14 @@ def minify_xml_file(filepath):
                         parent.remove(elem)
 
         # Strip empty detaileddescription or briefdescription
-        for desc_tag in ['briefdescription', 'detaileddescription']:
+        for desc_tag in ["briefdescription", "detaileddescription"]:
             for parent in root.findall(f".//{desc_tag}/.."):
                 if parent is not None:
                     for elem in parent.findall(desc_tag):
                         if elem is not None:
-                            if len(elem) == 0 and (elem.text is None or elem.text.strip() == ""):
+                            if len(elem) == 0 and (
+                                elem.text is None or elem.text.strip() == ""
+                            ):
                                 parent.remove(elem)
 
         # Minify text (collapse whitespace) to save tokens
@@ -53,17 +57,23 @@ def minify_xml_file(filepath):
                 if elem.tail and not elem.tail.strip():
                     elem.tail = ""
 
-        tree.write(filepath, encoding='utf-8', xml_declaration=True)
+        tree.write(filepath, encoding="utf-8", xml_declaration=True)
         return True
 
     except Exception as e:
         print(f"Error processing {filepath}: {e}")
         return False
 
+
 def filter_main():
     """CLI entry point for the SNR filter."""
-    parser = argparse.ArgumentParser(description='Doxygen XML SNR Filter')
-    parser.add_argument('xml_dir', nargs='?', default='docs/xml', help='Directory containing Doxygen XML files')
+    parser = argparse.ArgumentParser(description="Doxygen XML SNR Filter")
+    parser.add_argument(
+        "xml_dir",
+        nargs="?",
+        default="docs/xml",
+        help="Directory containing Doxygen XML files",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.xml_dir):
@@ -78,6 +88,7 @@ def filter_main():
 
     print(f"Minified {processed}/{len(xml_files)} XML files in {args.xml_dir}")
 
+
 def get_git_hooks_dir(repo: Path) -> Path:
     """Resolve the correct git hooks directory path (worktree-aware)."""
     try:
@@ -86,7 +97,7 @@ def get_git_hooks_dir(repo: Path) -> Path:
             cwd=repo,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         p = Path(result.stdout.strip())
         if not p.is_absolute():
@@ -96,16 +107,14 @@ def get_git_hooks_dir(repo: Path) -> Path:
         # Fallback to standard .git/hooks directory
         return repo / ".git" / "hooks"
 
+
 def setup_funnel(repo_path: str):
     """Installs Doxyfile.fast and post-commit hook into a repository."""
     repo = Path(repo_path).resolve()
     # Check if git repository in a worktree-aware way
     try:
         subprocess.run(
-            ["git", "rev-parse", "--git-dir"],
-            cwd=repo,
-            capture_output=True,
-            check=True
+            ["git", "rev-parse", "--git-dir"], cwd=repo, capture_output=True, check=True
         )
     except Exception:
         return False, f"Not a git repository: {repo}"
@@ -113,16 +122,22 @@ def setup_funnel(repo_path: str):
     # 1. Ensure a base Doxyfile exists
     base_doxyfile = repo / "Doxyfile"
     if not base_doxyfile.exists():
-        print(f"[WARNING] Base Doxyfile not found in {repo.name}. Generating a default one...")
+        print(
+            f"[WARNING] Base Doxyfile not found in {repo.name}. Generating a default one..."
+        )
         try:
-            subprocess.run(["doxygen", "-g", str(base_doxyfile)], check=True, capture_output=True)
+            subprocess.run(
+                ["doxygen", "-g", str(base_doxyfile)], check=True, capture_output=True
+            )
         except Exception as e:
             return False, f"Failed to generate base Doxyfile: {e}"
 
     # 2. Create Doxyfile.fast
     doxy_fast = repo / "Doxyfile.fast"
     if doxy_fast.exists():
-        print(f"[INFO] Doxyfile.fast already exists in {repo.name}. Overwriting with standard AI-Context overrides...")
+        print(
+            f"[INFO] Doxyfile.fast already exists in {repo.name}. Overwriting with standard AI-Context overrides..."
+        )
 
     doxyfile_content = """# Doxyfile.fast - Optimized for AI Context
 @INCLUDE               = Doxyfile
@@ -139,7 +154,7 @@ CALLER_GRAPH           = NO
 INCLUDE_GRAPH          = NO
 INCLUDED_BY_GRAPH      = NO
 """
-    with open(doxy_fast, "w", encoding='utf-8') as f:
+    with open(doxy_fast, "w", encoding="utf-8") as f:
         f.write(doxyfile_content)
 
     # 2. Install post-commit hook
@@ -164,16 +179,19 @@ if echo "$changed_files" | grep -E "\\.(h|hpp|cpp|c|py|ts|tsx)$" > /dev/null; th
     ) &
 fi
 """
-    with open(hook_path, "w", encoding='utf-8') as f:
+    with open(hook_path, "w", encoding="utf-8") as f:
         f.write(hook_content)
 
     os.chmod(hook_path, 0o755)
     return True, f"Successfully configured context funnel for {repo.name}"
 
+
 def setup_main():
     """CLI entry point for the setup utility."""
-    parser = argparse.ArgumentParser(description='Doxygen Context Funnel Setup')
-    parser.add_argument('repo_path', nargs='?', default='.', help='Path to the repository root')
+    parser = argparse.ArgumentParser(description="Doxygen Context Funnel Setup")
+    parser.add_argument(
+        "repo_path", nargs="?", default=".", help="Path to the repository root"
+    )
     args = parser.parse_args()
 
     success, msg = setup_funnel(args.repo_path)

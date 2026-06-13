@@ -2,13 +2,14 @@
 # Copyright (c) 2026 Matt Pocock
 
 import re
-from functools import wraps
 from typing import Any
+
+from pydantic import BaseModel
 
 # Regex for case-insensitive filler words, matching whole words
 FILLER_RE = re.compile(
-    r'\b(a|an|the|just|really|basically|actually|simply|sure|certainly|of\s+course|happy\s+to|please|would|could|should|likely|probably|maybe)\b',
-    re.IGNORECASE
+    r"\b(a|an|the|just|really|basically|actually|simply|sure|certainly|of\s+course|happy\s+to|please|would|could|should|likely|probably|maybe)\b",
+    re.IGNORECASE,
 )
 
 SYNONYMS = {
@@ -55,32 +56,35 @@ SYNONYMS = {
     "responses": "res",
 }
 
-SYNONYMS_RE = re.compile(r'\b(' + '|'.join(map(re.escape, SYNONYMS.keys())) + r')\b', re.IGNORECASE)
+SYNONYMS_RE = re.compile(
+    r"\b(" + "|".join(map(re.escape, SYNONYMS.keys())) + r")\b", re.IGNORECASE
+)
+
 
 def _replace_synonym(match: re.Match) -> str:
     word = match.group(1).lower()
     replacement = SYNONYMS.get(word, match.group(1))
     if match.group(1).isupper():
         return replacement.upper()
-    elif match.group(1)[0].isupper():
+    if match.group(1)[0].isupper():
         return replacement.capitalize()
     return replacement
+
 
 def compress_text(text: str) -> str:
     """Compress a single text block using caveman rules."""
     if not text or not isinstance(text, str):
         return text
     # 1. Remove filler words
-    text = FILLER_RE.sub('', text)
+    text = FILLER_RE.sub("", text)
     # 2. Replace synonyms
     text = SYNONYMS_RE.sub(_replace_synonym, text)
     # 3. Clean up whitespace
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r"\s+", " ", text)
     # 4. Clean up spaces before punctuation
-    text = re.sub(r'\s+([.,!?;:])', r'\1', text)
+    text = re.sub(r"\s+([.,!?;:])", r"\1", text)
     return text.strip()
 
-from pydantic import BaseModel
 
 def compress_payload(payload: Any) -> Any:
     """
@@ -91,13 +95,12 @@ def compress_payload(payload: Any) -> Any:
         model_dict = payload.model_dump()
         compressed_dict = compress_payload(model_dict)
         return payload.__class__(**compressed_dict)
-    elif isinstance(payload, dict):
+    if isinstance(payload, dict):
         return {key: compress_payload(val) for key, val in payload.items()}
-    elif isinstance(payload, list):
+    if isinstance(payload, list):
         return [compress_payload(item) for item in payload]
-    elif isinstance(payload, tuple):
+    if isinstance(payload, tuple):
         return tuple(compress_payload(item) for item in payload)
-    elif isinstance(payload, str):
+    if isinstance(payload, str):
         return compress_text(payload)
     return payload
-

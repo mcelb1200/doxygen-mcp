@@ -1,6 +1,7 @@
 """
 Tests for the DoxygenConfig model.
 """
+
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -9,7 +10,9 @@ import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.config import DoxygenConfig
+
 # pylint: enable=import-error
+
 
 class TestDoxygenConfig:
     """Test suite for DoxygenConfig."""
@@ -17,9 +20,11 @@ class TestDoxygenConfig:
     def test_from_env_basic(self):
         """Test from_env with default values and no environment variables."""
         # Mocking utils to avoid side effects and dependency on environment
-        with patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve, \
-             patch("doxygen_mcp.utils.get_project_name") as mock_get_name, \
-             patch.dict(os.environ, {}, clear=True):
+        with (
+            patch("doxygen_mcp.utils.resolve_project_path") as mock_resolve,
+            patch("doxygen_mcp.utils.get_project_name") as mock_get_name,
+            patch.dict(os.environ, {}, clear=True),
+        ):
 
             mock_resolve.return_value = Path("/tmp/test_project")
             mock_get_name.return_value = "Test Project"
@@ -33,11 +38,15 @@ class TestDoxygenConfig:
 
     def test_from_env_with_kwargs(self):
         """Test from_env with explicit kwargs."""
-        with patch("doxygen_mcp.utils.resolve_project_path"), \
-             patch("doxygen_mcp.utils.get_project_name") as mock_get_name, \
-             patch.dict(os.environ, {}, clear=True):
+        with (
+            patch("doxygen_mcp.utils.resolve_project_path"),
+            patch("doxygen_mcp.utils.get_project_name") as mock_get_name,
+            patch.dict(os.environ, {}, clear=True),
+        ):
 
-            config = DoxygenConfig.from_env(project_name="Custom Project", recursive=False)
+            config = DoxygenConfig.from_env(
+                project_name="Custom Project", recursive=False
+            )
 
             assert config.project_name == "Custom Project"
             assert config.recursive is False
@@ -53,7 +62,7 @@ class TestDoxygenConfig:
             "DOXYGEN_MCP_OUTPUT_DIRECTORY": "./env_docs",
             "DOXYGEN_MCP_OPTIMIZE_OUTPUT_FOR_C": "yes",
             "DOXYGEN_MCP_EXTRACT_PRIVATE": "1",
-            "DOXYGEN_MCP_FILE_PATTERNS": "*.cpp, *.h, *.hpp"
+            "DOXYGEN_MCP_FILE_PATTERNS": "*.cpp, *.h, *.hpp",
         }
 
         with patch.dict(os.environ, env_vars, clear=True):

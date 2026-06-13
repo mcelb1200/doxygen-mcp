@@ -1,8 +1,10 @@
-
-import pytest
 import os
 from pathlib import Path
+
+import pytest
+
 from doxygen_mcp.utils import update_ignore_file
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_security_newline(tmp_path):
@@ -13,10 +15,15 @@ async def test_update_ignore_file_security_newline(tmp_path):
     ignore_file = tmp_path / ".gitignore"
     if ignore_file.exists():
         content = ignore_file.read_text(encoding="utf-8")
-        assert "unsafe_entry" not in content, "Newlines allowed injection into .gitignore"
-        assert "safe_entry" not in content, "Should reject the entire entry if it contains newlines"
+        assert (
+            "unsafe_entry" not in content
+        ), "Newlines allowed injection into .gitignore"
+        assert (
+            "safe_entry" not in content
+        ), "Should reject the entire entry if it contains newlines"
 
     assert result is False, "Function should return False for invalid input"
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_security_traversal(tmp_path):
@@ -27,9 +34,12 @@ async def test_update_ignore_file_security_traversal(tmp_path):
     ignore_file = tmp_path / ".gitignore"
     if ignore_file.exists():
         content = ignore_file.read_text(encoding="utf-8")
-        assert "../outside_project" not in content, "Traversal sequence allowed in .gitignore"
+        assert (
+            "../outside_project" not in content
+        ), "Traversal sequence allowed in .gitignore"
 
     assert result is False, "Function should return False for traversal input"
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_valid(tmp_path):
@@ -42,6 +52,7 @@ async def test_update_ignore_file_valid(tmp_path):
     assert ignore_file.exists()
     content = ignore_file.read_text(encoding="utf-8")
     assert "docs/" in content
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_security_regex(tmp_path):
@@ -57,6 +68,7 @@ async def test_update_ignore_file_security_regex(tmp_path):
         result = await update_ignore_file(tmp_path, path)
         assert result is False, f"Should have rejected {path}"
 
+
 @pytest.mark.asyncio
 async def test_update_ignore_file_security_traversal_v2(tmp_path):
     """Test that parent directory references are rejected in various positions."""
@@ -66,7 +78,7 @@ async def test_update_ignore_file_security_traversal_v2(tmp_path):
         "subdir/..",
         "../../etc/passwd",
         "./../hidden",
-        "file..name"
+        "file..name",
     ]
 
     for path_to_ignore in dangerous_paths:
@@ -75,19 +87,19 @@ async def test_update_ignore_file_security_traversal_v2(tmp_path):
         ignore_file = tmp_path / ".gitignore"
         if ignore_file.exists():
             content = ignore_file.read_text(encoding="utf-8")
-            assert path_to_ignore not in content, f"Traversal sequence {path_to_ignore} allowed in .gitignore"
+            assert (
+                path_to_ignore not in content
+            ), f"Traversal sequence {path_to_ignore} allowed in .gitignore"
 
-        assert result is False, f"Function should return False for traversal input: {path_to_ignore}"
+        assert (
+            result is False
+        ), f"Function should return False for traversal input: {path_to_ignore}"
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_dots_allowed(tmp_path):
     """Test that entries with dots but not traversal are still allowed."""
-    safe_paths = [
-        ".hidden",
-        "file.ext",
-        "dir.with.dots/file",
-        "dot.dot"
-    ]
+    safe_paths = [".hidden", "file.ext", "dir.with.dots/file", "dot.dot"]
 
     for path_to_ignore in safe_paths:
         result = await update_ignore_file(tmp_path, path_to_ignore)
@@ -97,6 +109,7 @@ async def test_update_ignore_file_dots_allowed(tmp_path):
     content = ignore_file.read_text(encoding="utf-8")
     for path_to_ignore in safe_paths:
         assert path_to_ignore in content
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_permission_denied(tmp_path):
@@ -117,6 +130,7 @@ async def test_update_ignore_file_permission_denied(tmp_path):
     finally:
         # Restore permissions so tmp_path can be cleaned up
         ignore_file.chmod(0o644)
+
 
 @pytest.mark.asyncio
 async def test_update_ignore_file_logic_error_propagation(tmp_path, monkeypatch):

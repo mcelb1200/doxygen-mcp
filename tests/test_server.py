@@ -9,23 +9,22 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest  # pylint: disable=import-error
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+)
 
 # pylint: disable=import-error
 import doxygen_mcp.server
-from doxygen_mcp.server import (
-    doxy_create,
-    doxy_generate,
-    doxy_scan,
-    doxy_check
-)
 from doxygen_mcp.config import DoxygenConfig
+from doxygen_mcp.server import doxy_check, doxy_create, doxy_generate, doxy_scan
+
 # pylint: enable=import-error
+
 
 @pytest.fixture(autouse=True)
 def clear_doxygen_cache():
@@ -50,7 +49,7 @@ class TestDoxygenConfig:
         config = DoxygenConfig(
             project_name="Test Project",
             output_directory="./test_docs",
-            file_patterns=["*.cpp", "*.h"]
+            file_patterns=["*.cpp", "*.h"],
         )
 
         doxyfile_content = config.to_doxyfile()
@@ -58,7 +57,7 @@ class TestDoxygenConfig:
         assert 'PROJECT_NAME           = "Test Project"' in doxyfile_content
         assert 'OUTPUT_DIRECTORY       = "./test_docs"' in doxyfile_content
         assert 'FILE_PATTERNS          = "*.cpp" "*.h"' in doxyfile_content
-        assert 'EXTRACT_ALL            = YES' in doxyfile_content
+        assert "EXTRACT_ALL            = YES" in doxyfile_content
 
     def test_language_optimization(self):
         """Test language-specific optimizations"""
@@ -68,8 +67,8 @@ class TestDoxygenConfig:
 
         doxyfile_content = config.to_doxyfile()
 
-        assert 'OPTIMIZE_OUTPUT_FOR_C  = YES' in doxyfile_content
-        assert 'OPTIMIZE_OUTPUT_JAVA   = NO' in doxyfile_content
+        assert "OPTIMIZE_OUTPUT_FOR_C  = YES" in doxyfile_content
+        assert "OPTIMIZE_OUTPUT_JAVA   = NO" in doxyfile_content
 
 
 @pytest.mark.asyncio
@@ -81,7 +80,7 @@ async def test_create_project_success():
             project_path=temp_dir,
             language="cpp",
             include_subdirs=True,
-            extract_private=False
+            extract_private=False,
         )
 
         assert "✅ Doxygen project 'Test Project' created successfully" in result
@@ -91,11 +90,12 @@ async def test_create_project_success():
         assert doxyfile_path.exists()
 
         # Verify content
-        with open(doxyfile_path, 'r', encoding='utf-8') as f:
+        with open(doxyfile_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         assert 'PROJECT_NAME           = "Test Project"' in content
         assert '"*.cpp" "*.hpp" "*.cc" "*.hh" "*.cxx" "*.hxx"' in content
+
 
 @pytest.mark.asyncio
 async def test_create_project_invalid_path():
@@ -103,41 +103,33 @@ async def test_create_project_invalid_path():
     result = await doxy_create(
         project_name="Test Project",
         project_path="/invalid/path/that/cannot/be/created",
-        language="cpp"
+        language="cpp",
     )
 
     assert "❌ Failed to create project:" in result
 
+
 @pytest.mark.asyncio
 async def test_doxy_scan_nonexistent():
     """Test scanning a non-existent project"""
-    result = await doxy_scan(
-        project_path="/nonexistent/path"
-    )
+    result = await doxy_scan(project_path="/nonexistent/path")
 
     # Path outside allowed roots raises Security Error
     assert "Security Error" in result
+
 
 @pytest.mark.asyncio
 async def test_doxy_scan_success():
     """Test successful project scanning"""
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create some test files
-        test_files = [
-            "main.cpp",
-            "header.h",
-            "utils.py",
-            "config.json",
-            "README.md"
-        ]
+        test_files = ["main.cpp", "header.h", "utils.py", "config.json", "README.md"]
 
         for filename in test_files:
             file_path = Path(temp_dir) / filename
-            file_path.write_text(f"// Test content for {filename}", encoding='utf-8')
+            file_path.write_text(f"// Test content for {filename}", encoding="utf-8")
 
-        result = await doxy_scan(
-            project_path=temp_dir
-        )
+        result = await doxy_scan(project_path=temp_dir)
 
         assert "📁 Project Scan Results" in result
         assert "Total Files Found: 5" in result
@@ -145,8 +137,9 @@ async def test_doxy_scan_success():
         assert ".h: 1 files" in result
         assert ".py: 1 files" in result
 
+
 @pytest.mark.asyncio
-@patch('asyncio.create_subprocess_exec')
+@patch("asyncio.create_subprocess_exec")
 async def test_doxy_check_success(mock_exec):
     """Test successful Doxygen installation check"""
     # Create a mock process
@@ -156,40 +149,46 @@ async def test_doxy_check_success(mock_exec):
 
     mock_exec.return_value = process
 
-    with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+    with patch(
+        "doxygen_mcp.server.get_doxygen_executable", return_value="/usr/bin/doxygen"
+    ):
         result = await doxy_check()
 
     assert "✅ Doxygen 1.9.4 is installed and working" in result
 
+
 @pytest.mark.asyncio
-@patch('asyncio.create_subprocess_exec')
+@patch("asyncio.create_subprocess_exec")
 async def test_doxy_check_not_found(mock_exec):
     """Test Doxygen not found"""
     mock_exec.side_effect = FileNotFoundError()
 
-    with patch('doxygen_mcp.server.get_doxygen_executable', side_effect=ValueError("Doxygen is not installed")):
+    with patch(
+        "doxygen_mcp.server.get_doxygen_executable",
+        side_effect=ValueError("Doxygen is not installed"),
+    ):
         result = await doxy_check()
 
     assert "Doxygen is not installed" in result
+
 
 @pytest.mark.asyncio
 async def test_doxy_generate_no_doxyfile():
     """Test documentation generation without Doxyfile"""
     with tempfile.TemporaryDirectory() as temp_dir:
-        result = await doxy_generate(
-            project_path=temp_dir
-        )
+        result = await doxy_generate(project_path=temp_dir)
 
         assert "❌ No Doxyfile found" in result
 
+
 @pytest.mark.asyncio
-@patch('asyncio.create_subprocess_exec')
+@patch("asyncio.create_subprocess_exec")
 async def test_doxy_generate_success(mock_exec):
     """Test successful documentation generation"""
     with tempfile.TemporaryDirectory() as temp_dir:
         # Create a mock Doxyfile
         doxyfile_path = Path(temp_dir) / "Doxyfile"
-        doxyfile_path.write_text("PROJECT_NAME = Test", encoding='utf-8')
+        doxyfile_path.write_text("PROJECT_NAME = Test", encoding="utf-8")
 
         # Mock successful doxygen execution
         process = MagicMock()
@@ -197,12 +196,13 @@ async def test_doxy_generate_success(mock_exec):
         process.returncode = 0
         mock_exec.return_value = process
 
-        with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
-            result = await doxy_generate(
-                project_path=temp_dir
-            )
+        with patch(
+            "doxygen_mcp.server.get_doxygen_executable", return_value="/usr/bin/doxygen"
+        ):
+            result = await doxy_generate(project_path=temp_dir)
 
         assert "✅ Documentation generated successfully" in result
+
 
 @pytest.mark.asyncio
 async def test_path_traversal_protection():
@@ -217,10 +217,7 @@ async def test_path_traversal_protection():
 
     with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "/app/project"}):
         # This should fail as /etc is not under /app/project
-        result = await doxy_create(
-            project_name="Evil",
-            project_path="/etc/evil"
-        )
+        result = await doxy_create(project_name="Evil", project_path="/etc/evil")
         assert "Security Error: Access denied" in result
 
 

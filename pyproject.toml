@@ -97,3 +97,7 @@ check_untyped_defs = true
 [[tool.mypy.overrides]]
 module = "doxygen_mcp.query_engine"
 ignore_errors = true
+
+[tool.isort]
+profile = "black"
+

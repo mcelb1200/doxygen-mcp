@@ -1,33 +1,35 @@
 """
 Tests for environment-based configuration and path resolution.
 """
+
 # pylint: disable=import-error, redefined-outer-name
 import asyncio
 import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
-from doxygen_mcp.server import (
-    doxy_create,
-    doxy_generate,
-    doxy_query
-)
+from doxygen_mcp.server import doxy_create, doxy_generate, doxy_query
 from doxygen_mcp.utils import resolve_project_path
+
 # pylint: enable=import-error
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+)
+
 
 @pytest.fixture
 def temp_project_dir():
     """Fixture for a temporary project directory."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield temp_dir
+
 
 # pylint: disable=redefined-outer-name
 class TestEnvConfig:
@@ -58,31 +60,38 @@ class TestEnvConfig:
             result = await doxy_create(
                 project_name="Env Project",
                 # project_path is None by default
-                language="python"
+                language="python",
             )
 
             assert "✅ Doxygen project 'Env Project' created successfully" in result
             assert (Path(temp_project_dir) / "Doxyfile").exists()
 
     @pytest.mark.asyncio
-    @patch('asyncio.create_subprocess_exec')
+    @patch("asyncio.create_subprocess_exec")
     async def test_generate_docs_with_env(self, mock_exec, temp_project_dir):
         """Test generating docs using environment variable"""
         # Create Doxyfile first
-        (Path(temp_project_dir) / "Doxyfile").write_text("PROJECT_NAME=Test", encoding="utf-8")
+        (Path(temp_project_dir) / "Doxyfile").write_text(
+            "PROJECT_NAME=Test", encoding="utf-8"
+        )
 
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
-            with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_exec:
+            with patch(
+                "asyncio.create_subprocess_exec", new_callable=AsyncMock
+            ) as mock_exec:
                 process = MagicMock()
                 process.communicate = AsyncMock(return_value=(b"", b""))
                 process.returncode = 0
                 mock_exec.return_value = process
-                
-                with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+
+                with patch(
+                    "doxygen_mcp.server.get_doxygen_executable",
+                    return_value="/usr/bin/doxygen",
+                ):
                     result = await doxy_generate(
                         # project_path is None
                     )
-                
+
                 assert "✅ Documentation generated successfully" in result
 
     @pytest.mark.asyncio
@@ -90,14 +99,19 @@ class TestEnvConfig:
         """Test querying with DOXYGEN_XML_DIR"""
         xml_dir = Path(temp_project_dir) / "xml"
         xml_dir.mkdir(parents=True)
-        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>", encoding="utf-8")
+        (xml_dir / "index.xml").write_text(
+            "<doxygenindex></doxygenindex>", encoding="utf-8"
+        )
 
         with patch.dict(os.environ, {"DOXYGEN_XML_DIR": str(xml_dir)}):
-            with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
+            with patch("doxygen_mcp.server.DoxygenQueryEngine") as mock_engine_cls:
                 mock_engine = MagicMock()
                 mock_engine.query_symbol.return_value = {
-                    "kind": "class", "name": "Test", "brief": "Brief",
-                    "detailed": "", "members": []
+                    "kind": "class",
+                    "name": "Test",
+                    "brief": "Brief",
+                    "detailed": "",
+                    "members": [],
                 }
 
                 future = asyncio.Future()
@@ -115,18 +129,23 @@ class TestEnvConfig:
         # Setup standard structure: root/docs/xml
         xml_dir = Path(temp_project_dir) / "docs" / "xml"
         xml_dir.mkdir(parents=True)
-        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>", encoding="utf-8")
+        (xml_dir / "index.xml").write_text(
+            "<doxygenindex></doxygenindex>", encoding="utf-8"
+        )
 
         with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": temp_project_dir}):
             # Clear XML_DIR to ensure we use PROJECT_ROOT
             if "DOXYGEN_XML_DIR" in os.environ:
                 del os.environ["DOXYGEN_XML_DIR"]
 
-            with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
+            with patch("doxygen_mcp.server.DoxygenQueryEngine") as mock_engine_cls:
                 mock_engine = MagicMock()
                 mock_engine.query_symbol.return_value = {
-                    "kind": "class", "name": "Test", "brief": "Brief",
-                    "detailed": "", "members": []
+                    "kind": "class",
+                    "name": "Test",
+                    "brief": "Brief",
+                    "detailed": "",
+                    "members": [],
                 }
 
                 future = asyncio.Future()
@@ -142,9 +161,12 @@ class TestEnvConfig:
     async def test_query_reference_with_project_json_xml(self, temp_project_dir):
         """Test querying with xml_dir in doxygen_mcp.json"""
         import json
+
         xml_dir = Path(temp_project_dir) / "custom_xml_dir"
         xml_dir.mkdir(parents=True)
-        (xml_dir / "index.xml").write_text("<doxygenindex></doxygenindex>", encoding="utf-8")
+        (xml_dir / "index.xml").write_text(
+            "<doxygenindex></doxygenindex>", encoding="utf-8"
+        )
 
         config_file = Path(temp_project_dir) / "doxygen_mcp.json"
         with open(config_file, "w", encoding="utf-8") as f:
@@ -155,11 +177,14 @@ class TestEnvConfig:
             if "DOXYGEN_XML_DIR" in os.environ:
                 del os.environ["DOXYGEN_XML_DIR"]
 
-            with patch('doxygen_mcp.server.DoxygenQueryEngine') as mock_engine_cls:
+            with patch("doxygen_mcp.server.DoxygenQueryEngine") as mock_engine_cls:
                 mock_engine = MagicMock()
                 mock_engine.query_symbol.return_value = {
-                    "kind": "class", "name": "Test", "brief": "Brief",
-                    "detailed": "", "members": []
+                    "kind": "class",
+                    "name": "Test",
+                    "brief": "Brief",
+                    "detailed": "",
+                    "members": [],
                 }
 
                 future = asyncio.Future()
@@ -174,10 +199,15 @@ class TestEnvConfig:
     def test_resolve_project_path_expansion(self):
         """Test resolving path with home-relative ~ and environment variables"""
         home_path = Path.home().resolve()
-        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "~/test_project_dir", "TEST_VAR": "foo"}):
+        with patch.dict(
+            os.environ,
+            {"DOXYGEN_PROJECT_ROOT": "~/test_project_dir", "TEST_VAR": "foo"},
+        ):
             resolved = resolve_project_path(None)
             assert resolved == (home_path / "test_project_dir").resolve()
 
-        with patch.dict(os.environ, {"DOXYGEN_PROJECT_ROOT": "~/test_$TEST_VAR", "TEST_VAR": "foo"}):
+        with patch.dict(
+            os.environ, {"DOXYGEN_PROJECT_ROOT": "~/test_$TEST_VAR", "TEST_VAR": "foo"}
+        ):
             resolved = resolve_project_path(None)
             assert resolved == (home_path / "test_foo").resolve()

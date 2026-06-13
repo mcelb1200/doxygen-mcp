@@ -20,14 +20,9 @@ Key Features:
 - Custom theme and layout support
 """
 
-__version__ = "1.0.1"
+from .version import __version__
+
 __author__ = "Positronikal"
 __email__ = "hoyt.harness@gmail.com"
 
-try:
-    from .server import main
-    __all__ = ["main"]
-except (ImportError, ModuleNotFoundError):
-    # Allow importing the package even if dependencies aren't met
-    # (e.g. for basic utility access in scripts)
-    __all__ = []
+__all__ = []

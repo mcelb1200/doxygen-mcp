@@ -2,14 +2,31 @@
 Utility functions for Doxygen MCP context discovery and environment integration.
 """
 
+import asyncio
+import itertools
+import json
 import os
 import re
-import json
-import asyncio
 import shutil
-import itertools
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
+
+def load_project_config(project_root: Path) -> dict:
+    """
+    Securely load project-specific configuration from doxygen_mcp.json.
+    """
+    config_file = project_root / "doxygen_mcp.json"
+    if config_file.exists() and not config_file.is_symlink():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+                if isinstance(config_data, dict):
+                    return config_data
+        except Exception:
+            pass
+    return {}
+
 
 def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> Path:
     """
@@ -17,9 +34,19 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
     """
     if markers is None:
         markers = [
-            ".git", ".svn", "Doxyfile", "pyproject.toml", "package.json",
-            "CMakeLists.txt", "Makefile", "solution.sln", "go.mod", "Cargo.toml",
-            "requirements.txt", "build.gradle", "pom.xml"
+            ".git",
+            ".svn",
+            "Doxyfile",
+            "pyproject.toml",
+            "package.json",
+            "CMakeLists.txt",
+            "Makefile",
+            "solution.sln",
+            "go.mod",
+            "Cargo.toml",
+            "requirements.txt",
+            "build.gradle",
+            "pom.xml",
         ]
 
     current = start_path.resolve()
@@ -30,6 +57,7 @@ def find_project_root(start_path: Path, markers: Optional[List[str]] = None) -> 
                 return parent
 
     return current
+
 
 def resolve_project_path(project_path: Optional[str] = None) -> Path:
     """
@@ -54,7 +82,7 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
         "CURSOR_WORKSPACE_PATH",
         "GEMINI_PROJECT_ROOT",
         "ACTIVE_WORKSPACE_PATH",
-        "PWD", # Often set by shells/IDE terminals
+        "PWD",  # Often set by shells/IDE terminals
     ]
     for env_var in ide_roots:
         val = os.environ.get(env_var)
@@ -75,25 +103,18 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
 
     # Load project-specific allowed paths from doxygen_mcp.json in base root
     base_root = safe_roots[0] if safe_roots else discovery_root
-    config_file = base_root / "doxygen_mcp.json"
-    if config_file.exists() and not config_file.is_symlink():
-        try:
-            with open(config_file, "r", encoding="utf-8") as f:
-                config_data = json.load(f)
-                if isinstance(config_data, dict):
-                    extra_paths = config_data.get("allowed_paths", [])
-                    if isinstance(extra_paths, list):
-                        for p in extra_paths:
-                            if isinstance(p, str) and p.strip():
-                                p_str = os.path.expandvars(os.path.expanduser(p.strip()))
-                                p_path = Path(p_str)
-                                if not p_path.is_absolute():
-                                    p_path = (base_root / p_path).resolve()
-                                else:
-                                    p_path = p_path.resolve()
-                                safe_roots.append(p_path)
-        except Exception:
-            pass
+    config_data = load_project_config(base_root)
+    extra_paths = config_data.get("allowed_paths", [])
+    if isinstance(extra_paths, list):
+        for p in extra_paths:
+            if isinstance(p, str) and p.strip():
+                p_str = os.path.expandvars(os.path.expanduser(p.strip()))
+                p_path = Path(p_str)
+                if not p_path.is_absolute():
+                    p_path = (base_root / p_path).resolve()
+                else:
+                    p_path = p_path.resolve()
+                safe_roots.append(p_path)
 
     if not project_path:
         return safe_roots[0] if safe_roots else discovery_root
@@ -115,7 +136,10 @@ def resolve_project_path(project_path: Optional[str] = None) -> Path:
 
     # Special bypass for tests to avoid breaking temporary directory usage
     if not is_safe and os.environ.get("PYTEST_CURRENT_TEST"):
-        if str(requested_path).startswith("/tmp") or "temp" in str(requested_path).lower():
+        if (
+            str(requested_path).startswith("/tmp")
+            or "temp" in str(requested_path).lower()
+        ):
             is_safe = True
 
     if not is_safe:
@@ -132,15 +156,23 @@ def detect_primary_language(project_path: Path) -> str:
     Identify the dominant programming language in the project to optimize Doxygen settings.
     """
     ext_map = {
-        ".cpp": "cpp", ".hpp": "cpp", ".cc": "cpp", ".hh": "cpp", ".cxx": "cpp",
-        ".c": "c", ".h": "c",
+        ".cpp": "cpp",
+        ".hpp": "cpp",
+        ".cc": "cpp",
+        ".hh": "cpp",
+        ".cxx": "cpp",
+        ".c": "c",
+        ".h": "c",
         ".py": "python",
         ".php": "php",
         ".java": "java",
         ".cs": "csharp",
-        ".js": "javascript", ".ts": "javascript", ".jsx": "javascript", ".tsx": "javascript",
+        ".js": "javascript",
+        ".ts": "javascript",
+        ".jsx": "javascript",
+        ".tsx": "javascript",
         ".go": "go",
-        ".rs": "rust"
+        ".rs": "rust",
     }
 
     counts: Dict[str, int] = {}
@@ -161,6 +193,7 @@ def detect_primary_language(project_path: Path) -> str:
         return "mixed"
 
     return max(counts, key=lambda x: counts.get(x, 0))
+
 
 def get_project_name(resolved_path: Path) -> str:
     """
@@ -185,6 +218,7 @@ def get_project_name(resolved_path: Path) -> str:
     # Priority 3: Derived from workspace root folder name
     return resolved_path.name
 
+
 def get_ide_environment() -> Dict[str, Any]:
     """
     Detect if the server is running within a specific IDE and extract relevant context.
@@ -193,7 +227,7 @@ def get_ide_environment() -> Dict[str, Any]:
     context = {
         "ide": "unknown",
         "workspace_root": str(project_root),
-        "project_name": get_project_name(project_root)
+        "project_name": get_project_name(project_root),
     }
 
     # VS Code / Cursor detection
@@ -202,8 +236,10 @@ def get_ide_environment() -> Dict[str, Any]:
 
     if is_vscode:
         context["ide"] = "vscode"
-        if os.environ.get("CURSOR_GIT_IPC_HANDLE") or \
-           "cursor" in os.environ.get("APP_PATH", "").lower():
+        if (
+            os.environ.get("CURSOR_GIT_IPC_HANDLE")
+            or "cursor" in os.environ.get("APP_PATH", "").lower()
+        ):
             context["ide"] = "cursor"
 
         # Try to find VS Code settings
@@ -231,8 +267,9 @@ def get_active_context() -> Dict[str, Any]:
         "active_file": os.environ.get("MCP_ACTIVE_FILE"),
         "cursor_line": os.environ.get("MCP_CURSOR_LINE"),
         "cursor_column": os.environ.get("MCP_CURSOR_COLUMN"),
-        "selected_text": os.environ.get("MCP_SELECTED_TEXT")
+        "selected_text": os.environ.get("MCP_SELECTED_TEXT"),
     }
+
 
 def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     """
@@ -240,7 +277,13 @@ def _update_ignore_file_sync(project_root: Path, path_to_ignore: str) -> bool:
     Optimized for memory by iterating over lines and reducing return statements.
     """
     # Validate input to prevent arbitrary file write/traversal in .gitignore
-    if not path_to_ignore or "\n" in path_to_ignore or "\r" in path_to_ignore or ".." in path_to_ignore or not re.match(r"^[a-zA-Z0-9._\-/]+$", path_to_ignore):
+    if (
+        not path_to_ignore
+        or "\n" in path_to_ignore
+        or "\r" in path_to_ignore
+        or ".." in path_to_ignore
+        or not re.match(r"^[a-zA-Z0-9._\-/]+$", path_to_ignore)
+    ):
         return False
 
     # Prevent traversal or absolute paths
@@ -296,7 +339,10 @@ async def update_ignore_file(project_root: Path, path_to_ignore: str) -> bool:
     Returns True if an entry was added, False otherwise.
     """
     # pylint: disable=no-member
-    return await asyncio.to_thread(_update_ignore_file_sync, project_root, path_to_ignore)
+    return await asyncio.to_thread(
+        _update_ignore_file_sync, project_root, path_to_ignore
+    )
+
 
 def get_doxygen_executable() -> str:
     """

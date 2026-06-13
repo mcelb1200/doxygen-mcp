@@ -1,28 +1,33 @@
-
-import os
-import sys
-import shutil
-import tempfile
 import asyncio
+import os
+import shutil
+import sys
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest # pylint: disable=import-error
+import pytest  # pylint: disable=import-error
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+sys.path.insert(
+    0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+)
+
+import doxygen_mcp.server
+from doxygen_mcp.server import doxy_check
 
 # pylint: disable=import-error
 from doxygen_mcp.utils import get_doxygen_executable
-from doxygen_mcp.server import doxy_check
-import doxygen_mcp.server
+
 # pylint: enable=import-error
+
 
 @pytest.fixture(autouse=True)
 def clear_doxygen_cache():
     """Clear Doxygen version cache before each test"""
     doxygen_mcp.server._DOXYGEN_VERSION_CACHE.clear()
     yield
+
 
 @pytest.mark.asyncio
 async def test_get_doxygen_executable_valid():
@@ -43,6 +48,7 @@ async def test_get_doxygen_executable_valid():
         finally:
             os.environ["PATH"] = old_path
 
+
 @pytest.mark.asyncio
 async def test_get_doxygen_executable_invalid_name():
     """Test get_doxygen_executable with an invalid executable name"""
@@ -51,16 +57,23 @@ async def test_get_doxygen_executable_invalid_name():
         malicious_bin.touch(mode=0o755)
 
         with patch.dict(os.environ, {"DOXYGEN_PATH": str(malicious_bin)}):
-            with pytest.raises(ValueError, match="Security Error: Invalid Doxygen executable name"):
+            with pytest.raises(
+                ValueError, match="Security Error: Invalid Doxygen executable name"
+            ):
                 get_doxygen_executable()
+
 
 @pytest.mark.asyncio
 async def test_get_doxygen_executable_shutil_which_invalid():
     """Test get_doxygen_executable by mocking shutil.which to return an invalid executable"""
     with patch("doxygen_mcp.utils.shutil.which", return_value="/usr/bin/bash"):
         with patch.dict(os.environ, {"DOXYGEN_PATH": "bash"}):
-            with pytest.raises(ValueError, match="Security Error: Invalid Doxygen executable name 'bash'"):
+            with pytest.raises(
+                ValueError,
+                match="Security Error: Invalid Doxygen executable name 'bash'",
+            ):
                 get_doxygen_executable()
+
 
 @pytest.mark.asyncio
 async def test_get_doxygen_executable_not_found():
@@ -69,8 +82,9 @@ async def test_get_doxygen_executable_not_found():
         with pytest.raises(ValueError, match="Doxygen executable not found"):
             get_doxygen_executable()
 
+
 @pytest.mark.asyncio
-@patch('asyncio.create_subprocess_exec')
+@patch("asyncio.create_subprocess_exec")
 async def test_doxy_check_invalid_version(mock_exec):
     """Test doxy_check with an unexpected version format"""
     # Create a mock process
@@ -83,12 +97,15 @@ async def test_doxy_check_invalid_version(mock_exec):
 
     # We need to mock get_doxygen_executable to return a "valid" path
     # so it passes the name check
-    with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+    with patch(
+        "doxygen_mcp.server.get_doxygen_executable", return_value="/usr/bin/doxygen"
+    ):
         result = await doxy_check()
         assert "❌ Unexpected Doxygen version format" in result
 
+
 @pytest.mark.asyncio
-@patch('asyncio.create_subprocess_exec')
+@patch("asyncio.create_subprocess_exec")
 async def test_doxy_check_valid_version(mock_exec):
     """Test doxy_check with a valid version format"""
     process = MagicMock()
@@ -96,6 +113,8 @@ async def test_doxy_check_valid_version(mock_exec):
     process.returncode = 0
     mock_exec.return_value = process
 
-    with patch('doxygen_mcp.server.get_doxygen_executable', return_value="/usr/bin/doxygen"):
+    with patch(
+        "doxygen_mcp.server.get_doxygen_executable", return_value="/usr/bin/doxygen"
+    ):
         result = await doxy_check()
         assert "✅ Doxygen 1.9.4 is installed and working" in result

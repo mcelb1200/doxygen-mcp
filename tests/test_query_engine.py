@@ -1,6 +1,7 @@
 """
 Unit tests for the DoxygenQueryEngine.
 """
+
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -10,7 +11,9 @@ import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.query_engine import DoxygenQueryEngine
+
 # pylint: enable=import-error
+
 
 @pytest.fixture
 def xml_dir():
@@ -18,22 +21,27 @@ def xml_dir():
     with tempfile.TemporaryDirectory() as tmpdir:
         yield Path(tmpdir)
 
+
 @pytest.fixture
 def engine(xml_dir):  # pylint: disable=redefined-outer-name
     """Fixture for a DoxygenQueryEngine instance with pre-populated data."""
     # Create a basic index.xml
     index_xml = xml_dir / "index.xml"
-    index_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+    index_xml.write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygenindex version="1.9.1">
   <compound refid="class_test_class" kind="class"><name>TestClass</name></compound>
   <compound refid="namespace_test_namespace" kind="namespace"><name>TestNamespace</name></compound>
   <compound refid="test_file_8h" kind="file"><name>test_file.h</name></compound>
 </doxygenindex>
-""", encoding='utf-8')
+""",
+        encoding="utf-8",
+    )
 
     # Create a compound XML for TestClass
     class_xml = xml_dir / "class_test_class.xml"
-    class_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+    class_xml.write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygen>
   <compounddef id="class_test_class" kind="class">
     <compoundname>TestClass</compoundname>
@@ -55,11 +63,14 @@ def engine(xml_dir):  # pylint: disable=redefined-outer-name
     </sectiondef>
   </compounddef>
 </doxygen>
-""", encoding='utf-8')
+""",
+        encoding="utf-8",
+    )
 
     # Create a compound XML for test_file.h
     file_xml = xml_dir / "test_file_8h.xml"
-    file_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+    file_xml.write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygen>
   <compounddef id="test_file_8h" kind="file">
     <compoundname>test_file.h</compoundname>
@@ -74,23 +85,29 @@ def engine(xml_dir):  # pylint: disable=redefined-outer-name
     </sectiondef>
   </compounddef>
 </doxygen>
-""", encoding='utf-8')
+""",
+        encoding="utf-8",
+    )
 
     # Create a compound XML for TestNamespace
     ns_xml = xml_dir / "namespace_test_namespace.xml"
-    ns_xml.write_text("""<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+    ns_xml.write_text(
+        """<?xml version='1.0' encoding='UTF-8' standalone='no'?>
 <doxygen>
   <compounddef id="namespace_test_namespace" kind="namespace">
     <compoundname>TestNamespace</compoundname>
     <briefdescription><para>Namespace brief.</para></briefdescription>
   </compounddef>
 </doxygen>
-""", encoding='utf-8')
+""",
+        encoding="utf-8",
+    )
 
     query_engine = DoxygenQueryEngine(str(xml_dir))
     # pylint: disable=protected-access
     query_engine._load_index()
     return query_engine
+
 
 def test_load_index_valid(engine):  # pylint: disable=redefined-outer-name
     """Test loading a valid index.xml."""
@@ -100,6 +117,7 @@ def test_load_index_valid(engine):  # pylint: disable=redefined-outer-name
     assert "TestNamespace" in engine.compounds
     assert "test_file.h" in engine.compounds
 
+
 def test_load_index_missing(xml_dir):  # pylint: disable=redefined-outer-name
     """Test loading when index.xml is missing."""
     # DoxygenQueryEngine should handle missing index.xml gracefully
@@ -108,15 +126,17 @@ def test_load_index_missing(xml_dir):  # pylint: disable=redefined-outer-name
     engine._load_index()
     assert not engine.compounds
 
+
 def test_load_index_invalid_xml(xml_dir):  # pylint: disable=redefined-outer-name
     """Test loading when index.xml is malformed."""
     # DoxygenQueryEngine should handle malformed XML
     index_xml = xml_dir / "index.xml"
-    index_xml.write_text("invalid xml", encoding='utf-8')
+    index_xml.write_text("invalid xml", encoding="utf-8")
     engine = DoxygenQueryEngine(str(xml_dir))
     # pylint: disable=protected-access
     engine._load_index()
     assert not engine.compounds
+
 
 def test_query_symbol_exact(engine):  # pylint: disable=redefined-outer-name
     """Test exact symbol query."""
@@ -124,6 +144,7 @@ def test_query_symbol_exact(engine):  # pylint: disable=redefined-outer-name
     assert result is not None
     assert result["name"] == "TestClass"
     assert result["kind"] == "class"
+
 
 def test_query_symbol_partial(engine):  # pylint: disable=redefined-outer-name
     """Test partial and case-insensitive symbol query."""
@@ -136,16 +157,19 @@ def test_query_symbol_partial(engine):  # pylint: disable=redefined-outer-name
     assert result is not None
     assert result["name"] == "TestNamespace"
 
+
 def test_query_symbol_not_found(engine):  # pylint: disable=redefined-outer-name
     """Test query for non-existent symbol."""
     result = engine.query_symbol("NonExistent")
     assert result is None
+
 
 def test_get_file_structure_exact(engine):  # pylint: disable=redefined-outer-name
     """Test retrieving file structure with exact match."""
     result = engine.get_file_structure("test_file.h")
     assert len(result) == 1
     assert result[0]["name"] == "globalFunc"
+
 
 def test_get_file_structure_suffix(engine):  # pylint: disable=redefined-outer-name
     """Test retrieving file structure with suffix match."""
@@ -155,10 +179,12 @@ def test_get_file_structure_suffix(engine):  # pylint: disable=redefined-outer-n
     assert len(result) == 1
     assert result[0]["name"] == "globalFunc"
 
+
 def test_get_file_structure_not_found(engine):  # pylint: disable=redefined-outer-name
     """Test retrieving file structure for non-existent file."""
     result = engine.get_file_structure("nonexistent.h")
     assert not result
+
 
 def test_fetch_compound_details_success(engine):  # pylint: disable=redefined-outer-name
     """Test successful fetching of compound details."""
@@ -174,23 +200,30 @@ def test_fetch_compound_details_success(engine):  # pylint: disable=redefined-ou
     assert result["members"][0]["type"] == "void"
     assert result["members"][0]["args"] == "(int x)"
 
-def test_fetch_compound_details_not_found(engine):  # pylint: disable=redefined-outer-name
+
+def test_fetch_compound_details_not_found(
+    engine,
+):  # pylint: disable=redefined-outer-name
     """Test fetching details for non-existent refid."""
     # pylint: disable=protected-access
     result = engine._fetch_compound_details("nonexistent_refid")
     assert "error" in result
     assert "not found" in result["error"]
 
-def test_fetch_compound_details_malformed(xml_dir, engine):  # pylint: disable=redefined-outer-name
+
+def test_fetch_compound_details_malformed(
+    xml_dir, engine
+):  # pylint: disable=redefined-outer-name
     """Test fetching details for malformed compound XML."""
     # Create a malformed compound XML
     malformed_xml = xml_dir / "malformed.xml"
-    malformed_xml.write_text("invalid xml", encoding='utf-8')
+    malformed_xml.write_text("invalid xml", encoding="utf-8")
 
     # pylint: disable=protected-access
     result = engine._fetch_compound_details("malformed")
     assert "error" in result
     assert "Error parsing" in result["error"]
+
 
 def test_get_location(engine):  # pylint: disable=redefined-outer-name
     """Test location extraction."""
@@ -206,11 +239,13 @@ def test_get_location(engine):  # pylint: disable=redefined-outer-name
     assert loc["line"] == "10"
     assert loc["column"] == "5"
 
+
 def test_get_location_missing(engine):  # pylint: disable=redefined-outer-name
     """Test location extraction when missing."""
     element = ET.Element("node")
     # pylint: disable=protected-access
     assert engine._get_location(element) == {}
+
 
 def test_get_location_mock(engine):  # pylint: disable=redefined-outer-name
     """Test location extraction using a Mock, specifically when find returns None."""
@@ -219,13 +254,15 @@ def test_get_location_mock(engine):  # pylint: disable=redefined-outer-name
     # pylint: disable=protected-access
     assert engine._get_location(mock_element) == {}
 
+
 def test_get_text_recursive(engine):  # pylint: disable=redefined-outer-name
     """Test recursive text extraction."""
-    xml_content = '<briefdescription>Text <bold>child</bold> tail.</briefdescription>'
+    xml_content = "<briefdescription>Text <bold>child</bold> tail.</briefdescription>"
     element = ET.fromstring(xml_content)
     # pylint: disable=protected-access
     text = engine._get_text_recursive(element)
     assert text == "Text child tail."
+
 
 def test_get_text_recursive_complex(engine):  # pylint: disable=redefined-outer-name
     """Test complex recursive text extraction."""
@@ -241,10 +278,12 @@ def test_get_text_recursive_complex(engine):  # pylint: disable=redefined-outer-
     # _get_text_recursive strips the final result
     assert "Line 1.Line 2 Ref end." in text.replace("\n", "").replace("  ", "")
 
+
 def test_get_text_recursive_none(engine):  # pylint: disable=redefined-outer-name
     """Test recursive text extraction for None."""
     # pylint: disable=protected-access
     assert engine._get_text_recursive(None) == ""
+
 
 def test_list_all_symbols(engine):  # pylint: disable=redefined-outer-name
     """Test listing all symbols."""
@@ -253,6 +292,7 @@ def test_list_all_symbols(engine):  # pylint: disable=redefined-outer-name
     assert "TestClass" in symbols
     assert "TestNamespace" in symbols
     assert "test_file.h" in symbols
+
 
 def test_list_all_symbols_filtered(engine):  # pylint: disable=redefined-outer-name
     """Test filtered symbol listing."""
@@ -263,6 +303,7 @@ def test_list_all_symbols_filtered(engine):  # pylint: disable=redefined-outer-n
     files = engine.list_all_symbols(kind_filter="file")
     assert len(files) == 1
     assert files[0] == "test_file.h"
+
 
 def test_get_symbol_connections_success(engine):  # pylint: disable=redefined-outer-name
     """Test successful retrieval of symbol connections."""
@@ -277,11 +318,15 @@ def test_get_symbol_connections_success(engine):  # pylint: disable=redefined-ou
     assert "globalFunc" in result["members"][0]["references"]
     assert "otherFunc" in result["members"][0]["referencedby"]
 
-def test_get_symbol_connections_case_insensitive(engine):  # pylint: disable=redefined-outer-name
+
+def test_get_symbol_connections_case_insensitive(
+    engine,
+):  # pylint: disable=redefined-outer-name
     """Test case-insensitive symbol connection query."""
     result = engine.get_symbol_connections("testclass")
     assert result is not None
     assert result["name"] == "TestClass"
+
 
 def test_get_symbol_connections_partial(engine):  # pylint: disable=redefined-outer-name
     """Test partial symbol connection query."""
@@ -289,41 +334,56 @@ def test_get_symbol_connections_partial(engine):  # pylint: disable=redefined-ou
     assert result is not None
     assert result["name"] == "TestNamespace"
 
-def test_get_symbol_connections_not_found(engine):  # pylint: disable=redefined-outer-name
+
+def test_get_symbol_connections_not_found(
+    engine,
+):  # pylint: disable=redefined-outer-name
     """Test connection query for non-existent symbol."""
     result = engine.get_symbol_connections("NonExistent")
     assert result is None
 
-def test_fetch_compound_connections_security_error(engine):  # pylint: disable=redefined-outer-name
+
+def test_fetch_compound_connections_security_error(
+    engine,
+):  # pylint: disable=redefined-outer-name
     """Test with a path that triggers the security check."""
     # pylint: disable=protected-access
     result = engine._fetch_compound_connections("../outside")
     assert "error" in result
     assert "Security Error" in result["error"]
 
-def test_fetch_compound_connections_not_found(engine):  # pylint: disable=redefined-outer-name
+
+def test_fetch_compound_connections_not_found(
+    engine,
+):  # pylint: disable=redefined-outer-name
     """Test with a non-existent refid."""
     # pylint: disable=protected-access
     result = engine._fetch_compound_connections("nonexistent_refid")
     assert "error" in result
     assert "not found" in result["error"]
 
-def test_fetch_compound_connections_malformed(xml_dir, engine):  # pylint: disable=redefined-outer-name
+
+def test_fetch_compound_connections_malformed(
+    xml_dir, engine
+):  # pylint: disable=redefined-outer-name
     """Test with malformed XML."""
     # Create a malformed compound XML
     malformed_xml = xml_dir / "malformed_connections.xml"
-    malformed_xml.write_text("invalid xml", encoding='utf-8')
+    malformed_xml.write_text("invalid xml", encoding="utf-8")
 
     # pylint: disable=protected-access
     result = engine._fetch_compound_connections("malformed_connections")
     assert "error" in result
     assert "Error parsing" in result["error"]
 
-def test_fetch_compound_connections_no_compounddef(xml_dir, engine):  # pylint: disable=redefined-outer-name
+
+def test_fetch_compound_connections_no_compounddef(
+    xml_dir, engine
+):  # pylint: disable=redefined-outer-name
     """Test with XML missing compounddef."""
     # Create an XML without compounddef
     no_compounddef_xml = xml_dir / "no_compounddef.xml"
-    no_compounddef_xml.write_text("<doxygen></doxygen>", encoding='utf-8')
+    no_compounddef_xml.write_text("<doxygen></doxygen>", encoding="utf-8")
 
     # pylint: disable=protected-access
     result = engine._fetch_compound_connections("no_compounddef")

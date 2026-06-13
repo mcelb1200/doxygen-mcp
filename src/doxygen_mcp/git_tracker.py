@@ -2,12 +2,14 @@
 Git Tracker Utility for Doxygen MCP.
 Provides Temporal Context (What Was vs What Is) for source files.
 """
-import subprocess
+
 import logging
+import subprocess
 from pathlib import Path
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
 
 def get_git_root(filepath: Path) -> Optional[Path]:
     """Find the root of the git repository containing the file."""
@@ -17,11 +19,12 @@ def get_git_root(filepath: Path) -> Optional[Path]:
             cwd=filepath.parent,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         return Path(result.stdout.strip())
     except subprocess.CalledProcessError:
         return None
+
 
 def check_working_tree(repo_root: Path, filepath: Path) -> str:
     """Check if the file has uncommitted changes in the working tree."""
@@ -32,7 +35,7 @@ def check_working_tree(repo_root: Path, filepath: Path) -> str:
             cwd=repo_root,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         status = result.stdout.strip()
         if not status:
@@ -48,6 +51,7 @@ def check_working_tree(repo_root: Path, filepath: Path) -> str:
         logger.error(f"Error checking working tree for {filepath}: {e}")
         return "[UNKNOWN]"
 
+
 def check_branch_state(repo_root: Path, filepath: Path) -> str:
     """Check if the file has been modified in the current branch relative to main/master."""
     try:
@@ -58,11 +62,22 @@ def check_branch_state(repo_root: Path, filepath: Path) -> str:
             try:
                 # Get the merge base to compare branch changes
                 base_cmd = ["git", "merge-base", "HEAD", branch]
-                base_result = subprocess.run(base_cmd, cwd=repo_root, capture_output=True, text=True, check=True)
+                base_result = subprocess.run(
+                    base_cmd, cwd=repo_root, capture_output=True, text=True, check=True
+                )
                 merge_base = base_result.stdout.strip()
 
-                diff_cmd = ["git", "diff", f"{merge_base}...HEAD", "--name-status", "--", str(rel_path)]
-                diff_result = subprocess.run(diff_cmd, cwd=repo_root, capture_output=True, text=True, check=True)
+                diff_cmd = [
+                    "git",
+                    "diff",
+                    f"{merge_base}...HEAD",
+                    "--name-status",
+                    "--",
+                    str(rel_path),
+                ]
+                diff_result = subprocess.run(
+                    diff_cmd, cwd=repo_root, capture_output=True, text=True, check=True
+                )
 
                 status = diff_result.stdout.strip()
                 if not status:
@@ -70,12 +85,13 @@ def check_branch_state(repo_root: Path, filepath: Path) -> str:
 
                 return "[MODIFIED FROM MAIN] -> This symbol is actively being refactored in this branch."
             except subprocess.CalledProcessError:
-                continue # Try master if main fails
+                continue  # Try master if main fails
 
         return "[UNKNOWN BASE BRANCH]"
     except Exception as e:
         logger.error(f"Error checking branch state for {filepath}: {e}")
         return "[UNKNOWN]"
+
 
 def get_file_timeline(filepath_str: str, is_indexed: bool = True) -> str:
     """

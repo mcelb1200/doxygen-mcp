@@ -1,11 +1,14 @@
 """
 Tests for the generate_config function in server.py
 """
+
 import json
 import sys
 from io import StringIO
 from unittest.mock import MagicMock
+
 from doxygen_mcp.server import generate_config
+
 
 def test_generate_config_gemini_parity():
     """Verify that --gemini flag produces same output as standard for now."""

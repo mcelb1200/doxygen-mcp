@@ -1,11 +1,14 @@
 """
 Security tests for DoxygenConfig to prevent configuration injection.
 """
+
 import pytest  # pylint: disable=import-error
 
 # pylint: disable=import-error
 from doxygen_mcp.config import DoxygenConfig
+
 # pylint: enable=import-error
+
 
 class TestSecurityConfig:
     """Security tests for DoxygenConfig."""
@@ -24,11 +27,11 @@ class TestSecurityConfig:
     def test_input_paths_injection(self):
         """Test preventing injection via input_paths."""
         malicious_path = 'src"\nINJECTED_KEY=VALUE\nREM="'
-        config = DoxygenConfig(input_paths=['normal_path', malicious_path])
+        config = DoxygenConfig(input_paths=["normal_path", malicious_path])
         doxyfile_content = config.to_doxyfile()
 
         # The injected key should not appear at the start of a line
-        assert '\nINJECTED_KEY=VALUE' not in doxyfile_content
+        assert "\nINJECTED_KEY=VALUE" not in doxyfile_content
 
         # It should appear as part of the value, quoted and escaped.
         # Original: src" -> src\"
@@ -69,7 +72,7 @@ class TestSecurityConfig:
         doxyfile_content = config.to_doxyfile()
 
         # The injected key should not appear at the start of a line
-        assert '\nINJECT=YES' not in doxyfile_content
+        assert "\nINJECT=YES" not in doxyfile_content
 
         # Expected: "../\" INJECT=YES \"
         expected_part = '../\\" INJECT=YES \\"'
@@ -81,24 +84,28 @@ class TestSecurityConfig:
         doxyfile_content = config.to_doxyfile()
 
         # Should be escaped as \"
-        assert 'PROJECT_NAME           = "Project with \\"quotes\\""' in doxyfile_content
+        assert (
+            'PROJECT_NAME           = "Project with \\"quotes\\""' in doxyfile_content
+        )
 
     def test_backslash_escaping(self):
         """Test that backslashes are properly escaped."""
-        config = DoxygenConfig(project_name='Project with \\ backslash')
+        config = DoxygenConfig(project_name="Project with \\ backslash")
         doxyfile_content = config.to_doxyfile()
 
         # Should be escaped as \\
-        assert 'PROJECT_NAME           = "Project with \\\\ backslash"' in doxyfile_content
+        assert (
+            'PROJECT_NAME           = "Project with \\\\ backslash"' in doxyfile_content
+        )
 
     def test_control_character_injection(self):
         """Test that control characters (including line breaks) are sanitized."""
         # Inject vertical tab, form feed, etc.
-        malicious_name = 'My Project\vINJECTED=YES\fREM='
+        malicious_name = "My Project\vINJECTED=YES\fREM="
         config = DoxygenConfig(project_name=malicious_name)
         doxyfile_content = config.to_doxyfile()
 
         # Should not contain unescaped control characters
-        assert '\v' not in doxyfile_content
-        assert '\f' not in doxyfile_content
-        assert '\nINJECTED=YES' not in doxyfile_content
+        assert "\v" not in doxyfile_content
+        assert "\f" not in doxyfile_content
+        assert "\nINJECTED=YES" not in doxyfile_content

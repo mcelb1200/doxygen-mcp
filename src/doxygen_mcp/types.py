@@ -1,7 +1,9 @@
-from typing import Generic, TypeVar, Optional, Any
+from typing import Generic, Optional, TypeVar
+
 from pydantic import BaseModel
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class MCPResult(BaseModel, Generic[T]):
     success: bool

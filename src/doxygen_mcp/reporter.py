@@ -3,12 +3,15 @@
 
 import datetime
 import html
-import os
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 from .query_engine import DoxygenQueryEngine
 
-def discover_candidates(engine: DoxygenQueryEngine, project_path: Path) -> List[Dict[str, Any]]:
+
+def discover_candidates(
+    engine: DoxygenQueryEngine, _project_path: Path
+) -> List[Dict[str, Any]]:
     """Dynamically discover architectural candidates from Doxygen symbols."""
     candidates = []
     classes = engine.list_all_symbols(kind_filter="class")
@@ -19,11 +22,10 @@ def discover_candidates(engine: DoxygenQueryEngine, project_path: Path) -> List[
         conn = engine.get_symbol_connections(cls)
         if not conn or "error" in conn:
             continue
-        
         referenced = set()
         for member in conn.get("members", []):
             referenced.update(member.get("references", []))
-            
+
         for other in classes:
             if other == cls:
                 continue
@@ -47,21 +49,23 @@ def discover_candidates(engine: DoxygenQueryEngine, project_path: Path) -> List[
         mermaid_before = f"flowchart LR\n  {c1} <--> {c2}"
         mermaid_after = f"flowchart LR\n  subgraph Consolidated [Unified {c1}_{c2}]\n    {c1}\n    {c2}\n  end"
 
-        candidates.append({
-            "title": f"Consolidate Coupled Classes {c1} and {c2}",
-            "badge_strength": "Strong",
-            "badge_category": "in-process",
-            "files": files,
-            "mermaid_before": mermaid_before,
-            "mermaid_after": mermaid_after,
-            "problem": f"Bi-directional coupling between class {c1} and {c2} violates clean module seams.",
-            "solution": f"Merge {c1} and {c2} into a single unified module, hiding internal calls behind a clean seam.",
-            "wins": [
-                "Locality: bugs concentrate in unified class",
-                "Leverage: single interface for callers",
-                "Delete redundant bridging methods"
-            ]
-        })
+        candidates.append(
+            {
+                "title": f"Consolidate Coupled Classes {c1} and {c2}",
+                "badge_strength": "Strong",
+                "badge_category": "in-process",
+                "files": files,
+                "mermaid_before": mermaid_before,
+                "mermaid_after": mermaid_after,
+                "problem": f"Bi-directional coupling between class {c1} and {c2} violates clean module seams.",
+                "solution": f"Merge {c1} and {c2} into a single unified module, hiding internal calls behind a clean seam.",
+                "wins": [
+                    "Locality: bugs concentrate in unified class",
+                    "Leverage: single interface for callers",
+                    "Delete redundant bridging methods",
+                ],
+            }
+        )
 
     # 2. Look for Deep Class Inheritance
     for cls in classes:
@@ -77,97 +81,105 @@ def discover_candidates(engine: DoxygenQueryEngine, project_path: Path) -> List[
             mermaid_before = f"flowchart TD\n  {base_classes[0]} --> {cls}\n  {cls} --> {derived_classes[0]}"
             mermaid_after = f"flowchart TD\n  {derived_classes[0]} --> {base_classes[0]}\n  {derived_classes[0]} -.-> |composes| {cls}"
 
-            candidates.append({
-                "title": f"Flatten Deep Inheritance of {cls}",
-                "badge_strength": "Worth exploring",
-                "badge_category": "ports & adapters",
-                "files": [f],
-                "mermaid_before": mermaid_before,
-                "mermaid_after": mermaid_after,
-                "problem": f"Deep class hierarchy with {cls} introduces unnecessary complexity and high coupling.",
-                "solution": f"Flatten inheritance hierarchy, replacing middle layers with composition or direct interfaces.",
-                "wins": [
-                    "Locality: simpler class hierarchy",
-                    "Leverage: caller interacts with composite interface",
-                    "Reduce base class dependency leakage"
-                ]
-            })
+            candidates.append(
+                {
+                    "title": f"Flatten Deep Inheritance of {cls}",
+                    "badge_strength": "Worth exploring",
+                    "badge_category": "ports & adapters",
+                    "files": [f],
+                    "mermaid_before": mermaid_before,
+                    "mermaid_after": mermaid_after,
+                    "problem": f"Deep class hierarchy with {cls} introduces unnecessary complexity and high coupling.",
+                    "solution": f"Flatten inheritance hierarchy, replacing middle layers with composition or direct interfaces.",
+                    "wins": [
+                        "Locality: simpler class hierarchy",
+                        "Leverage: caller interacts with composite interface",
+                        "Reduce base class dependency leakage",
+                    ],
+                }
+            )
             if len(candidates) >= 3:
                 break
 
     # 3. Default Fallback Candidate
     if not candidates:
-        candidates.append({
-            "title": "Consolidate Doxygen MCP Config and Server Utilities",
-            "badge_strength": "Worth exploring",
-            "badge_category": "in-process",
-            "files": ["src/doxygen_mcp/server.py", "src/doxygen_mcp/utils.py"],
-            "mermaid_before": "flowchart TD\n  server[server.py] --> utils[utils.py]\n  server --> config[config.py]",
-            "mermaid_after": "flowchart TD\n  subgraph CoreModule [Core Server Module]\n    server[server.py]\n    utils[utils.py]\n  end\n  CoreModule --> config[config.py]",
-            "problem": "Server logic and environment helper utils exist as separate shallow modules.",
-            "solution": "Deepen server core by absorbing utility helpers behind a single unified interface seam.",
-            "wins": [
-                "Locality: path resolution encapsulated",
-                "Leverage: callers use server directly",
-                "Simpler mock interfaces in tests"
-            ]
-        })
+        candidates.append(
+            {
+                "title": "Consolidate Doxygen MCP Config and Server Utilities",
+                "badge_strength": "Worth exploring",
+                "badge_category": "in-process",
+                "files": ["src/doxygen_mcp/server.py", "src/doxygen_mcp/utils.py"],
+                "mermaid_before": "flowchart TD\n  server[server.py] --> utils[utils.py]\n  server --> config[config.py]",
+                "mermaid_after": "flowchart TD\n  subgraph CoreModule [Core Server Module]\n    server[server.py]\n    utils[utils.py]\n  end\n  CoreModule --> config[config.py]",
+                "problem": "Server logic and environment helper utils exist as separate shallow modules.",
+                "solution": "Deepen server core by absorbing utility helpers behind a single unified interface seam.",
+                "wins": [
+                    "Locality: path resolution encapsulated",
+                    "Leverage: callers use server directly",
+                    "Simpler mock interfaces in tests",
+                ],
+            }
+        )
 
     return candidates
+
 
 def get_git_version(project_path: Path) -> str:
     try:
         import subprocess
+
         res = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=project_path,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         val = res.stdout.strip()
         if val:
             return val
     except Exception:
         pass
-    
+
     doxyfile = project_path / "Doxyfile"
     if doxyfile.exists():
         try:
             content = doxyfile.read_bytes()
             import hashlib
+
             return hashlib.sha256(content).hexdigest()[:16]
         except Exception:
             pass
     return "no-vcs-version"
 
+
 def generate_report_html(project_path: Path, xml_dir: str) -> str:
     """Generate visual architecture review HTML report content."""
-    import subprocess
     import hashlib
 
     engine = DoxygenQueryEngine._cache.get(str(Path(xml_dir).absolute()))
     if not engine:
         # Fallback if cache not hit
         import asyncio
+
         engine = asyncio.run(DoxygenQueryEngine.create(xml_dir))
 
     candidates = discover_candidates(engine, project_path)
-    
+
     project_name = project_path.name
     date_str = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     version = get_git_version(project_path)
-    
+
     hasher = hashlib.sha256()
     hasher.update(f"{date_str}:{version}".encode("utf-8"))
     verification_hash = hasher.hexdigest()[:16]
-    
+
     card_list_html = []
     for idx, c in enumerate(candidates):
         strength_color = {
             "Strong": "emerald",
             "Worth exploring": "amber",
-            "Speculative": "slate"
+            "Speculative": "slate",
         }.get(c["badge_strength"], "slate")
 
         files_li = "\n".join(
@@ -244,10 +256,10 @@ def generate_report_html(project_path: Path, xml_dir: str) -> str:
         </article>
         """
         card_list_html.append(card_html)
-        
+
     candidate_cards_html = "\n".join(card_list_html)
     top_candidate = candidates[0]
-    
+
     html_content = f"""<!doctype html>
 <html lang="en">
   <head>

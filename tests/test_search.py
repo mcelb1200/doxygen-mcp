@@ -1,9 +1,12 @@
-import pytest
 import os
 import shutil
-from pathlib import Path
 import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import pytest
+
 from doxygen_mcp.search import DoxygenSearchIndex
+
 
 def test_search_index_batching(tmp_path):
     test_dir = tmp_path / "test_search"

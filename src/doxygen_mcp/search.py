@@ -2,17 +2,21 @@
 Semantic Search Engine using SQLite FTS5 for Doxygen MCP.
 Provides fast conceptual search across code and specifications.
 """
-import sqlite3
+
 import logging
 import os
+import sqlite3
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import defusedxml.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 
+
 class DoxygenSearchIndex:
     """FTS5-based search index for Doxygen symbols and repository context."""
+
     def __init__(self, xml_dir: str):
         self.xml_dir = Path(xml_dir).resolve()
         self.index_xml = self.xml_dir / "index.xml"
@@ -119,7 +123,7 @@ class DoxygenSearchIndex:
                 cursor.executemany(
                     "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
                     "VALUES (?, ?, ?, ?, ?, ?)",
-                    batch
+                    batch,
                 )
         except Exception as e:
             logger.error("Error parsing Doxygen XML for index: %s", e)
@@ -142,15 +146,25 @@ class DoxygenSearchIndex:
 
     def _ingest_broader_context(self, cursor):
         """Scan repository for documentation files and ingest them."""
-        ignore_dirs = {".git", "build", "node_modules", "html", "latex", ".venv", "__pycache__"}
+        ignore_dirs = {
+            ".git",
+            "build",
+            "node_modules",
+            "html",
+            "latex",
+            ".venv",
+            "__pycache__",
+        }
         batch = []
 
         for root, dirs, files in os.walk(self.repo_root):
-            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith('.')]
+            dirs[:] = [
+                d for d in dirs if d not in ignore_dirs and not d.startswith(".")
+            ]
 
             for file in files:
                 ext = Path(file).suffix.lower()
-                if ext in {'.md', '.yaml', '.yml', '.txt'}:
+                if ext in {".md", ".yaml", ".yml", ".txt"}:
                     result = self._ingest_file(root, file)
                     if result:
                         batch.append(result)
@@ -159,7 +173,7 @@ class DoxygenSearchIndex:
             cursor.executemany(
                 "INSERT INTO symbols (name, kind, refid, brief, detailed, filepath) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
-                batch
+                batch,
             )
 
     def _ingest_file(self, root, file):
@@ -167,11 +181,17 @@ class DoxygenSearchIndex:
         filepath = Path(root) / file
         try:
             rel_path = filepath.relative_to(self.repo_root)
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            return (file, "documentation", "file_context", "Repository Specification/Documentation",
-                    content, str(rel_path))
+            return (
+                file,
+                "documentation",
+                "file_context",
+                "Repository Specification/Documentation",
+                content,
+                str(rel_path),
+            )
         except Exception:
             return None
 
@@ -184,24 +204,29 @@ class DoxygenSearchIndex:
             conn = self.get_connection()
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT name, kind, refid, brief, filepath, bm25(symbols) as rank
                 FROM symbols
                 WHERE symbols MATCH ?
                 ORDER BY rank
                 LIMIT ?
-            """, (query, limit))
+            """,
+                (query, limit),
+            )
 
             results = []
             for row in cursor.fetchall():
-                results.append({
-                    "name": row[0],
-                    "kind": row[1],
-                    "refid": row[2],
-                    "brief": row[3],
-                    "filepath": row[4],
-                    "rank": round(row[5], 2) # bm25 score
-                })
+                results.append(
+                    {
+                        "name": row[0],
+                        "kind": row[1],
+                        "refid": row[2],
+                        "brief": row[3],
+                        "filepath": row[4],
+                        "rank": round(row[5], 2),  # bm25 score
+                    }
+                )
 
             conn.close()
             return results

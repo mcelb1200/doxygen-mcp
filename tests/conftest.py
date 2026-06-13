@@ -1,6 +1,7 @@
 """
 Shared test configuration and mocks.
 """
+
 import asyncio
 import sys
 import xml.etree.ElementTree as ET
@@ -13,6 +14,7 @@ mock_defusedxml = MagicMock()
 mock_defusedxml.ElementTree = ET
 sys.modules["defusedxml"] = mock_defusedxml
 sys.modules["defusedxml.ElementTree"] = ET
+
 
 @pytest.hookimpl(tryfirst=True)
 def pytest_pyfunc_call(pyfuncitem):
@@ -27,6 +29,7 @@ def pytest_pyfunc_call(pyfuncitem):
         return True
     return None
 
+
 # Mock mcp if not installed
 try:
     import mcp.server.fastmcp  # pylint: disable=unused-import, import-error
@@ -37,15 +40,18 @@ except ImportError:
 
     class FastMCP:
         """Mock FastMCP class."""
+
         def __init__(self, name, *args, **kwargs):  # pylint: disable=unused-argument
             self.name = name
             self.tools = {}
 
         def tool(self):
             """Mock tool decorator."""
+
             def decorator(func):
                 self.tools[func.__name__] = func
                 return func
+
             return decorator
 
         def run(self):

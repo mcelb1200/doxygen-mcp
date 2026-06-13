@@ -1,6 +1,7 @@
 """
 Tests for detect_primary_language function.
 """
+
 # pylint: disable=import-error, redefined-outer-name
 import tempfile
 from pathlib import Path
@@ -9,16 +10,19 @@ import pytest  # pylint: disable=import-error
 
 from doxygen_mcp.utils import detect_primary_language
 
+
 @pytest.fixture
 def temp_project_dir():
     """Fixture for a temporary project directory."""
     with tempfile.TemporaryDirectory() as temp_dir:
         yield Path(temp_dir)
 
+
 def test_detect_language_empty(temp_project_dir):
     """Test detect_primary_language on an empty directory."""
     lang = detect_primary_language(temp_project_dir)
     assert lang == "mixed"
+
 
 def test_detect_language_single_file(temp_project_dir):
     """Test detect_primary_language with a single recognized file."""
@@ -26,6 +30,7 @@ def test_detect_language_single_file(temp_project_dir):
 
     lang = detect_primary_language(temp_project_dir)
     assert lang == "python"
+
 
 def test_detect_language_mixed_dominance(temp_project_dir):
     """Test that detect_primary_language selects the most frequent language."""
@@ -38,6 +43,7 @@ def test_detect_language_mixed_dominance(temp_project_dir):
     lang = detect_primary_language(temp_project_dir)
     assert lang == "python"
 
+
 def test_detect_language_case_insensitive(temp_project_dir):
     """Test that detect_primary_language ignores extension case."""
     (temp_project_dir / "file1.CPP").touch()
@@ -46,6 +52,7 @@ def test_detect_language_case_insensitive(temp_project_dir):
 
     lang = detect_primary_language(temp_project_dir)
     assert lang == "cpp"
+
 
 def test_detect_language_depth(temp_project_dir):
     """Test that detect_primary_language scans root and one level deep, but not deeper."""
@@ -67,6 +74,7 @@ def test_detect_language_depth(temp_project_dir):
     lang = detect_primary_language(temp_project_dir)
     assert lang == "cpp"  # Should be cpp (2) vs python (1), ignoring java (10)
 
+
 def test_detect_language_multiple_extensions(temp_project_dir):
     """Test that multiple extensions map to the same language."""
     # 4 javascript files with different extensions
@@ -82,6 +90,7 @@ def test_detect_language_multiple_extensions(temp_project_dir):
 
     lang = detect_primary_language(temp_project_dir)
     assert lang == "javascript"
+
 
 def test_detect_language_ignore_directories(temp_project_dir):
     """Test that directories with extensions are ignored."""
