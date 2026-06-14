@@ -1,6 +1,7 @@
 import pytest
 from pydantic import BaseModel
-from doxygen_mcp.caveman import compress_text, compress_payload
+
+from doxygen_mcp.caveman import compress_payload, compress_text
 
 
 class DummyModel(BaseModel):
