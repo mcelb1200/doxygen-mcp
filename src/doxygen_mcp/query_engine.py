@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional, Tuple
@@ -262,46 +263,65 @@ class DoxygenQueryEngine:
                             m["is_class_member"] = False
                             members.append(m)
 
+                # Collect all refids for parallel loading
+                class_refids = [
+                    ic.get("refid")
+                    for ic in compounddef.findall("innerclass")
+                    if ic.get("refid")
+                ]
+                ns_refids = [
+                    ins.get("refid")
+                    for ins in compounddef.findall("innernamespace")
+                    if ins.get("refid")
+                ]
+                all_refids = class_refids + ns_refids
+
+                # Fetch details in parallel
+                if all_refids:
+                    with ThreadPoolExecutor(
+                        max_workers=min(len(all_refids), 8)
+                    ) as executor:
+                        details_list = list(
+                            executor.map(self._fetch_compound_details, all_refids)
+                        )
+                    details_map = dict(zip(all_refids, details_list))
+                else:
+                    details_map = {}
+
                 # Get members of inner classes defined in this file
-                for innerclass in compounddef.findall("innerclass"):
-                    class_refid = innerclass.get("refid")
-                    if class_refid:
-                        class_details = self._fetch_compound_details(class_refid)
-                        if class_details and "members" in class_details:
-                            # Add the class itself as a symbol
-                            members.append(
-                                {
-                                    "name": class_details["name"],
-                                    "full_name": class_details["name"],
-                                    "kind": class_details["kind"],
-                                    "type": "",
-                                    "args": "",
-                                    "location": class_details.get("location") or {},
-                                    "brief": class_details.get("brief") or "",
-                                    "is_class_member": False,
-                                }
-                            )
-                            # Add class members
-                            for m in class_details["members"]:
-                                m["full_name"] = f"{class_details['name']}::{m['name']}"
-                                m["is_class_member"] = True
-                                members.append(m)
+                for class_refid in class_refids:
+                    class_details = details_map.get(class_refid)
+                    if class_details and "members" in class_details:
+                        # Add the class itself as a symbol
+                        members.append(
+                            {
+                                "name": class_details["name"],
+                                "full_name": class_details["name"],
+                                "kind": class_details["kind"],
+                                "type": "",
+                                "args": "",
+                                "location": class_details.get("location") or {},
+                                "brief": class_details.get("brief") or "",
+                                "is_class_member": False,
+                            }
+                        )
+                        # Add class members
+                        for m in class_details["members"]:
+                            m["full_name"] = f"{class_details['name']}::{m['name']}"
+                            m["is_class_member"] = True
+                            members.append(m)
 
                 # Get members of inner namespaces defined in this file
-                for innernamespace in compounddef.findall("innernamespace"):
-                    ns_refid = innernamespace.get("refid")
-                    if ns_refid:
-                        ns_details = self._fetch_compound_details(ns_refid)
-                        if ns_details and "members" in ns_details:
-                            for m in ns_details["members"]:
-                                loc = m.get("location") or {}
-                                m_file = loc.get("file", "")
-                                if m_file and Path(m_file).name == file_name:
-                                    m["full_name"] = (
-                                        f"{ns_details['name']}::{m['name']}"
-                                    )
-                                    m["is_class_member"] = False
-                                    members.append(m)
+                for ns_refid in ns_refids:
+                    ns_details = details_map.get(ns_refid)
+                    if ns_details and "members" in ns_details:
+                        for m in ns_details["members"]:
+                            loc = m.get("location") or {}
+                            m_file = loc.get("file", "")
+                            if m_file and Path(m_file).name == file_name:
+                                m["full_name"] = f"{ns_details['name']}::{m['name']}"
+                                m["is_class_member"] = False
+                                members.append(m)
 
         except Exception as e:
             logger.error("Error parsing file structure for %s: %s", file_path, e)
