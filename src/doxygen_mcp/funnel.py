@@ -189,7 +189,7 @@ if echo "$changed_files" | grep -E "\\.(h|hpp|cpp|c|py|ts|tsx)$" > /dev/null; th
     (
         cd "$(git rev-parse --show-toplevel)" || exit
         doxygen Doxyfile.fast > /dev/null 2>&1
-        {filter_bin} docs/xml > /dev/null 2>&1
+        "{filter_bin}" docs/xml > /dev/null 2>&1
     ) &
 fi
 """
