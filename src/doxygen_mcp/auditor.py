@@ -74,13 +74,10 @@ class PythonDocVisitor(ast.NodeVisitor):
 def audit_python_files(project_path: Path) -> List[Dict[str, Any]]:
     """Scan all Python files in the project path recursively for missing docstrings."""
     gaps = []
-    for root, _, files in os.walk(project_path):
-        # Skip standard venv/cache directories
-        if any(
-            p in root
-            for p in ["venv", "env", ".venv", ".git", "__pycache__", "build", "dist"]
-        ):
-            continue
+    ignored_dirs = {"venv", "env", ".venv", ".git", "__pycache__", "build", "dist"}
+    for root, dirs, files in os.walk(project_path):
+        # In-place modification to prevent descending into ignored directories
+        dirs[:] = [d for d in dirs if d not in ignored_dirs]
         for file in files:
             if file.endswith(".py"):
                 file_path = Path(root) / file
