@@ -1,5 +1,12 @@
-# Optimized for fast background XML updates (used by doxygen-mcp)
-@INCLUDE = Doxyfile
+# Doxyfile.fast - Optimized for AI Context (Lightning Fast)
+@INCLUDE               = Doxyfile
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+XML_OUTPUT             = docs/xml
+RECURSIVE              = YES
+REFERENCES_RELATION    = YES
+REFERENCED_BY_RELATION = YES
 HAVE_DOT               = NO
 CLASS_GRAPH            = NO
 COLLABORATION_GRAPH    = NO
@@ -7,9 +14,15 @@ CALL_GRAPH             = NO
 CALLER_GRAPH           = NO
 INCLUDE_GRAPH          = NO
 INCLUDED_BY_GRAPH      = NO
-GENERATE_HTML          = NO
-GENERATE_LATEX         = NO
-GENERATE_XML           = YES
+
+# Silence diagnostic noise but capture to log for enrichment
 QUIET                  = YES
-WARNINGS               = NO
-WARN_IF_UNDOCUMENTED   = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_FORMAT            = "$file:$line: $text"
+WARN_LOGFILE           = logs/doxygen_warnings.log
+
+VERBATIM_HEADERS       = NO
+SOURCE_BROWSER         = NO
+INLINE_SOURCES         = NO

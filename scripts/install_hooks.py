@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def get_git_hooks_dir(target_dir: Path) -> Path:
     """Resolve the correct git hooks directory path (worktree-aware)."""
     try:
@@ -12,14 +13,15 @@ def get_git_hooks_dir(target_dir: Path) -> Path:
             cwd=target_dir,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         p = Path(result.stdout.strip())
         if not p.is_absolute():
             p = (target_dir / p).resolve()
         return p
     except Exception:
-        return target_dir / '.git' / 'hooks'
+        return target_dir / ".git" / "hooks"
+
 
 def install_hooks(target_dir=None):
     if not target_dir:
@@ -33,24 +35,28 @@ def install_hooks(target_dir=None):
             ["git", "rev-parse", "--git-dir"],
             cwd=target_dir,
             capture_output=True,
-            check=True
+            check=True,
         )
     except Exception:
-        print(f'Error: {target_dir} is not a git repository.')
+        print(f"Error: {target_dir} is not a git repository.")
         return
 
     hooks_dir = get_git_hooks_dir(target_dir)
     hooks_dir.mkdir(exist_ok=True)
 
     script_dir = Path(__file__).parent.parent
-    template_dir = script_dir / 'templates' / 'hooks'
+    template_dir = script_dir / "templates" / "hooks"
 
     # Determine OS
-    is_windows = os.name == 'nt'
+    is_windows = os.name == "nt"
 
     # 1. Install Doxyfile.fast
-    shutil.copy(template_dir / 'Doxyfile.fast.template', target_dir / 'Doxyfile.fast')
-    print('Installed Doxyfile.fast')
+    doxy_fast = target_dir / "Doxyfile.fast"
+    if doxy_fast.exists():
+        print("Doxyfile.fast already exists, preserving it")
+    else:
+        shutil.copy(template_dir / "Doxyfile.fast.template", doxy_fast)
+        print("Installed Doxyfile.fast")
 
     # 2. Install Hooks
     if is_windows:
@@ -60,15 +66,16 @@ def install_hooks(target_dir=None):
         pass
 
     # Copy pre-commit
-    shutil.copy(template_dir / 'pre-commit.sh.template', hooks_dir / 'pre-commit')
-    os.chmod(hooks_dir / 'pre-commit', 0o755)
+    shutil.copy(template_dir / "pre-commit.sh.template", hooks_dir / "pre-commit")
+    os.chmod(hooks_dir / "pre-commit", 0o755)
 
     # Copy pre-push
-    shutil.copy(template_dir / 'pre-push.sh.template', hooks_dir / 'pre-push')
-    os.chmod(hooks_dir / 'pre-push', 0o755)
+    shutil.copy(template_dir / "pre-push.sh.template", hooks_dir / "pre-push")
+    os.chmod(hooks_dir / "pre-push", 0o755)
 
-    print('Installed git hooks to .git/hooks/')
-    print('Doxygen will now update metadata in the background on commit and push.')
+    print("Installed git hooks to .git/hooks/")
+    print("Doxygen will now update metadata in the background on commit and push.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     install_hooks(sys.argv[1] if len(sys.argv) > 1 else None)

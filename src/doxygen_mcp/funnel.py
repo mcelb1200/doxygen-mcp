@@ -136,10 +136,10 @@ def setup_funnel(repo_path: str):
     doxy_fast = repo / "Doxyfile.fast"
     if doxy_fast.exists():
         print(
-            f"[INFO] Doxyfile.fast already exists in {repo.name}. Overwriting with standard AI-Context overrides..."
+            f"[INFO] Doxyfile.fast already exists in {repo.name}. Preserving existing configuration."
         )
-
-    doxyfile_content = """# Doxyfile.fast - Optimized for AI Context
+    else:
+        doxyfile_content = """# Doxyfile.fast - Optimized for AI Context (Lightning Fast)
 @INCLUDE               = Doxyfile
 GENERATE_HTML          = NO
 GENERATE_LATEX         = NO
@@ -149,13 +149,27 @@ RECURSIVE              = YES
 REFERENCES_RELATION    = YES
 REFERENCED_BY_RELATION = YES
 HAVE_DOT               = NO
+CLASS_GRAPH            = NO
+COLLABORATION_GRAPH    = NO
 CALL_GRAPH             = NO
 CALLER_GRAPH           = NO
 INCLUDE_GRAPH          = NO
 INCLUDED_BY_GRAPH      = NO
+
+# Silence diagnostic noise but capture to log for enrichment
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_FORMAT            = "$file:$line: $text"
+WARN_LOGFILE           = logs/doxygen_warnings.log
+
+VERBATIM_HEADERS       = NO
+SOURCE_BROWSER         = NO
+INLINE_SOURCES         = NO
 """
-    with open(doxy_fast, "w", encoding="utf-8") as f:
-        f.write(doxyfile_content)
+        with open(doxy_fast, "w", encoding="utf-8") as f:
+            f.write(doxyfile_content)
 
     # 2. Install post-commit hook
     hook_dir = get_git_hooks_dir(repo)
