@@ -31,7 +31,7 @@ def check_working_tree(repo_root: Path, filepath: Path) -> str:
     try:
         rel_path = filepath.relative_to(repo_root)
         result = subprocess.run(
-            ["git", "status", "--porcelain", str(rel_path)],
+            ["git", "status", "--porcelain", "--", str(rel_path)],
             cwd=repo_root,
             capture_output=True,
             text=True,
