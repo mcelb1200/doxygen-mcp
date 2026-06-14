@@ -37,6 +37,9 @@ class DoxygenQueryEngine:
         self.compounds: Dict[str, Any] = {}
         # Optimization indices
         self._lower_map: Dict[str, Any] = {}  # lower_case_name -> info
+        self._substring_map: Dict[str, Any] = (
+            {}
+        )  # substring -> info for O(1) partial match
         self._file_map: Dict[str, List[Dict[str, Any]]] = {}  # basename -> list of info
         self._files: List[Tuple[str, Dict[str, Any]]] = (
             []
@@ -80,7 +83,15 @@ class DoxygenQueryEngine:
             self.compounds[name] = info
 
             # Build optimization indices
-            self._lower_map[name.lower()] = info
+            lower_name = name.lower()
+            self._lower_map[lower_name] = info
+
+            # Suffix/substring index for fast O(1) partial matches
+            for i in range(len(lower_name)):
+                for j in range(i + 1, len(lower_name) + 1):
+                    sub = lower_name[i:j]
+                    if sub not in self._substring_map:
+                        self._substring_map[sub] = info
 
             if kind == "file":
                 self._files.append((name, info))
@@ -125,10 +136,11 @@ class DoxygenQueryEngine:
         if lower_name in self._lower_map:
             return self._fetch_compound_details(self._lower_map[lower_name]["refid"])
 
-        # Partial match (fallback to O(N) scan)
-        for name_lower, info in self._lower_map.items():
-            if lower_name in name_lower:
-                return self._fetch_compound_details(info["refid"])
+        # Partial match (O(1) lookup using substring map)
+        if lower_name in self._substring_map:
+            return self._fetch_compound_details(
+                self._substring_map[lower_name]["refid"]
+            )
 
         return None
 
@@ -141,11 +153,8 @@ class DoxygenQueryEngine:
             lower_name = symbol_name.lower()
             if lower_name in self._lower_map:
                 refid = self._lower_map[lower_name]["refid"]
-            else:
-                for name_lower, info in self._lower_map.items():
-                    if lower_name in name_lower:
-                        refid = info["refid"]
-                        break
+            elif lower_name in self._substring_map:
+                refid = self._substring_map[lower_name]["refid"]
 
         if not refid:
             return None
