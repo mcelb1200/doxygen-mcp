@@ -176,30 +176,45 @@ def find_build_dir(project_path: Path) -> Optional[Path]:
 
 def scan_binary_gaps(nm_tool: str, build_dir: Path) -> Dict[str, List[str]]:
     """Scan build object files for undefined symbols."""
-    gaps = {}
+    gaps: Dict[str, List[str]] = {}
     obj_files = list(build_dir.rglob("*.o")) + list(build_dir.rglob("*.obj"))
-    for obj in obj_files[:50]:  # Limit file count for performance
-        try:
-            res = subprocess.run(
-                [nm_tool, "-u", str(obj)], capture_output=True, text=True, check=True
-            )
-            undefined = []
-            for line in res.stdout.splitlines():
-                parts = line.strip().split()
-                if parts:
-                    sym = parts[-1]
-                    if (
-                        not sym.startswith("__")
-                        and not sym.startswith("_Z4")
-                        and not sym.startswith("_Z3")
-                    ):
-                        undefined.append(sym)
-            if undefined:
-                rel_path = obj.relative_to(build_dir)
-                source_guess = rel_path.with_suffix("")
-                gaps[str(source_guess)] = undefined
-        except Exception:
-            pass
+    files_to_scan = obj_files[:50]  # Limit file count for performance
+
+    if not files_to_scan:
+        return gaps
+
+    try:
+        # check=False so that one invalid file doesn't crash the entire batch.
+        res = subprocess.run(
+            [nm_tool, "-u", "-A"] + [str(f) for f in files_to_scan],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        for line in res.stdout.splitlines():
+            if ":" not in line:
+                continue
+
+            # Use rsplit to safely handle Windows paths (e.g. C:\path\to\file.o:)
+            file_part, sym_part = line.rsplit(":", 1)
+            parts = sym_part.strip().split()
+            if parts:
+                sym = parts[-1]
+                if (
+                    not sym.startswith("__")
+                    and not sym.startswith("_Z4")
+                    and not sym.startswith("_Z3")
+                ):
+                    obj = Path(file_part)
+                    rel_path = obj.relative_to(build_dir)
+                    source_guess = str(rel_path.with_suffix(""))
+
+                    if source_guess not in gaps:
+                        gaps[source_guess] = []
+                    gaps[source_guess].append(sym)
+    except Exception:
+        pass
+
     return gaps
 
 

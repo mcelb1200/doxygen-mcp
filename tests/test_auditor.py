@@ -135,16 +135,23 @@ def test_scan_binary_gaps(mock_run):
         # Create mock build structure
         build_folder = temp_path / "build"
         build_folder.mkdir()
-        (build_folder / "file.o").write_text("dummy", encoding="utf-8")
+        obj_file = build_folder / "file.o"
+        obj_file.write_text("dummy", encoding="utf-8")
 
-        # Mock nm output
+        # Mock nm output with -A format: filepath: symbol
         mock_process = MagicMock()
-        mock_process.stdout = (
-            "         U undefined_symbol\n         U __ignored_symbol\n"
-        )
+        mock_process.stdout = f"{str(obj_file)}:         U undefined_symbol\n{str(obj_file)}:         U __ignored_symbol\n"
         mock_run.return_value = mock_process
 
         gaps = scan_binary_gaps("nm", build_folder)
+
+        # Check call args
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert "nm" in args
+        assert "-u" in args
+        assert "-A" in args
+        assert str(obj_file) in args
 
         assert "file" in gaps
         assert "undefined_symbol" in gaps["file"]
