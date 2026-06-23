@@ -140,9 +140,7 @@ def test_scan_binary_gaps(mock_run):
 
         # Mock nm output with -A format: filepath: symbol
         mock_process = MagicMock()
-        mock_process.stdout = (
-            f"{str(obj_file)}:         U undefined_symbol\n{str(obj_file)}:         U __ignored_symbol\n"
-        )
+        mock_process.stdout = f"{str(obj_file)}:         U undefined_symbol\n{str(obj_file)}:         U __ignored_symbol\n"
         mock_run.return_value = mock_process
 
         gaps = scan_binary_gaps("nm", build_folder)
