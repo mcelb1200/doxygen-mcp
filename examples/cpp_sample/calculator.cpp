@@ -24,31 +24,31 @@ namespace MathUtils {
 
     double Calculator::add(double a, double b) {
         lastResult = a + b;
-        
+
         std::ostringstream oss;
         oss << formatNumber(a) << " + " << formatNumber(b) << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
-        
+
         return lastResult;
     }
 
     double Calculator::subtract(double a, double b) {
         lastResult = a - b;
-        
+
         std::ostringstream oss;
         oss << formatNumber(a) << " - " << formatNumber(b) << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
-        
+
         return lastResult;
     }
 
     double Calculator::multiply(double a, double b) {
         lastResult = a * b;
-        
+
         std::ostringstream oss;
         oss << formatNumber(a) << " * " << formatNumber(b) << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
-        
+
         return lastResult;
     }
 
@@ -56,13 +56,13 @@ namespace MathUtils {
         if (std::abs(b) < 1e-10) {
             throw std::invalid_argument("Division by zero is not allowed");
         }
-        
+
         lastResult = a / b;
-        
+
         std::ostringstream oss;
         oss << formatNumber(a) << " / " << formatNumber(b) << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
-        
+
         return lastResult;
     }
 
@@ -82,11 +82,11 @@ namespace MathUtils {
 
     double Calculator::power(double base, double exponent) {
         lastResult = std::pow(base, exponent);
-        
+
         std::ostringstream oss;
         oss << formatNumber(base) << " ^ " << formatNumber(exponent) << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
-        
+
         return lastResult;
     }
 
@@ -94,13 +94,13 @@ namespace MathUtils {
         if (number < 0) {
             throw std::invalid_argument("Square root of negative number is not allowed");
         }
-        
+
         lastResult = std::sqrt(number);
-        
+
         std::ostringstream oss;
         oss << "sqrt(" << formatNumber(number) << ") = " << formatNumber(lastResult);
         history.push_back(oss.str());
-        
+
         return lastResult;
     }
 

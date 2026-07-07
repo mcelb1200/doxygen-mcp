@@ -4,8 +4,6 @@ Tests for Doxygen MCP Server
 Basic test suite to verify core functionality of the Doxygen MCP server.
 """
 
-import asyncio
-import json
 import os
 import tempfile
 import pytest
@@ -14,7 +12,6 @@ from unittest.mock import patch, MagicMock
 
 from doxygen_mcp.server import (
     DoxygenConfig,
-    mcp,
     create_doxygen_project,
     generate_documentation,
     scan_project,
@@ -24,15 +21,15 @@ from doxygen_mcp.server import (
 
 class TestDoxygenConfig:
     """Test the DoxygenConfig model"""
-    
+
     def test_default_config(self):
         """Test default configuration values"""
         config = DoxygenConfig()
         assert config.project_name == "My Project"
-        assert config.extract_all == True
-        assert config.generate_html == True
-        assert config.recursive == True
-    
+        assert config.extract_all
+        assert config.generate_html
+        assert config.recursive
+
     def test_config_serialization(self):
         """Test Doxyfile generation"""
         config = DoxygenConfig(
@@ -40,22 +37,22 @@ class TestDoxygenConfig:
             output_directory="./test_docs",
             file_patterns=["*.cpp", "*.h"]
         )
-        
+
         doxyfile_content = config.to_doxyfile()
-        
+
         assert 'PROJECT_NAME           = "Test Project"' in doxyfile_content
         assert 'OUTPUT_DIRECTORY       = "./test_docs"' in doxyfile_content
         assert 'FILE_PATTERNS          = *.cpp *.h' in doxyfile_content
         assert 'EXTRACT_ALL            = YES' in doxyfile_content
-    
+
     def test_language_optimization(self):
         """Test language-specific optimizations"""
         config = DoxygenConfig()
         config.optimize_output_for_c = True
         config.optimize_output_java = False
-        
+
         doxyfile_content = config.to_doxyfile()
-        
+
         assert 'OPTIMIZE_OUTPUT_FOR_C  = YES' in doxyfile_content
         assert 'OPTIMIZE_OUTPUT_JAVA   = NO' in doxyfile_content
 
@@ -71,17 +68,17 @@ async def test_create_project_success():
             include_subdirs=True,
             extract_private=False
         )
-        
+
         assert "✅ Doxygen project 'Test Project' created successfully!" in result
-        
+
         # Check if Doxyfile was created
         doxyfile_path = Path(temp_dir) / "Doxyfile"
         assert doxyfile_path.exists()
-        
+
         # Verify content
         with open(doxyfile_path, 'r') as f:
             content = f.read()
-        
+
         assert 'PROJECT_NAME           = "Test Project"' in content
         assert '*.cpp *.hpp *.cc *.hh *.cxx *.hxx' in content
 
@@ -102,7 +99,7 @@ async def test_scan_project_nonexistent():
     result = await scan_project(
         project_path="/nonexistent/path"
     )
-    
+
     assert "❌ Project path does not exist:" in result
 
 @pytest.mark.asyncio
@@ -121,11 +118,11 @@ async def test_scan_project_success():
         for filename in test_files:
             file_path = Path(temp_dir) / filename
             file_path.write_text(f"// Test content for {filename}")
-        
+
         result = await scan_project(
             project_path=temp_dir
         )
-        
+
         assert "📁 Project Scan Results" in result
         assert "Total Files Found: 5" in result
         assert ".cpp: 1 files" in result
@@ -142,7 +139,7 @@ async def test_check_doxygen_install_success(mock_run):
     )
 
     result = await check_doxygen_install()
-    
+
     assert "✅ Doxygen 1.9.4 is installed and working!" in result
 
 @pytest.mark.asyncio
@@ -152,7 +149,7 @@ async def test_check_doxygen_install_not_found(mock_run):
     mock_run.side_effect = FileNotFoundError()
 
     result = await check_doxygen_install()
-    
+
     assert "❌ Doxygen is not installed" in result
 
 @pytest.mark.asyncio
@@ -163,7 +160,7 @@ async def test_generate_documentation_no_doxyfile():
             project_path=temp_dir,
             output_format="html"
         )
-        
+
         assert "❌ No Doxyfile found" in result
 
 @pytest.mark.asyncio
@@ -174,60 +171,60 @@ async def test_generate_documentation_success(mock_run):
         # Create a mock Doxyfile
         doxyfile_path = Path(temp_dir) / "Doxyfile"
         doxyfile_path.write_text("PROJECT_NAME = Test")
-        
+
         # Mock successful doxygen execution
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="1.9.4\n"),  # version check
             MagicMock(returncode=0, stderr="")  # documentation generation
         ]
-        
+
         result = await generate_documentation(
             project_path=temp_dir,
             output_format="html"
         )
-        
+
         assert "✅ Documentation generated successfully!" in result
 
 
 class TestLanguageDetection:
     """Test language-specific configuration"""
-    
+
     def test_cpp_language_config(self):
         """Test C++ language configuration"""
         config = DoxygenConfig()
-        
+
         # Simulate C++ project setup
         config.file_patterns = ["*.cpp", "*.hpp", "*.cc", "*.hh", "*.cxx", "*.hxx"]
         config.optimize_output_for_c = False
-        
+
         doxyfile_content = config.to_doxyfile()
-        
+
         assert "*.cpp *.hpp *.cc *.hh *.cxx *.hxx" in doxyfile_content
         assert "OPTIMIZE_OUTPUT_FOR_C  = NO" in doxyfile_content
-    
+
     def test_python_language_config(self):
         """Test Python language configuration"""
         config = DoxygenConfig()
-        
+
         # Simulate Python project setup
         config.file_patterns = ["*.py"]
         config.optimize_output_java = True  # Python uses Java-style optimization
-        
+
         doxyfile_content = config.to_doxyfile()
-        
+
         assert "FILE_PATTERNS          = *.py" in doxyfile_content
         assert "OPTIMIZE_OUTPUT_JAVA   = YES" in doxyfile_content
-    
+
     def test_c_language_config(self):
         """Test C language configuration"""
         config = DoxygenConfig()
-        
+
         # Simulate C project setup
         config.file_patterns = ["*.c", "*.h"]
         config.optimize_output_for_c = True
-        
+
         doxyfile_content = config.to_doxyfile()
-        
+
         assert "FILE_PATTERNS          = *.c *.h" in doxyfile_content
         assert "OPTIMIZE_OUTPUT_FOR_C  = YES" in doxyfile_content
 

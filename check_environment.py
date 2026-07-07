@@ -4,10 +4,10 @@ Basic functionality test for Doxygen MCP Server
 Run this script to verify core functionality before MCP integration
 """
 
+import os
 import subprocess
 import sys
 from pathlib import Path
-import json
 
 def test_doxygen_installation():
     """Test if Doxygen is installed and accessible"""
@@ -50,7 +50,7 @@ def test_python_dependencies():
     print("\n🔍 Testing Python dependencies...")
     required_packages = ['mcp', 'pydantic']
     missing_packages = []
-    
+
     for package in required_packages:
         try:
             __import__(package)
@@ -58,7 +58,7 @@ def test_python_dependencies():
         except ImportError:
             print(f"❌ {package} is missing")
             missing_packages.append(package)
-    
+
     if missing_packages:
         print(f"\n⚠️ Missing packages: {', '.join(missing_packages)}")
         print("Install with: pip install -r requirements.txt")
@@ -68,7 +68,7 @@ def test_python_dependencies():
 def test_project_structure():
     """Test if all required project files are present"""
     print("\n🔍 Testing project structure...")
-    
+
     project_root = Path(__file__).parent
     required_files = [
         'server.py',
@@ -81,7 +81,7 @@ def test_project_structure():
         'examples/cpp_sample/calculator.h',
         'examples/cpp_sample/calculator.cpp'
     ]
-    
+
     missing_files = []
     for file_path in required_files:
         full_path = project_root / file_path
@@ -90,7 +90,7 @@ def test_project_structure():
         else:
             print(f"❌ {file_path}")
             missing_files.append(file_path)
-    
+
     if missing_files:
         print(f"\n⚠️ Missing files: {', '.join(missing_files)}")
         return False
@@ -99,17 +99,17 @@ def test_project_structure():
 def test_example_project():
     """Test the example C++ project"""
     print("\n🔍 Testing example C++ project...")
-    
+
     project_root = Path(__file__).parent
     example_path = project_root / "examples" / "cpp_sample"
-    
+
     # Count source files
     cpp_files = list(example_path.glob("*.cpp"))
     h_files = list(example_path.glob("*.h"))
-    
+
     print(f"📄 Found {len(cpp_files)} .cpp files")
     print(f"📄 Found {len(h_files)} .h files")
-    
+
     # Check if files have Doxygen comments
     documented_files = 0
     for file_path in cpp_files + h_files:
@@ -119,7 +119,7 @@ def test_example_project():
             print(f"✅ {file_path.name} has Doxygen comments")
         else:
             print(f"⚠️ {file_path.name} lacks Doxygen comments")
-    
+
     total_files = len(cpp_files) + len(h_files)
     if total_files > 0:
         print(f"📊 Documentation coverage: {documented_files}/{total_files} files")
@@ -131,7 +131,7 @@ def test_example_project():
 def test_manual_doxygen_run():
     """Test running Doxygen manually on the example project"""
     print("\n🔍 Testing manual Doxygen run...")
-    
+
     project_root = Path(__file__).parent
     example_path = project_root / "examples" / "cpp_sample"
 
@@ -143,7 +143,7 @@ def test_manual_doxygen_run():
     if not str(safe_example_path).startswith(os.getcwd()):
         print(f"❌ Example project path is not within the current working directory: {example_path}")
         return False
-    
+
     # Create a simple Doxyfile for testing
     doxyfile_content = f"""
 PROJECT_NAME           = "Calculator Example Test"
@@ -156,13 +156,13 @@ GENERATE_LATEX         = NO
 EXTRACT_ALL            = YES
 SOURCE_BROWSER         = YES
 """
-    
+
     doxyfile_path = example_path / "Doxyfile.test"
     doxyfile_path.write_text(doxyfile_content)
-    
+
     try:
         print(f"📝 Created test Doxyfile: {doxyfile_path}")
-        
+
         # Run Doxygen
         result = subprocess.run(
             ["doxygen", str(doxyfile_path)],
@@ -170,10 +170,10 @@ SOURCE_BROWSER         = YES
             capture_output=True,
             text=True
         )
-        
+
         if result.returncode == 0:
             print("✅ Doxygen ran successfully!")
-            
+
             # Check if HTML output was created
             html_index = example_path / "test_docs" / "html" / "index.html"
             if html_index.exists():
@@ -187,7 +187,7 @@ SOURCE_BROWSER         = YES
             print("❌ Doxygen failed to run")
             print(f"Error output: {result.stderr}")
             return False
-            
+
     except Exception as e:
         print(f"❌ Error running Doxygen test: {e}")
         return False
@@ -200,7 +200,7 @@ def main():
     """Run all tests"""
     print("🚀 Doxygen MCP Server - Basic Functionality Tests")
     print("=" * 60)
-    
+
     tests = [
         ("Doxygen Installation", test_doxygen_installation),
         ("Graphviz Installation", test_graphviz_installation),
@@ -209,9 +209,9 @@ def main():
         ("Example Project", test_example_project),
         ("Manual Doxygen Run", test_manual_doxygen_run)
     ]
-    
+
     results = []
-    
+
     for test_name, test_func in tests:
         try:
             success = test_func()
@@ -219,21 +219,21 @@ def main():
         except Exception as e:
             print(f"❌ {test_name} failed with exception: {e}")
             results.append((test_name, False))
-    
+
     # Summary
     print("\n" + "=" * 60)
     print("📊 Test Results Summary:")
     print("=" * 60)
-    
+
     passed = 0
     for test_name, success in results:
         status = "✅ PASS" if success else "❌ FAIL"
         print(f"{status} {test_name}")
         if success:
             passed += 1
-    
+
     print(f"\n🎯 Overall: {passed}/{len(results)} tests passed")
-    
+
     if passed == len(results):
         print("\n🎉 All tests passed! Ready for MCP integration testing.")
         return True
