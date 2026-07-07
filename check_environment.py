@@ -13,7 +13,9 @@ def test_doxygen_installation():
     """Test if Doxygen is installed and accessible"""
     print("🔍 Testing Doxygen installation...")
     try:
-        result = subprocess.run(["doxygen", "--version"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["doxygen", "--version"], capture_output=True, text=True  # noqa: S607
+        )
         if result.returncode == 0:
             version = result.stdout.strip()
             print(f"✅ Doxygen {version} is installed and working!")
@@ -31,7 +33,9 @@ def test_graphviz_installation():
     """Test if Graphviz (dot) is installed"""
     print("\n🔍 Testing Graphviz (dot) installation...")
     try:
-        result = subprocess.run(["dot", "-V"], capture_output=True, text=True)
+        result = subprocess.run(
+            ["dot", "-V"], capture_output=True, text=True  # noqa: S607
+        )
         if result.returncode == 0:
             # Graphviz outputs version to stderr
             version_info = result.stderr.strip()
@@ -141,7 +145,7 @@ def test_manual_doxygen_run():
         print(f"❌ Invalid example project path: {example_path}")
         return False
     if not str(safe_example_path).startswith(os.getcwd()):
-        print(f"❌ Example project path is not within the current working directory: {example_path}")
+        print(f"❌ Example project path is not within the current working directory: {example_path}")  # noqa: E501
         return False
 
     # Create a simple Doxyfile for testing
@@ -164,8 +168,8 @@ SOURCE_BROWSER         = YES
         print(f"📝 Created test Doxyfile: {doxyfile_path}")
 
         # Run Doxygen
-        result = subprocess.run(
-            ["doxygen", str(doxyfile_path)],
+        result = subprocess.run(  # noqa: S603
+            ["doxygen", str(doxyfile_path)],  # noqa: S607
             cwd=example_path,
             capture_output=True,
             text=True
@@ -238,7 +242,7 @@ def main():
         print("\n🎉 All tests passed! Ready for MCP integration testing.")
         return True
     else:
-        print(f"\n⚠️ {len(results) - passed} tests failed. Please address issues before proceeding.")
+        print(f"\n⚠️ {len(results) - passed} tests failed. Please address issues before proceeding.")  # noqa: E501
         return False
 
 if __name__ == "__main__":
