@@ -67,7 +67,9 @@ def test_discover_candidates_fallback():
 
     candidates = discover_candidates(engine, Path("/fake"))
     assert len(candidates) == 1
-    assert candidates[0]["title"] == "Consolidate Doxygen MCP Config and Server Utilities"
+    assert (
+        candidates[0]["title"] == "Consolidate Doxygen MCP Config and Server Utilities"
+    )
     assert candidates[0]["badge_strength"] == "Worth exploring"
 
 
@@ -104,25 +106,30 @@ def test_get_git_version_no_vcs(mock_run, tmp_path):
 @pytest.mark.asyncio
 @patch("doxygen_mcp.reporter.discover_candidates")
 @patch("doxygen_mcp.reporter.get_git_version")
-@patch.dict("doxygen_mcp.query_engine.DoxygenQueryEngine._cache", {"/fake/xml": MagicMock()})
+@patch.dict(
+    "doxygen_mcp.query_engine.DoxygenQueryEngine._cache", {"/fake/xml": MagicMock()}
+)
 async def test_generate_report_html_cache_hit(mock_git_version, mock_discover):
     # Set the cache value manually so that `.get()` will find it
     from doxygen_mcp.query_engine import DoxygenQueryEngine
+
     mock_engine = MagicMock()
     DoxygenQueryEngine._cache[str(Path("/fake/xml").absolute())] = mock_engine
 
     mock_git_version.return_value = "v1.0"
-    mock_discover.return_value = [{
-        "title": "Mock Candidate",
-        "badge_strength": "Strong",
-        "badge_category": "mock-cat",
-        "files": ["file1.cpp"],
-        "mermaid_before": "A-->B",
-        "mermaid_after": "B-->A",
-        "problem": "Problem X",
-        "solution": "Solution Y",
-        "wins": ["Win Z"]
-    }]
+    mock_discover.return_value = [
+        {
+            "title": "Mock Candidate",
+            "badge_strength": "Strong",
+            "badge_category": "mock-cat",
+            "files": ["file1.cpp"],
+            "mermaid_before": "A-->B",
+            "mermaid_after": "B-->A",
+            "problem": "Problem X",
+            "solution": "Solution Y",
+            "wins": ["Win Z"],
+        }
+    ]
 
     html = generate_report_html(Path("/fake"), "/fake/xml")
 
@@ -136,30 +143,37 @@ async def test_generate_report_html_cache_hit(mock_git_version, mock_discover):
 @patch("doxygen_mcp.reporter.discover_candidates")
 @patch("doxygen_mcp.reporter.get_git_version")
 @patch("asyncio.run")
-def test_generate_report_html_cache_miss(mock_asyncio_run, mock_git_version, mock_discover):
+def test_generate_report_html_cache_miss(
+    mock_asyncio_run, mock_git_version, mock_discover
+):
     # Ensure cache is empty
     from doxygen_mcp.query_engine import DoxygenQueryEngine
+
     DoxygenQueryEngine._cache.clear()
 
     mock_engine = MagicMock()
     mock_asyncio_run.return_value = mock_engine
 
     mock_git_version.return_value = "v2.0"
-    mock_discover.return_value = [{
-        "title": "Fallback Candidate",
-        "badge_strength": "Speculative",
-        "badge_category": "mock-cat",
-        "files": ["file2.cpp"],
-        "mermaid_before": "A-->B",
-        "mermaid_after": "B-->A",
-        "problem": "Problem X",
-        "solution": "Solution Y",
-        "wins": ["Win Z"]
-    }]
+    mock_discover.return_value = [
+        {
+            "title": "Fallback Candidate",
+            "badge_strength": "Speculative",
+            "badge_category": "mock-cat",
+            "files": ["file2.cpp"],
+            "mermaid_before": "A-->B",
+            "mermaid_after": "B-->A",
+            "problem": "Problem X",
+            "solution": "Solution Y",
+            "wins": ["Win Z"],
+        }
+    ]
 
     # Mocking create is not strictly necessary if we patch asyncio.run directly,
     # but we can patch create to prevent real objects from being passed to asyncio.run
-    with patch("doxygen_mcp.query_engine.DoxygenQueryEngine.create", new_callable=MagicMock) as mock_create:
+    with patch(
+        "doxygen_mcp.query_engine.DoxygenQueryEngine.create", new_callable=MagicMock
+    ) as mock_create:
         mock_create.return_value = "dummy_coro"
         html = generate_report_html(Path("/fake"), "/fake/xml")
         mock_create.assert_called_once_with("/fake/xml")
