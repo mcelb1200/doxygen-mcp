@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from .query_engine import DoxygenQueryEngine
 
 
+# pylint: disable=too-many-locals,too-many-branches
 def discover_candidates(
     engine: DoxygenQueryEngine, _project_path: Path
 ) -> List[Dict[str, Any]]:
@@ -16,28 +17,37 @@ def discover_candidates(
     candidates = []
     classes = engine.list_all_symbols(kind_filter="class")
 
-    # 1. Look for Tightly Coupled Modules (cross-references)
-    coupled_pairs = set()
+    # Pre-fetch and cache connections for all classes to avoid N+1 queries
+    # and optimize O(N^2) loops.
+    class_connections = {}
+    class_references = {}
+
     for cls in classes:
         conn = engine.get_symbol_connections(cls)
         if not conn or "error" in conn:
             continue
+
+        class_connections[cls] = conn
         referenced = set()
         for member in conn.get("members", []):
             referenced.update(member.get("references", []))
+        class_references[cls] = referenced
 
-        for other in classes:
-            if other == cls:
+    # 1. Look for Tightly Coupled Modules (cross-references)
+    coupled_pairs = set()
+    for cls in classes:
+        if cls not in class_references:
+            continue
+
+        referenced = class_references[cls]
+        for other in referenced:
+            if other == cls or other not in class_references:
                 continue
-            if other in referenced:
-                other_conn = engine.get_symbol_connections(other)
-                if other_conn and "error" not in other_conn:
-                    other_referenced = set()
-                    for o_member in other_conn.get("members", []):
-                        other_referenced.update(o_member.get("references", []))
-                    if cls in other_referenced:
-                        pair = tuple(sorted([cls, other]))
-                        coupled_pairs.add(pair)
+
+            other_referenced = class_references[other]
+            if cls in other_referenced:
+                pair = tuple(sorted([cls, other]))
+                coupled_pairs.add(pair)
 
     for c1, c2 in list(coupled_pairs)[:3]:
         c1_details = engine.query_symbol(c1) or {}
@@ -69,9 +79,10 @@ def discover_candidates(
 
     # 2. Look for Deep Class Inheritance
     for cls in classes:
-        conn = engine.get_symbol_connections(cls)
-        if not conn or "error" in conn:
+        if cls not in class_connections:
             continue
+
+        conn = class_connections[cls]
         base_classes = conn.get("base_classes", [])
         derived_classes = conn.get("derived_classes", [])
         if base_classes and derived_classes:
