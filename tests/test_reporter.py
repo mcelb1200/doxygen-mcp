@@ -1,6 +1,6 @@
+import datetime
 import os
 import sys
-import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -13,8 +13,8 @@ sys.path.insert(
 
 from doxygen_mcp.reporter import (
     discover_candidates,
-    get_git_version,
     generate_report_html,
+    get_git_version,
 )
 
 
@@ -103,13 +103,12 @@ def test_get_git_version_no_vcs(mock_run, tmp_path):
     assert version == "no-vcs-version"
 
 
-@pytest.mark.asyncio
 @patch("doxygen_mcp.reporter.discover_candidates")
 @patch("doxygen_mcp.reporter.get_git_version")
 @patch.dict(
     "doxygen_mcp.query_engine.DoxygenQueryEngine._cache", {"/fake/xml": MagicMock()}
 )
-async def test_generate_report_html_cache_hit(mock_git_version, mock_discover):
+def test_generate_report_html_cache_hit(mock_git_version, mock_discover):
     # Set the cache value manually so that `.get()` will find it
     from doxygen_mcp.query_engine import DoxygenQueryEngine
 
