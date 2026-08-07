@@ -3,7 +3,7 @@ name = "doxygen-mcp"
 dynamic = ["version"]
 description = "A comprehensive Model Context Protocol (MCP) server that provides full access to Doxygen's documentation generation capabilities."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<4.0"
 license = { file = "COPYING.md" }
 authors = [
     { name = "Positronikal", email = "hoyt.harness@gmail.com" }
