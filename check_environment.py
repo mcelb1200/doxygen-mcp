@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Basic functionality test for Doxygen MCP Server
 Run this script to verify core functionality before MCP integration
@@ -14,7 +15,8 @@ def test_doxygen_installation():
     print("🔍 Testing Doxygen installation...")
     try:
         result = subprocess.run(
-            ["doxygen", "--version"], capture_output=True, text=True  # noqa: S607
+            ["doxygen", "--version"],  # noqa: S607
+            capture_output=True, text=True
         )
         if result.returncode == 0:
             version = result.stdout.strip()
@@ -26,7 +28,8 @@ def test_doxygen_installation():
             return False
     except FileNotFoundError:
         print("❌ Doxygen is not installed or not in PATH")
-        print("Please install Doxygen from: https://www.doxygen.nl/download.html")
+        print("Please install Doxygen from: "
+              "https://www.doxygen.nl/download.html")
         return False
 
 def test_graphviz_installation():
@@ -45,7 +48,8 @@ def test_graphviz_installation():
             print("❌ Graphviz dot command failed")
             return False
     except FileNotFoundError:
-        print("⚠️ Graphviz (dot) not found - diagrams will not be generated")
+        print("⚠️ Graphviz (dot) not found"
+              " - diagrams will not be generated")
         print("Install from: https://graphviz.org/download/")
         return False
 
@@ -126,7 +130,8 @@ def test_example_project():
 
     total_files = len(cpp_files) + len(h_files)
     if total_files > 0:
-        print(f"📊 Documentation coverage: {documented_files}/{total_files} files")
+        coverage = f"{documented_files}/{total_files}"
+        print(f"📊 Documentation coverage: {coverage} files")
         return documented_files > 0
     else:
         print("❌ No source files found in example project")
@@ -145,7 +150,9 @@ def test_manual_doxygen_run():
         print(f"❌ Invalid example project path: {example_path}")
         return False
     if not str(safe_example_path).startswith(os.getcwd()):
-        print(f"❌ Example project path is not within the current working directory: {example_path}")  # noqa: E501
+        msg = ("❌ Example project path is not within "
+               f"the current working directory: {example_path}")
+        print(msg)
         return False
 
     # Create a simple Doxyfile for testing
@@ -182,7 +189,8 @@ SOURCE_BROWSER         = YES
             html_index = example_path / "test_docs" / "html" / "index.html"
             if html_index.exists():
                 print(f"✅ HTML documentation created: {html_index}")
-                print(f"📊 Documentation size: {html_index.stat().st_size} bytes")
+                size = html_index.stat().st_size
+                print(f"📊 Documentation size: {size} bytes")
                 return True
             else:
                 print("❌ HTML documentation not found")
@@ -242,7 +250,8 @@ def main():
         print("\n🎉 All tests passed! Ready for MCP integration testing.")
         return True
     else:
-        print(f"\n⚠️ {len(results) - passed} tests failed. Please address issues before proceeding.")  # noqa: E501
+        n = len(results) - passed
+        print(f"\n⚠️ {n} tests failed. Please address issues before proceeding.")
         return False
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file calculator.h
  * @brief A simple calculator class demonstrating Doxygen documentation
@@ -160,7 +161,7 @@ namespace MathUtils {
         OperationType operation;         ///< Type of operation performed
         std::string timestamp;          ///< When the calculation was performed
         bool success;                    ///< Whether the calculation succeeded
-        std::string errorMessage;       ///< Error message if calculation failed
+        std::string errorMessage;  ///< Error message if calculation failed
 
         /**
          * @brief Default constructor

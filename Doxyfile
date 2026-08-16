@@ -2,10 +2,10 @@
 
 # Project related configuration options
 PROJECT_NAME           = "Doxygen MCP Server"
-PROJECT_NUMBER         = "3.0.0"
+PROJECT_NUMBER         = "3.0.2"
 PROJECT_BRIEF          = ""
 PROJECT_LOGO           = ""
-OUTPUT_DIRECTORY       = "D:\dev\ARTIFICIAL_INTELLIGENCE\MCP\doxygen-mcp\docs"
+OUTPUT_DIRECTORY       = doxygen
 
 # Build related configuration options
 EXTRACT_ALL            = YES
@@ -14,7 +14,7 @@ EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
 
 # Input related configuration options
-INPUT                  = D:\dev\ARTIFICIAL_INTELLIGENCE\MCP\doxygen-mcp
+INPUT                  = .
 FILE_PATTERNS          = *.py
 RECURSIVE              = YES
 

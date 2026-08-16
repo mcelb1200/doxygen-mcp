@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "doxygen-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "doxygen-mcp"]
+    }
+  }
+}

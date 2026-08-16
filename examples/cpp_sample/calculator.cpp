@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file calculator.cpp
  * @brief Implementation of the Calculator class
@@ -26,7 +27,8 @@ namespace MathUtils {
         lastResult = a + b;
 
         std::ostringstream oss;
-        oss << formatNumber(a) << " + " << formatNumber(b) << " = " << formatNumber(lastResult);
+        oss << formatNumber(a) << " + " << formatNumber(b)
+            << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
 
         return lastResult;
@@ -36,7 +38,8 @@ namespace MathUtils {
         lastResult = a - b;
 
         std::ostringstream oss;
-        oss << formatNumber(a) << " - " << formatNumber(b) << " = " << formatNumber(lastResult);
+        oss << formatNumber(a) << " - " << formatNumber(b)
+            << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
 
         return lastResult;
@@ -46,7 +49,8 @@ namespace MathUtils {
         lastResult = a * b;
 
         std::ostringstream oss;
-        oss << formatNumber(a) << " * " << formatNumber(b) << " = " << formatNumber(lastResult);
+        oss << formatNumber(a) << " * " << formatNumber(b)
+            << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
 
         return lastResult;
@@ -60,7 +64,8 @@ namespace MathUtils {
         lastResult = a / b;
 
         std::ostringstream oss;
-        oss << formatNumber(a) << " / " << formatNumber(b) << " = " << formatNumber(lastResult);
+        oss << formatNumber(a) << " / " << formatNumber(b)
+            << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
 
         return lastResult;
@@ -84,7 +89,8 @@ namespace MathUtils {
         lastResult = std::pow(base, exponent);
 
         std::ostringstream oss;
-        oss << formatNumber(base) << " ^ " << formatNumber(exponent) << " = " << formatNumber(lastResult);
+        oss << formatNumber(base) << " ^ " << formatNumber(exponent)
+            << " = " << formatNumber(lastResult);
         history.push_back(oss.str());
 
         return lastResult;
@@ -92,13 +98,15 @@ namespace MathUtils {
 
     double Calculator::sqrt(double number) {
         if (number < 0) {
-            throw std::invalid_argument("Square root of negative number is not allowed");
+            throw std::invalid_argument(
+                "Square root of negative number is not allowed");
         }
 
         lastResult = std::sqrt(number);
 
         std::ostringstream oss;
-        oss << "sqrt(" << formatNumber(number) << ") = " << formatNumber(lastResult);
+        oss << "sqrt(" << formatNumber(number) << ") = "
+            << formatNumber(lastResult);
         history.push_back(oss.str());
 
         return lastResult;

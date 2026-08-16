@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file main.cpp
  * @brief Example usage of the Calculator class
@@ -84,7 +85,8 @@ int main() {
         std::cout << "\n=== Mathematical Constants ===" << std::endl;
         std::cout << "Pi: " << MathUtils::Constants::PI << std::endl;
         std::cout << "E: " << MathUtils::Constants::E << std::endl;
-        std::cout << "Golden Ratio: " << MathUtils::Constants::GOLDEN_RATIO << std::endl;
+        std::cout << "Golden Ratio: "
+                  << MathUtils::Constants::GOLDEN_RATIO << std::endl;
 
         // Test error handling
         std::cout << "\n=== Error Handling Test ===" << std::endl;
