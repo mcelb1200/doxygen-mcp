@@ -29,14 +29,14 @@ from pathlib import Path
 from typing import List
 
 # MCP server imports
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doxygen-mcp")
 
-mcp = FastMCP("Doxygen")
+mcp = MCPServer("Doxygen")
 
 
 def _yn(value: bool) -> str:
