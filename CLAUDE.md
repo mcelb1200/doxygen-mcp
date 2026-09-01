@@ -1,7 +1,5 @@
 # CLAUDE.md — doxygen-mcp
 
-> Vault documentation: `C:\Users\hoyth\Obsidian\Positronikal\03-OPERATIONS\Engineering\doxygen-mcp\`
-
 MCP server for generating and querying Doxygen documentation. Hard fork under `hoyt-harness` GitHub account. Python, managed with **uv**.
 
 ## Development Environment
@@ -23,4 +21,4 @@ GNU Coding Standards file layout (AUTHORS.md, BUGS.md, CONTRIBUTING.md, COPYING.
 
 ## Standards
 
-Follow `D:\Engineering\PositronikalCodingStandards\standards\` and `D:\Engineering\_references\CODING_BIBLE.md`. GNU Coding Standards apply to structure and formatting.
+Follow the [Positronikal Coding Standards](https://github.com/Positronikal/PositronikalCodingStandards/tree/main/standards/) and GNU Coding Standards for structure and formatting.

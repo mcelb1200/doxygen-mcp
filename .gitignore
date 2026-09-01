@@ -124,6 +124,9 @@ Doxyfile
 *.mcp
 .mcp/
 
+# Local Claude Code context (vault pointers, workstation paths)
+.claude/CLAUDE.md
+
 # Python virtual environment
 pip-selfcheck.json
 pyvenv.cfg
