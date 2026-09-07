@@ -53,6 +53,25 @@ To allow a single global server instance to safely access other projects, depend
 
 ## ⚙️ Advanced Features
 
+### 🧰 CLI Utilities & Funnel Automation
+
+#### 1. Doxygen XML SNR Filter (`doxygen-snr-filter`)
+Compresses raw Doxygen XML files by stripping non-semantic tags before LLM ingestion:
+```bash
+# Minify default docs/xml
+doxygen-snr-filter
+
+# Or specify a custom XML directory
+doxygen-snr-filter path/to/docs/xml
+```
+
+#### 2. Auto-Sync Funnel Installer (`doxygen-setup-funnel`)
+Automatically sets up `Doxyfile.fast` and Git worktree-aware commit hooks in a target repository:
+```bash
+doxygen-setup-funnel /path/to/target/repo
+```
+Once installed, fast incremental Doxygen builds run automatically on commits involving header changes, ensuring AI agents always query fresh XML symbols.
+
 ### 🗜️ Token Crusher Middleware
 Output text is automatically compressed using Caveman SNR rules by default to save LLM token costs.
 - **Bypass**: To receive raw outputs, set `export DOXYGEN_COMPRESS_OUTPUT=false`.
@@ -110,7 +129,7 @@ uv tool upgrade doxygen-mcp
 ```
 
 ### How to Release
-1. Update package version in [pyproject.toml](file:///home/pa-system/github/doxygen-mcp/pyproject.toml) and [__init__.py](file:///home/pa-system/github/doxygen-mcp/src/doxygen_mcp/__init__.py).
+1. Update package version in [pyproject.toml](pyproject.toml) and [__init__.py](src/doxygen_mcp/__init__.py).
 2. Commit and tag release:
    ```bash
    git tag -a v1.0.2 -m "Release v1.0.2"

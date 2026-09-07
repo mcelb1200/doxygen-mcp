@@ -2,17 +2,10 @@
 
 # Project related configuration options
 PROJECT_NAME           = "Doxygen MCP Server"
-<<<<<<< HEAD
-PROJECT_NUMBER         = ""
+PROJECT_NUMBER         = "3.0.2"
 PROJECT_BRIEF          = "MCP server for Doxygen documentation management"
 PROJECT_LOGO           = ""
-OUTPUT_DIRECTORY       = /home/pa-system/github/doxygen-mcp/docs
-=======
-PROJECT_NUMBER         = "3.0.2"
-PROJECT_BRIEF          = ""
-PROJECT_LOGO           = ""
-OUTPUT_DIRECTORY       = doxygen
->>>>>>> upstream/main
+OUTPUT_DIRECTORY       = docs
 
 # Build related configuration options
 EXTRACT_ALL            = YES
@@ -21,11 +14,7 @@ EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
 
 # Input related configuration options
-<<<<<<< HEAD
-INPUT                  = /home/pa-system/github/doxygen-mcp/src
-=======
-INPUT                  = .
->>>>>>> upstream/main
+INPUT                  = src
 FILE_PATTERNS          = *.py
 RECURSIVE              = YES
 
@@ -38,23 +27,21 @@ OPTIMIZE_OUTPUT_VHDL   = NO
 # Output format configuration
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
-GENERATE_RTF           = NO
-GENERATE_MAN           = NO
 GENERATE_XML           = YES
-GENERATE_DOCBOOK       = NO
+XML_OUTPUT             = xml
+XML_PROGRAMLISTING     = YES
 
-# Diagram generation
+# Diagram options
 HAVE_DOT               = YES
-CLASS_GRAPH            = YES
-COLLABORATION_GRAPH    = YES
 CALL_GRAPH             = YES
 CALLER_GRAPH           = YES
-INCLUDE_GRAPH          = YES
-INCLUDED_BY_GRAPH      = YES
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = YES
+DIRECTORY_GRAPH        = YES
 
-# Source browsing
-SOURCE_BROWSER         = YES
-INLINE_SOURCES         = NO
-STRIP_CODE_COMMENTS    = YES
-REFERENCED_BY_RELATION = YES
-REFERENCES_RELATION    = YES
+# Quiet mode
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = NO

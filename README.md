@@ -58,6 +58,12 @@ doxygen-mcp config --path /path/to/project
 doxygen-mcp config --gemini --path /path/to/project
 ```
 
+## 🧰 CLI Utilities
+In addition to the MCP server daemon, the package provides standalone CLI executables:
+* **`doxygen-mcp`**: Core Model Context Protocol server (supports MCP Python SDK v1 and v2 `MCPServer`). Includes helper commands like `doxygen-mcp config --gemini --path <project>`.
+* **`doxygen-snr-filter [xml_dir]`**: High-speed XML Signal-to-Noise Ratio (SNR) minifier. Strips non-semantic XML tags and repetitive metadata to compress Doxygen XML payloads for token-efficient LLM ingestion.
+* **`doxygen-setup-funnel [repo_path]`**: Automated hook and configuration funnel installer. Mounts optimized `Doxyfile.fast` and Git worktree-aware commit hooks (`post-commit`, `pre-push`) to keep XML indexes continuously in sync.
+
 ## 🛠️ Tools
 | Tool | Purpose |
 |------|---------|
@@ -109,4 +115,4 @@ To allow a single global server instance to safely reference neighbor projects o
 - **Safe Config**: No `Doxyfile` overwrite.
 
 ## 📄 License
-GPLv3. See [COPYING.md](./COPYING.md).
+GPLv3. See [COPYING](./COPYING).
