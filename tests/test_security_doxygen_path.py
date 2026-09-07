@@ -43,7 +43,7 @@ async def test_get_doxygen_executable_valid():
         try:
             with patch.dict(os.environ, {"DOXYGEN_PATH": "doxygen"}):
                 exe = get_doxygen_executable()
-                assert Path(exe).name == "doxygen"
+                assert Path(exe).name.lower() in ("doxygen", "doxygen.exe")
                 assert Path(exe).is_absolute()
         finally:
             os.environ["PATH"] = old_path

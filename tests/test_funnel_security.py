@@ -83,14 +83,16 @@ class TestFunnel(unittest.TestCase):
     def test_get_git_hooks_dir_worktree(self):
         from doxygen_mcp.funnel import get_git_hooks_dir
 
-        repo = Path("/mock/repo")
-        with patch("subprocess.run") as mock_run:
-            mock_result = MagicMock()
-            mock_result.stdout = "/main/repo/.git/worktrees/wt1/hooks\n"
-            mock_run.return_value = mock_result
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo = Path(temp_dir) / "repo"
+            expected_hooks = Path(temp_dir) / "main" / ".git" / "worktrees" / "wt1" / "hooks"
+            with patch("subprocess.run") as mock_run:
+                mock_result = MagicMock()
+                mock_result.stdout = f"{expected_hooks}\n"
+                mock_run.return_value = mock_result
 
-            hooks_dir = get_git_hooks_dir(repo)
-            self.assertEqual(hooks_dir, Path("/main/repo/.git/worktrees/wt1/hooks"))
+                hooks_dir = get_git_hooks_dir(repo)
+                self.assertEqual(hooks_dir, expected_hooks.resolve())
 
 
 if __name__ == "__main__":

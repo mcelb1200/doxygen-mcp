@@ -354,6 +354,9 @@ def get_doxygen_executable() -> str:
 
     # Resolve the absolute path of the executable
     resolved_path = shutil.which(doxygen_path)
+    if not resolved_path and Path(doxygen_path).is_file():
+        resolved_path = str(Path(doxygen_path).resolve())
+
     if not resolved_path:
         raise ValueError(f"Doxygen executable not found: {doxygen_path}")
 
