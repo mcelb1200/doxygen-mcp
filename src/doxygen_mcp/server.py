@@ -28,7 +28,10 @@ except ImportError:
 import shutil
 
 # MCP server imports
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.mcpserver import MCPServer
+except ImportError:
+    from mcp.server.fastmcp import FastMCP as MCPServer
 
 from .config import DoxygenConfig
 from .funnel import minify_xml_file, setup_funnel
@@ -44,13 +47,19 @@ from .utils import (
     resolve_project_path,
     update_ignore_file,
 )
-from .version import __version__
+try:
+    from ._version import __version__
+except ImportError:
+    try:
+        from .version import __version__
+    except ImportError:
+        __version__ = '1.0.1'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("doxygen-mcp")
 
-mcp = FastMCP("Doxygen")
+mcp = MCPServer("Doxygen")
 
 # Global Output Compression (Token Crusher Middleware)
 from functools import wraps

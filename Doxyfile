@@ -2,10 +2,17 @@
 
 # Project related configuration options
 PROJECT_NAME           = "Doxygen MCP Server"
+<<<<<<< HEAD
 PROJECT_NUMBER         = ""
 PROJECT_BRIEF          = "MCP server for Doxygen documentation management"
 PROJECT_LOGO           = ""
 OUTPUT_DIRECTORY       = /home/pa-system/github/doxygen-mcp/docs
+=======
+PROJECT_NUMBER         = "3.0.2"
+PROJECT_BRIEF          = ""
+PROJECT_LOGO           = ""
+OUTPUT_DIRECTORY       = doxygen
+>>>>>>> upstream/main
 
 # Build related configuration options
 EXTRACT_ALL            = YES
@@ -14,7 +21,11 @@ EXTRACT_STATIC         = YES
 EXTRACT_LOCAL_CLASSES  = YES
 
 # Input related configuration options
+<<<<<<< HEAD
 INPUT                  = /home/pa-system/github/doxygen-mcp/src
+=======
+INPUT                  = .
+>>>>>>> upstream/main
 FILE_PATTERNS          = *.py
 RECURSIVE              = YES
 

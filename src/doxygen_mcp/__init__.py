@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """
 Doxygen MCP Server
 
@@ -20,9 +21,17 @@ Key Features:
 - Custom theme and layout support
 """
 
-from .version import __version__
+try:
+    from ._version import __version__
+except ImportError:
+    try:
+        from .version import __version__
+    except ImportError:
+        from importlib.metadata import version
+
+        __version__ = version("doxygen-mcp")
 
 __author__ = "Positronikal"
 __email__ = "hoyt.harness@gmail.com"
 
-__all__ = []
+__all__ = ["__version__"]

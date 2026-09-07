@@ -9,7 +9,21 @@
       "Bash(ls:*)",
       "Bash(where:*)",
       "mcp__doxygen__generate_documentation",
-      "mcp__doxygen__validate_documentation"
+      "mcp__doxygen__validate_documentation",
+      "Bash(uv run *)",
+      "Bash(bash hooks/ci-check.sh)",
+      "Bash(powershell.exe *)",
+      "Bash(python -c ' *)",
+      "Bash(uv venv *)",
+      "Bash(gh run *)",
+      "Bash(gh api *)",
+      "Bash(uv lock *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Issues: {len\\(d[\\\\\"results\\\\\"]\\)}, errors: {len\\(d[\\\\\"errors\\\\\"]\\)}'\\)\")",
+      "Bash(uv pip *)",
+      "Bash(python3 -c \"import sys, json; lines = sys.stdin.read\\(\\); start = lines.find\\('{'\\); d = json.loads\\(lines[start:]\\); vulns = d.get\\('vulnerabilities', []\\); print\\(f'Vulnerabilities: {len\\(vulns\\)}'\\); [print\\(f'  - {v[\\\\\"package_name\\\\\"]} {v[\\\\\"analyzed_version\\\\\"]}: {v[\\\\\"advisory\\\\\"]}'\\) for v in vulns]\")",
+      "Bash(/d/Engineering/PositronikalCodingStandards/.venv/Scripts/positronikal-check $TARGET *)",
+      "Bash(/d/Engineering/PositronikalCodingStandards/.venv/Scripts/python.exe *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
